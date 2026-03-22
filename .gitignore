@@ -1,0 +1,31 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Dataset — large files, download via Kaggle
+data/raw/plantvillage/
+data/raw/synthetic/
+data/raw/field_photos/
+
+# Trained model weights — large .h5 files
+models/checkpoints/
+models/exports/*.h5
+
+# Keep confusion matrix and other small exports
+!models/exports/*.png
+
+# TensorBoard logs
+logs/
+
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.idea/
+.vscode/

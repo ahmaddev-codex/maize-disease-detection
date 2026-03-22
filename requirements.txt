@@ -1,0 +1,25 @@
+# Core ML — TF 2.16 supports Python 3.12 and Apple Silicon natively
+tensorflow==2.16.2
+numpy==1.26.4
+scikit-learn==1.4.2
+
+# Image processing
+opencv-python==4.9.0.80
+Pillow==10.3.0
+
+# OCR
+pytesseract==0.3.10
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.25.1
+
+# Data / visualisation
+pandas==2.2.2
+matplotlib==3.8.4
+seaborn==0.13.2
+
+# Utilities
+tqdm==4.66.4
+pyyaml==6.0.1
+
+# Edge inference (install separately on Pi/Jetson)
+# tflite-runtime
