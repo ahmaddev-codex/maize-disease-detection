@@ -5,7 +5,7 @@ then trains the fusion model end-to-end.
 
 Run:
     python -m src.phase3_fusion.train_fusion \
-        --cnn-weights models/exports/efficientnetb3_maize.h5 \
+        --cnn-weights models/exports/efficientnetb3_maize.keras \
         --metadata-csv data/annotations/labels_with_metadata.csv
 
 Expected CSV columns:
@@ -27,7 +27,7 @@ from src.phase3_fusion.fusion_model import build_fusion_model, compile_fusion_mo
 
 BATCH_SIZE     = 32
 FUSION_EPOCHS  = 25
-EXPORT_PATH    = "models/exports/fusion_model.h5"
+EXPORT_PATH    = "models/exports/fusion_model.keras"
 CHECKPOINT_DIR = "models/checkpoints"
 
 
@@ -66,7 +66,7 @@ def _load_image(path: str) -> tf.Tensor:
     raw   = tf.io.read_file(path)
     image = tf.image.decode_jpeg(raw, channels=3)
     image = tf.image.resize(image, IMG_SIZE)
-    return tf.cast(image, tf.float32) / 255.0
+    return tf.cast(image, tf.float32)   # keep [0, 255]; EfficientNetB3 rescales internally
 
 
 def build_fusion_dataset(
@@ -100,7 +100,7 @@ def get_callbacks() -> list:
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     return [
         tf.keras.callbacks.ModelCheckpoint(
-            filepath=os.path.join(CHECKPOINT_DIR, "phase3_fusion_best.h5"),
+            filepath=os.path.join(CHECKPOINT_DIR, "phase3_fusion_best.keras"),
             monitor="val_accuracy",
             save_best_only=True,
             verbose=1,
@@ -179,7 +179,7 @@ def parse_args():
     p = argparse.ArgumentParser(description="Train Phase 3 fusion model")
     p.add_argument("--metadata-csv",  default="data/annotations/labels_with_metadata.csv",
                    help="CSV with image_path, label, and OCR metadata columns")
-    p.add_argument("--cnn-weights",   default="models/exports/efficientnetb3_maize.h5",
+    p.add_argument("--cnn-weights",   default="models/exports/efficientnetb3_maize.keras",
                    help="Path to trained Phase 1 weights")
     p.add_argument("--freeze-cnn",    action="store_true", default=True,
                    help="Freeze CNN weights during fusion training")
