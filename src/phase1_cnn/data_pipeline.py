@@ -25,19 +25,25 @@ def build_augmentation():
         tf.keras.layers.RandomFlip("horizontal_and_vertical"),
         tf.keras.layers.RandomRotation(0.2),
         tf.keras.layers.RandomZoom(0.15),
-        tf.keras.layers.RandomBrightness(0.1),
-        tf.keras.layers.RandomContrast(0.1),
+        tf.keras.layers.RandomTranslation(0.1, 0.1),
+        tf.keras.layers.RandomBrightness(factor=0.2),
+        tf.keras.layers.RandomContrast(0.2),
     ], name="augmentation")
 
 
 # ── Image loading ──────────────────────────────────────────────────────────────
 
 def load_and_preprocess(image_path: str, label: int):
-    """Read image from disk, decode (JPEG or PNG), resize, normalise to [0, 1]."""
+    """Read image from disk, decode (JPEG or PNG), resize to [0, 255] float32.
+
+    EfficientNetB3 includes its own internal Rescaling(1/255) + Normalization
+    layers.  Do NOT divide by 255 here — passing pre-normalized [0,1] values
+    causes a double-rescaling that collapses activations and tanks accuracy.
+    """
     raw   = tf.io.read_file(image_path)
     image = tf.image.decode_image(raw, channels=3, expand_animations=False)
     image = tf.image.resize(image, IMG_SIZE)
-    image = tf.cast(image, tf.float32) / 255.0
+    image = tf.cast(image, tf.float32)   # keep in [0, 255]; model rescales internally
     return image, label
 
 

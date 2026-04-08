@@ -4,8 +4,10 @@ Run:
     python -m src.phase1_cnn.train
 
 Two-stage training:
-  Stage 1 — frozen base, 15 epochs, lr=1e-3
-  Stage 2 — unfreeze top layers, 20 epochs, lr=1e-5
+  Stage 1 — frozen base, 20 epochs, lr=1e-3  (train head only)
+  Stage 2 — unfreeze top layers, 30 epochs, lr=1e-5  (fine-tune end-to-end)
+
+Target: ≥90% validation accuracy on 4-class PlantVillage maize dataset.
 """
 
 import os
@@ -17,11 +19,11 @@ from src.phase1_cnn.model import build_model, compile_model, unfreeze_for_finetu
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
 
-STAGE1_EPOCHS   = 15
-STAGE2_EPOCHS   = 20
+STAGE1_EPOCHS   = 20
+STAGE2_EPOCHS   = 30
 BATCH_SIZE      = 32
 CHECKPOINT_DIR  = "models/checkpoints"
-EXPORT_PATH     = "models/exports/efficientnetb3_maize.h5"
+EXPORT_PATH     = "models/exports/efficientnetb3_maize.keras"
 
 
 # ── Callbacks ──────────────────────────────────────────────────────────────────
@@ -30,22 +32,22 @@ def get_callbacks(stage: int) -> list:
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     return [
         tf.keras.callbacks.ModelCheckpoint(
-            filepath=os.path.join(CHECKPOINT_DIR, f"phase1_stage{stage}_best.h5"),
+            filepath=os.path.join(CHECKPOINT_DIR, f"phase1_stage{stage}_best.keras"),
             monitor="val_accuracy",
             save_best_only=True,
             verbose=1,
         ),
         tf.keras.callbacks.EarlyStopping(
             monitor="val_accuracy",
-            patience=5,
+            patience=8,          # more patience — fine-tuning can plateau briefly
             restore_best_weights=True,
             verbose=1,
         ),
         tf.keras.callbacks.ReduceLROnPlateau(
             monitor="val_loss",
-            factor=0.5,
-            patience=3,
-            min_lr=1e-7,
+            factor=0.4,
+            patience=4,
+            min_lr=1e-8,
             verbose=1,
         ),
         tf.keras.callbacks.TensorBoard(
@@ -84,17 +86,32 @@ def train(args):
     )
 
     # ── Stage 2: fine-tune ──────────────────────────────────────────────────
+    # Keras 3 / TF 2.16 bug: calling compile() on an existing model instance
+    # leaves Adam's slot variables (m, v) sized for the frozen variable set.
+    # When newly-unfrozen convolution layers produce gradients, their shapes
+    # don't match the empty slots → "Incompatible shapes: [0] vs [...]".
+    # Fix: save weights → rebuild fresh model (clean optimizer slots) →
+    #      reload weights → train stage 2 from epoch 0.
     print("\n=== Stage 2: Fine-tuning (top layers unfrozen) ===")
-    model = unfreeze_for_finetuning(model, learning_rate=1e-5)
-    stage1_completed = len(history1.history["loss"])
-    history2 = model.fit(
+    tmp_weights = os.path.join(CHECKPOINT_DIR, "tmp_stage1.weights.h5")
+    model.save_weights(tmp_weights)
+
+    model2 = build_model()
+    model2 = unfreeze_for_finetuning(model2, learning_rate=1e-5)
+    model2.load_weights(tmp_weights)
+
+    history2 = model2.fit(
         train_ds,
         validation_data=val_ds,
-        epochs=stage1_completed + args.stage2_epochs,
+        epochs=args.stage2_epochs,
         class_weight=class_weights,
         callbacks=get_callbacks(stage=2),
-        initial_epoch=stage1_completed,
     )
+    model = model2
+
+    # Remove temp weights file
+    if os.path.exists(tmp_weights):
+        os.remove(tmp_weights)
 
     # ── Export ──────────────────────────────────────────────────────────────
     os.makedirs(os.path.dirname(EXPORT_PATH), exist_ok=True)

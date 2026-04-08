@@ -6,7 +6,7 @@ Loads a trained model and a test dataset, then prints:
   - Confusion matrix (saved to models/exports/)
 
 Run:
-    python -m src.phase1_cnn.evaluate --model models/exports/efficientnetb3_maize.h5
+    python -m src.phase1_cnn.evaluate --model models/exports/efficientnetb3_maize.keras
 """
 
 import os
@@ -71,7 +71,7 @@ def _plot_confusion_matrix(cm: np.ndarray):
 
 def parse_args():
     p = argparse.ArgumentParser(description="Evaluate Phase 1 CNN")
-    p.add_argument("--model",      default="models/exports/efficientnetb3_maize.h5")
+    p.add_argument("--model",      default="models/exports/efficientnetb3_maize.keras")
     p.add_argument("--csv",        default="data/annotations/labels.csv")
     p.add_argument("--batch-size", type=int, default=32)
     return p.parse_args()
