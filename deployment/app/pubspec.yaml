@@ -1,0 +1,70 @@
+name: maize_disease_detector
+description: On-device maize disease detection for Nigerian smallholder farmers.
+version: 1.0.0+1
+publish_to: none
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Camera & image
+  camera: ^0.12.0+1
+  image_picker: ^1.1.2
+  image: ^4.1.7
+
+  # TFLite inference
+  tflite_flutter: ^0.12.1
+
+  # OCR — Google ML Kit (on-device, no network)
+  google_mlkit_text_recognition: ^0.15.1
+
+  # Runtime permissions
+  permission_handler: ^11.3.1
+
+  # UI utilities
+  percent_indicator: ^4.2.3
+
+  # ── Phase B: Professional UI ───────────────────────────────────────────────
+  # Offline map (OpenStreetMap tiles, farm boundary, disease markers)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # Charts for dashboard trend lines
+  fl_chart: ^0.70.0
+
+  # GPS tagging of scans
+  geolocator: ^13.0.2
+
+  # File paths (for saving PDFs, images)
+  path_provider: ^2.1.5
+
+  # ── Phase B/E: Persistence & Export ───────────────────────────────────────
+  # SQLite persistence — scan history
+  drift: ^2.23.1
+  drift_flutter: ^0.2.4
+  sqlite3_flutter_libs: ^0.5.29
+
+  # PDF report generation
+  pdf: ^3.11.1
+
+  # Share PDF / images via WhatsApp, email, etc.
+  share_plus: ^10.1.4
+
+  # ── Phase C: AI Recommendations ───────────────────────────────────────────
+  # Claude API (Anthropic) — online AI advisor
+  http: ^1.2.2
+  flutter_secure_storage: ^9.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/models/
