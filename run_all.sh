@@ -114,7 +114,7 @@ echo ""
 # ── Step 2: Phase 1 — Evaluation ──────────────────────────────────────────────
 echo ">>> Step 2: Phase 1 — Evaluating on held-out test set..."
 $VENV -m src.phase1_cnn.evaluate \
-  --model models/exports/efficientnetb3_maize.h5 \
+  --model models/exports/efficientnetb3_maize.keras \
   --csv   "$LABELS_CSV"
 echo ""
 
@@ -160,19 +160,48 @@ echo "    Epochs: $EPOCHS_P3"
 echo ""
 $VENV -m src.phase3_fusion.train_fusion \
   --metadata-csv  "$META_CSV" \
-  --cnn-weights   models/exports/efficientnetb3_maize.h5 \
+  --cnn-weights   models/exports/efficientnetb3_maize.keras \
   --freeze-cnn \
   --epochs $EPOCHS_P3
 echo ""
 
-# ── Done ───────────────────────────────────────────────────────────────────────
+# ── Step 5: Phase 4 — TFLite conversion ────────────────────────────────────────
+echo ">>> Step 5: Phase 4 — Converting model to TFLite INT8 + FP16..."
+$VENV -m src.phase4_edge.convert_tflite \
+  --model "$KERAS_MODEL" \
+  --csv   "$LABELS_CSV"
+echo ""
+
+# ── Step 6: Phase 5 — UAV demo (flight plan + patch inference + heatmap) ──────
+echo ">>> Step 6: Phase 5 — UAV integration demo..."
+mkdir -p data/uav
+
+echo "    6a. Generating demo flight plan..."
+$VENV -m deployment.uav.flight_planner --demo --output data/uav/mission.waypoints
+
+echo "    6b. Running patch inference on synthetic orthomosaic..."
+$VENV -m deployment.uav.patch_runner \
+  --demo \
+  --model models/exports/efficientnetb3_maize_int8.tflite \
+  --output data/uav/patch_predictions.csv
+
+echo "    6c. Generating disease heatmap..."
+$VENV -m deployment.uav.heatmap \
+  --csv    data/uav/patch_predictions.csv \
+  --output data/uav/disease_heatmap.html
+echo ""
+
 echo "============================================================"
 echo "  Pipeline complete!"
 echo ""
 echo "  Outputs:"
-echo "    models/exports/efficientnetb3_maize.h5   ← Phase 1 CNN"
-echo "    models/exports/fusion_model.h5            ← Phase 3 Fusion"
+echo "    models/exports/efficientnetb3_maize.keras      ← Phase 1 CNN"
+echo "    models/exports/fusion_model.keras              ← Phase 3 Fusion"
+echo "    models/exports/efficientnetb3_maize_int8.tflite← Phase 4 TFLite"
 echo "    models/exports/confusion_matrix_phase1.png"
+echo "    data/uav/mission.waypoints                     ← Phase 5 flight plan"
+echo "    data/uav/patch_predictions.csv                 ← Phase 5 inference"
+echo "    data/uav/disease_heatmap.html                  ← Phase 5 heatmap"
 echo ""
 echo "  To run full training (15+20 / 25 epochs):"
 echo "    bash run_all.sh --full"
