@@ -31,7 +31,7 @@ def build_fusion_model(
     Build the full fusion model.
 
     Args:
-        cnn_weights_path: Path to a Phase 1 trained .h5 file. If None, CNN
+        cnn_weights_path: Path to a Phase 1 trained .keras file. If None, CNN
                           weights are random (useful for testing the graph).
         freeze_cnn:       If True, CNN weights are frozen during fusion training.
                           Set False to fine-tune end-to-end.
