@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
+import 'package:flutter/foundation.dart';
 
 part 'database.g.dart';
 
@@ -90,7 +88,15 @@ class AppDatabase extends _$AppDatabase {
   int get schemaVersion => 1;
 
   static QueryExecutor _openConnection() {
-    return driftDatabase(name: 'maizeguard.db');
+    return driftDatabase(
+      name: 'maizeguard.db',
+      web: kIsWeb
+          ? DriftWebOptions(
+              sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+              driftWorker: Uri.parse('drift_worker.js'),
+            )
+          : null,
+    );
   }
 
   // Convenience singleton so every widget can share one connection.
