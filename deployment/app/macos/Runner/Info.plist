@@ -32,5 +32,7 @@
 	<string>Maize Detector uses the camera to photograph maize leaves for disease detection.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Maize Detector reads leaf photos from your library for disease analysis.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>MaizeGuard tags scans with GPS coordinates to map disease hotspots on your farm.</string>
 </dict>
 </plist>

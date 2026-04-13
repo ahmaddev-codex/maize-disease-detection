@@ -1,20 +1,20 @@
 import 'dart:io';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:flutter/services.dart';
 
 import '../models/prediction.dart';
 
-/// Extracts crop metadata from a seed bag label photograph using ML Kit OCR.
+/// Extracts crop metadata from a seed bag label photograph.
+///
+/// On iOS (device + simulator): uses Apple Vision (VNRecognizeTextRequest)
+/// via a native method channel. Vision is built into iOS 13+ and supports
+/// arm64 on both physical devices and iOS 26+ simulators on Apple Silicon.
+///
+/// On Android: returns empty SeedLabelData. ML Kit Android OCR can be added
+/// via a separate channel when needed.
 ///
 /// All processing is on-device — no network call.
-/// Only construct this class on Android / iOS.
 class OcrService {
-  // Lazy: do NOT create TextRecognizer at construction time.
-  // The native plugin is not available on macOS / desktop.
-  TextRecognizer? _recognizer;
-  TextRecognizer get _rec {
-    _recognizer ??= TextRecognizer(script: TextRecognitionScript.latin);
-    return _recognizer!;
-  }
+  static const _channel = MethodChannel('com.maizedetector.ocr/vision');
 
   // Known Nigerian maize variety names for fuzzy matching
   static const List<String> _knownVarieties = [
@@ -34,7 +34,8 @@ class OcrService {
     // YYYY-MM-DD
     RegExp(r'(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})'),
     // "15 March 2024" or "March 2024"
-    RegExp(r'(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})',
+    RegExp(
+        r'(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})',
         caseSensitive: false),
   ];
 
@@ -48,26 +49,34 @@ class OcrService {
   };
 
   /// Run OCR on [imageFile] and extract structured seed label fields.
+  ///
+  /// Throws on native errors (file not found, Vision internal error, etc.).
+  /// Returns [SeedLabelData] with empty fields when called on Android.
   Future<SeedLabelData> extractFromImage(File imageFile) async {
-    final inputImage = InputImage.fromFile(imageFile);
-    final recognised = await _rec.processImage(inputImage);
-    final rawText    = recognised.text;
-    final upperText  = rawText.toUpperCase();
+    if (!Platform.isIOS) {
+      // Android / other platforms: no OCR backend available yet.
+      return const SeedLabelData(rawText: '');
+    }
 
+    final rawText =
+        await _channel.invokeMethod<String>('recognizeText', {
+              'imagePath': imageFile.path,
+            }) ??
+            '';
+
+    final upperText = rawText.toUpperCase();
     return SeedLabelData(
-      cropVariety:  _extractVariety(upperText),
-      batchNumber:  _extractBatch(rawText),
+      cropVariety: _extractVariety(upperText),
+      batchNumber: _extractBatch(rawText),
       plantingDate: _extractDate(rawText),
-      rawText:      rawText,
+      rawText: rawText,
     );
   }
 
   String? _extractVariety(String upperText) {
-    // Direct substring match first (fast path)
     for (final variety in _knownVarieties) {
       if (upperText.contains(variety)) return variety;
     }
-    // Fuzzy: check if any word tokens overlap significantly
     for (final variety in _knownVarieties) {
       final tokens = variety.split(' ');
       final matched = tokens.where((t) => upperText.contains(t)).length;
@@ -82,20 +91,17 @@ class OcrService {
   }
 
   String? _extractDate(String text) {
-    // Pattern 0: DD/MM/YYYY
     var m = _datePatterns[0].firstMatch(text);
     if (m != null) {
-      final d = m.group(1)!.padLeft(2, '0');
+      final d  = m.group(1)!.padLeft(2, '0');
       final mo = m.group(2)!.padLeft(2, '0');
-      final y = m.group(3)!;
+      final y  = m.group(3)!;
       return '$y-$mo-$d';
     }
-    // Pattern 1: YYYY-MM-DD
     m = _datePatterns[1].firstMatch(text);
     if (m != null) {
       return '${m.group(1)}-${m.group(2)!.padLeft(2, '0')}-${m.group(3)!.padLeft(2, '0')}';
     }
-    // Pattern 2: "15 March 2024"
     m = _datePatterns[2].firstMatch(text);
     if (m != null) {
       final d  = m.group(1)!.padLeft(2, '0');
@@ -106,5 +112,5 @@ class OcrService {
     return null;
   }
 
-  void dispose() => _recognizer?.close();
+  void dispose() {}
 }

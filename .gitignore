@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
+docs/
 
 # Dataset — large files, download via Kaggle
 data/raw/plantvillage/
