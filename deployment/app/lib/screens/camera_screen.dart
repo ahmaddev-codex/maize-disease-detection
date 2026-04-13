@@ -202,7 +202,8 @@ class _CameraScreenState extends State<CameraScreen>
         children: [
           CircularProgressIndicator(color: GhC.success, strokeWidth: 2),
           SizedBox(height: 16),
-          Text('Starting camera…', style: TextStyle(color: GhC.fgMuted, fontSize: 13)),
+          Text('Starting camera…',
+              style: TextStyle(color: Colors.white54, fontSize: 13)),
         ],
       ),
     );
@@ -247,7 +248,7 @@ class _CameraScreenState extends State<CameraScreen>
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.55),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: GhC.border.withValues(alpha: 0.4)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
               ),
               child: const Text(
                 'Tap to focus · Fill the frame with one leaf',
@@ -376,9 +377,12 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            onPressed: onBack,
+          GestureDetector(
+            onTap: onBack,
+            child: const Padding(
+              padding: EdgeInsets.all(12),
+              child: Icon(Icons.arrow_back_rounded, color: Colors.white),
+            ),
           ),
           const Spacer(),
           Container(
