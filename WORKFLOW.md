@@ -1,7 +1,7 @@
 # Professional Deployment Workflow
 
 ## Overview
-This repository follows a professional Git workflow with three main branches and feature branches for organized development and deployment.
+This repository follows a Git workflow with three main branches and feature branches for organized development and deployment.
 
 ## Branch Structure
 
