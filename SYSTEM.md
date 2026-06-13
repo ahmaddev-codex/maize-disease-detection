@@ -5,6 +5,9 @@
 
 ---
 
+> ⚠️ **Mobile platform updated 2026-06-13:** Flutter → React Native 0.73 (Android-first).  
+> Active mobile source: `mobile/`   Flutter kept at `deployment/app/` for reference.
+
 ## Table of Contents
 
 1. [System Overview](#1-system-overview)
@@ -14,7 +17,7 @@
 5. [Phase 3 — Multimodal Fusion](#5-phase-3--multimodal-fusion)
 6. [Phase 4 — Edge Deployment](#6-phase-4--edge-deployment)
 7. [Phase 5 — UAV Integration](#7-phase-5--uav-integration)
-8. [Flutter Mobile App](#8-flutter-mobile-app)
+8. [React Native Mobile App](#8-react-native-mobile-app)
 9. [Raspberry Pi GUI](#9-raspberry-pi-gui)
 10. [Data Flow — End to End](#10-data-flow--end-to-end)
 11. [Running the Full Pipeline](#11-running-the-full-pipeline)
@@ -421,7 +424,7 @@ with colour-coded disease markers and a confidence heatmap overlay.
 
 ---
 
-## 8. Flutter Mobile App
+## 8. React Native Mobile App
 
 The primary farmer-facing tool. Runs EfficientNetB3 TFLite entirely on-device
 with no network connection required.

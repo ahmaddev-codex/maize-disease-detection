@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+android/app/build/
+android/build/
+ios/build/
+ios/Pods/
+ios/DerivedData/
+
+# Generated files
+android/app/src/main/assets/index.android.bundle
+android/app/src/main/assets/index.android.bundle.map
+ios/main.jsbundle
+
+# React Native
+.expo/
+.expo-shared/
+
+# Metro bundler
+.metro-health-check*
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+
+# Android
+*.apk
+*.aab
+local.properties
+.gradle/
+
+# Keystore
+*.keystore
+!debug.keystore

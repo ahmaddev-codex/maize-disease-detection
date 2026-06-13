@@ -1,0 +1,7 @@
+#!/bin/sh
+# Custom gradlew — uses the locally cached Gradle 8.14 distribution.
+# This avoids downloading Gradle from the internet.
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/tools:$PATH"
+GRADLE_BIN="$HOME/.gradle/wrapper/dists/gradle-8.14-all/c2qonpi39x1mddn7hk5gh9iqj/gradle-8.14/bin/gradle"
+exec "$GRADLE_BIN" "$@"
