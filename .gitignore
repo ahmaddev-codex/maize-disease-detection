@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info/
 .eggs/
 docs/
+.claude/
 
 # Dataset — large files, download via Kaggle
 data/raw/plantvillage/
@@ -30,3 +31,11 @@ logs/
 # IDE
 .idea/
 .vscode/
+
+# Old Flutter deployment app — replaced by mobile/ (React Native)
+deployment/app/
+
+# Environment files
+.env
+.env.*
+!.env.example

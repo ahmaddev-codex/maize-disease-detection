@@ -103,84 +103,48 @@ planting_date →  days-since-epoch or seasonal bucket
 
 ---
 
-## Flutter App — Phase A (Core) ✅
-> Primary farmer-facing tool. TFLite on-device inference, camera overlay, OCR capture.
+## React Native App — Sprint A: Core ✅
+> ⚠️ Platform migrated from Flutter → React Native 0.73 (Android-first) on 2026-06-13.
+> Source: `mobile/`   Flutter source kept at `deployment/app/` for reference only.
 
-- [x] `deployment/app/` — Flutter project scaffolded (Android + macOS)
-- [x] Camera preview with leaf framing guide, brightness hints, tap-to-focus
-- [x] On-device TFLite inference — INT8 with FP16 fallback (`tflite_flutter`)
-- [x] OCR metadata capture screen (ML Kit, Android/iOS only)
-- [x] Disease result + treatment recommendation screen
-- [x] Inference runs in compute isolate — UI stays responsive
-
----
-
-## Flutter App — Phase B: Professional UI  `[~]`
-> Goal: production-grade UI — dashboard, farm map, scan history, field report export.
-
-### B1 — Dashboard screen
-- [ ] Farm health score card (aggregate of recent scans)
-- [ ] Disease trend sparklines (last 7 / 30 days)
-- [ ] Recent scans strip with thumbnails + quick stats
-- [ ] Quick-action FAB (camera / gallery / UAV)
-
-### B2 — Map screen (offline-capable)
-- [ ] `flutter_map` + OpenStreetMap tiles (cached for offline use)
-- [ ] Farm boundary polygon (drawn by user or imported from GeoJSON)
-- [ ] Disease hotspot markers from past UAV surveys
-- [ ] UAV live position marker (when connected)
-
-### B3 — Scan history
-- [ ] SQLite persistence (`drift` package) — store all scan results with image path, class, confidence, GPS, timestamp
-- [ ] Filterable list: by disease type, date range, confidence threshold
-- [ ] Tap to re-open result screen for any past scan
-
-### B4 — Field report export
-- [ ] PDF generation (`pdf` package) — cover page, disease summary, map screenshot, treatment plan
-- [ ] Share via WhatsApp / email (`share_plus` package)
-- [ ] Offline-first — report generated entirely on-device
+- [x] `mobile/` — React Native project scaffolded (Android-first)
+- [x] Camera screen — VisionCamera v4, green corner guide, brightness frame processor
+- [x] On-device TFLite inference — INT8 (GPU delegate) with FP16 CPU fallback (`react-native-fast-tflite`)
+- [x] Image preprocessing — Skia resize to 300×300, RGBA→RGB strip
+- [x] OCR screen — ML Kit Text Recognition v2, full Android implementation
+- [x] OCR field extraction — crop variety (fuzzy match, 13 Nigerian varieties), batch number, planting date
+- [x] Result screen — disease class, confidence bars (animated), 4-class score matrix
+- [x] SQLite persistence — op-sqlite, `scan_records` table, GPS tagging
+- [x] Recommendation screen — on-device rule engine (season/urgency/fungicide)
+- [x] Gemini 2.0 Flash API advisor — HTTPS with offline fallback
+- [x] Dashboard — farm health score, 7-day bar chart (victory-native), disease breakdown
+- [x] History — filterable list, swipe-to-delete, disease colour labels
+- [x] Map screen — react-native-maps + OSM tiles + GPS-tagged disease markers
+- [x] Settings — dark/light theme, Gemini API key (Keychain), model status
+- [x] Navigation — bottom tabs (Home/Dashboard/History/Map) + stack (Camera/Result/OCR/Recommendation)
+- [x] GitHub-dark theme — DarkColors + LightColors matching Flutter palette
+- [x] TFLite models copied to `mobile/assets/models/`
 
 ---
 
-## Flutter App — Phase C: AI Recommendations  `[ ]`
-> Goal: contextualised, intelligent treatment recommendations beyond static lookup tables.
+## React Native App — Sprint B: Polish  `[ ]`
+> Goal: PDF export, offline map caching, PDF sharing.
 
-### C1 — On-device contextual engine
-- [ ] Rule engine factoring in: disease class + confidence, crop variety (from OCR), season, scan history trend, Nigerian state (fungicide availability)
-- [ ] `lib/services/recommendation_engine.dart`
-
-### C2 — Claude API integration (online)
-- [ ] Call Anthropic API with structured context: disease, confidence, variety, planting date, field history, region
-- [ ] Returns detailed agronomic advice: specific fungicide brands in Nigeria, application rates, growth-stage timing, resistance management
-- [ ] `lib/services/ai_advisor.dart` — graceful offline fallback to C1 rule engine
-
-### C3 — Trend prediction (on-device)
-- [ ] Lightweight LSTM / time-series model (<1 MB TFLite) trained on scan history
-- [ ] Predicts disease progression for next 7 days
-- [ ] Alert system: push notification if model predicts outbreak
+- [ ] PDF report generation (`react-native-html-to-pdf`) — disease summary + treatment plan
+- [ ] Share PDF via WhatsApp/email (`react-native-share`)
+- [ ] Offline OSM tile caching for map screen
+- [ ] Pull-to-refresh on History and Dashboard screens
+- [ ] Notes editing for past scan records
 
 ---
 
-## Flutter App — Phase D: UAV Control  `[ ]`
-> Goal: control ArduPilot/PX4 drones directly from the app over WiFi/UDP MAVLink.
+## React Native App — Sprint C: UAV Integration  `[ ]`
+> Goal: MAVLink telemetry view in app, live mission monitoring.
 
-### D1 — MAVLink telemetry (read-only)
-- [ ] UDP socket on port 14550 via `dart:io` (raw MAVLink v2 parsing)
-- [ ] `lib/services/mavlink_service.dart` — parse HEARTBEAT, GPS_RAW_INT, SYS_STATUS, ATTITUDE, BATTERY_STATUS
-- [ ] Telemetry dashboard: altitude, speed, battery %, GPS lock, flight mode, armed state
-
-### D2 — UAV control screen
-- [ ] Artificial horizon (attitude indicator widget)
-- [ ] Compass rose + heading
-- [ ] Telemetry gauges (altitude, ground speed, battery)
-- [ ] Arm / Disarm / Takeoff / RTL / Land buttons (with confirmation dialogs)
-- [ ] Flight mode selector (Loiter, Auto, Guided)
-
-### D3 — Mission planning & upload
-- [ ] Farm boundary drawing tool on map screen
-- [ ] Auto-generate grid waypoints (port of `flight_planner.py` logic to Dart)
-- [ ] Upload mission to drone via MAVLink MISSION_ITEM messages
-- [ ] Mission progress tracking (current waypoint, % complete, ETA)
+- [ ] UDP MAVLink v2 socket via `react-native-udp`
+- [ ] Parse HEARTBEAT, GPS_RAW_INT, BATTERY_STATUS messages
+- [ ] UAV status overlay on Map screen (altitude, battery, mode)
+- [ ] Trigger UAV scan from app, receive heatmap results
 
 ### D4 — Live video + real-time inference
 - [ ] RTSP stream from drone companion computer → Flutter video player

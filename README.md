@@ -1,6 +1,10 @@
-# Maize Disease Detection System
+# MaizeGuard — AI-Powered Maize Disease Detection System
 
-A multimodal deep learning system for detecting maize leaf diseases in Nigerian smallholder farms. Combines an EfficientNetB3 CNN classifier with a Tesseract OCR pipeline to fuse visual disease features with seed bag metadata — achieving improved accuracy over image-only baselines.
+A multimodal AI system for detecting diseases in maize (corn) crops targeting Nigerian smallholder farmers. Combines an EfficientNetB3 CNN classifier with a Tesseract OCR pipeline for seed label metadata fusion — delivering on-device inference with no internet connection required.
+
+**Mobile Platform:** React Native 0.73 (Android-first)  
+**ML Backend:** Python 3.12 + TensorFlow 2.16  
+**Team:** Olapade (CNN/CV) · Tijani (OCR) · Oshodilawal (Edge/UI)
 
 ---
 
@@ -8,11 +12,13 @@ A multimodal deep learning system for detecting maize leaf diseases in Nigerian 
 
 - [Overview](#overview)
 - [Architecture](#architecture)
+- [Mobile App (React Native)](#mobile-app-react-native)
+- [ML Pipeline](#ml-pipeline)
 - [Dataset](#dataset)
 - [Project Structure](#project-structure)
 - [Setup](#setup)
 - [Usage](#usage)
-- [Results](#results)
+- [Diagrams](#diagrams)
 - [Roadmap](#roadmap)
 - [Team](#team)
 
@@ -20,103 +26,175 @@ A multimodal deep learning system for detecting maize leaf diseases in Nigerian 
 
 ## Overview
 
-Maize (*Zea mays*) is a staple crop across sub-Saharan Africa. Disease outbreaks — particularly Northern Corn Leaf Blight, Rust, and Gray Leaf Spot — can destroy up to 80% of a harvest if undetected. Smallholder farmers in Nigeria rarely have access to agronomists, making on-device, offline-capable disease detection critical.
+Maize (*Zea mays*) is a staple crop across sub-Saharan Africa. Disease outbreaks — particularly Northern Corn Leaf Blight (NCLB), Rust, and Gray Leaf Spot (GLS) — can destroy up to 80% of a harvest if undetected. Smallholder farmers in Nigeria rarely have access to agronomists, making on-device, offline-capable disease detection critical.
 
-This system is designed to run on a smartphone or edge device (Raspberry Pi 4 / Jetson Nano) and provides:
+MaizeGuard provides:
 
-- **Instant disease classification** from a photo of a maize leaf
-- **Metadata-enhanced accuracy** by reading seed bag labels via OCR and fusing crop variety, batch number, and planting date into the prediction
-- **UAV-scale mapping** (Phase 5) — GPS-tagged disease heatmaps from aerial imagery
+- **Instant disease classification** from a leaf photo — runs fully offline on Android
+- **OCR seed label scanning** — reads crop variety, batch number, and planting date from seed bags
+- **Metadata-enhanced accuracy** — fuses seed label data with visual features via the multimodal fusion model
+- **GPS-tagged scan history** — tracks disease spread across a farm over time
+- **AI-powered recommendations** — on-device rule engine + optional Gemini AI advice
+- **UAV-scale mapping** (Phase 5) — disease heatmaps from aerial imagery
 
 ---
 
 ## Architecture
 
+### System Layers
+
 ```
-┌─────────────────────┐        ┌──────────────────────┐
-│   Leaf Image        │        │  Seed Bag Label Photo │
-│   (300×300 RGB)     │        │  (any resolution)     │
-└────────┬────────────┘        └──────────┬────────────┘
-         │                                │
-         ▼                                ▼
-┌─────────────────────┐        ┌──────────────────────┐
-│  EfficientNetB3     │        │  OCR Preprocessor    │
-│  (ImageNet weights) │        │  grayscale → denoise  │
-│  frozen base +      │        │  → threshold → deskew │
-│  custom head        │        └──────────┬────────────┘
-└────────┬────────────┘                   │
-         │                                ▼
-         │  256-d feature vector  ┌──────────────────────┐
-         │                        │  Tesseract 5 OCR     │
-         │                        │  + Fuzzy Matching    │
-         │                        │  → crop_variety      │
-         │                        │  → batch_number      │
-         │                        │  → planting_date     │
-         │                        └──────────┬────────────┘
-         │                                   │
-         │                                   ▼
-         │                        ┌──────────────────────┐
-         │                        │  Metadata Encoder    │
-         │                        │  17-d float32 vector │
-         │                        └──────────┬────────────┘
-         │                                   │
-         └──────────────┬────────────────────┘
-                        │  concat [256 + 17] = 273-d
+┌──────────────────────────────────────────────────────────┐
+│  PRESENTATION — React Native (Android)                   │
+│  Home · Camera · Result · OCR · Dashboard                │
+│  History · Map · Recommendation · Settings               │
+├──────────────────────────────────────────────────────────┤
+│  BUSINESS LOGIC — TypeScript Services                    │
+│  classifier · ocrService · recommendationEngine          │
+│  aiAdvisor · locationService · database                  │
+├──────────────────────────────────────────────────────────┤
+│  DATA — Local Persistence                                │
+│  op-sqlite (scan history) · AsyncStorage · Keychain      │
+├──────────────────────────────────────────────────────────┤
+│  ML CORE — Bundled TFLite Models                         │
+│  EfficientNetB3 INT8 (~13MB) · FP16 fallback (~23MB)    │
+└──────────────────────────────────────────────────────────┘
+```
+
+### ML Pipeline
+
+```
+Leaf Image (300×300 RGB)        Seed Label Photo
+         │                              │
+         ▼                              ▼
+  EfficientNetB3              OCR Preprocessor
+  (ImageNet weights)          grayscale → denoise
+  frozen base +               → threshold → deskew
+  custom head                          │
+         │                             ▼
+         │ 256-d features       Tesseract 5 LSTM
+         │                      + Fuzzy Matching
+         │                      → crop_variety
+         │                      → batch_number
+         │                      → planting_date
+         │                             │
+         │                             ▼
+         │                      Metadata Encoder
+         │                      24-d float32 vector
+         │                             │
+         └──────────────┬──────────────┘
+                        │ Concatenate (280-d)
                         ▼
-              ┌───────────────────┐
-              │  Fusion Head      │
-              │  Dense(128) →     │
-              │  Dense(4)         │
-              │  softmax          │
-              └────────┬──────────┘
-                       │
-                       ▼
-           ┌─────────────────────┐
-           │  Disease Class      │
-           │  NCLB / Rust /      │
-           │  GLS / Healthy      │
-           └─────────────────────┘
+                  Fusion Head
+                  Dense(128) → Dense(4) → Softmax
+                        │
+                        ▼
+              NCLB · Rust · GLS · Healthy
 ```
 
-### Components
+---
 
-| Component | File | Description |
-|---|---|---|
-| Data pipeline | [src/phase1_cnn/data_pipeline.py](src/phase1_cnn/data_pipeline.py) | Image loader, augmentation, stratified split, class weights |
-| CNN model | [src/phase1_cnn/model.py](src/phase1_cnn/model.py) | EfficientNetB3 + classification head, feature extractor |
-| CNN training | [src/phase1_cnn/train.py](src/phase1_cnn/train.py) | Two-stage training (frozen base → fine-tune) |
-| CNN evaluation | [src/phase1_cnn/evaluate.py](src/phase1_cnn/evaluate.py) | Accuracy, classification report, confusion matrix |
-| OCR preprocessor | [src/phase2_ocr/preprocessor.py](src/phase2_ocr/preprocessor.py) | Grayscale, denoise, adaptive threshold, deskew |
-| OCR extractor | [src/phase2_ocr/extractor.py](src/phase2_ocr/extractor.py) | Tesseract 5 + fuzzy field parsing |
-| Metadata encoder | [src/phase2_ocr/encoder.py](src/phase2_ocr/encoder.py) | 17-d float32 vector from extracted fields |
-| Fusion model | [src/phase3_fusion/fusion_model.py](src/phase3_fusion/fusion_model.py) | Two-input Keras model (image + metadata) |
-| Fusion training | [src/phase3_fusion/train_fusion.py](src/phase3_fusion/train_fusion.py) | End-to-end fusion training script |
+## Mobile App (React Native)
+
+The primary farmer-facing tool. All inference runs on-device — no internet required for core features.
+
+### Screens
+
+| Screen | Description |
+|---|---|
+| **Home** | Scan entry point — camera, gallery, and seed label OCR options |
+| **Camera** | Full-screen VisionCamera v4 with framing guide and brightness hints |
+| **Result** | Disease class, confidence percentage, 4-class score bars, treatments |
+| **OCR** | Seed label scanner — extracts variety, batch number, planting date |
+| **Dashboard** | Farm health score, 7-day trend chart, disease breakdown |
+| **History** | Filterable scan history with GPS markers and swipe-to-delete |
+| **Map** | OpenStreetMap with GPS-tagged disease markers |
+| **Recommendation** | On-device advice or Gemini AI-powered agronomic guidance |
+| **Settings** | Dark/light theme, Gemini API key, model metadata |
+
+### Key Libraries
+
+| Purpose | Library |
+|---|---|
+| TFLite inference | `react-native-fast-tflite` (JSI, GPU delegate) |
+| Camera | `react-native-vision-camera` v4 |
+| Image preprocessing | `@shopify/react-native-skia` |
+| OCR | `@react-native-ml-kit/text-recognition` |
+| Database | `@op-engineering/op-sqlite` |
+| Maps | `react-native-maps` + OSM tiles |
+| Charts | `victory-native` |
+| State | Zustand |
+
+### Quick Start (Android)
+
+```bash
+# 1. Copy TFLite models and install dependencies
+bash mobile/setup.sh
+
+# 2. Connect Android device (API 24+) or start emulator
+# 3. Run
+cd mobile
+npx react-native run-android
+```
+
+---
+
+## ML Pipeline
+
+### Phase 1 — CNN Classifier
+
+```bash
+# Full training (~50 epochs, targets ≥90% accuracy)
+bash run_all.sh --full
+
+# Quick smoke test (3 epochs)
+bash run_all.sh --quick
+```
+
+Model: `models/exports/efficientnetb3_maize_int8.tflite` (~13 MB)
+
+### Phase 2 — OCR Pipeline
+
+```bash
+python src/phase2_ocr/extractor.py --image data/raw/seed_labels/sample.jpg
+```
+
+### Phase 3 — Multimodal Fusion
+
+```bash
+python src/phase3_fusion/train_fusion.py
+```
+
+### Phase 4 — Edge Deployment (Raspberry Pi / Jetson)
+
+```bash
+python src/phase4_edge/inference.py --image leaf.jpg
+```
+
+### Phase 5 — UAV Heatmap (Demo)
+
+```bash
+python deployment/uav/patch_runner.py --demo
+python deployment/uav/heatmap.py
+```
 
 ---
 
 ## Dataset
 
-**Source**: [PlantVillage Maize Disease Dataset](https://www.kaggle.com/datasets/smaranjitghose/corn-or-maize-leaf-disease-dataset) (Kaggle)
+**Source:** [PlantVillage Maize Disease Dataset](https://www.kaggle.com/datasets/smaranjitghose/corn-or-maize-leaf-disease-dataset) (Kaggle)
 
-| Class | Disease | Images | Folder |
-|---|---|---|---|
-| 0 | NCLB (Northern Corn Leaf Blight) | 1,146 | `Blight/` |
-| 1 | Rust (Common Rust) | 1,306 | `Common_Rust/` |
-| 2 | GLS (Gray Leaf Spot) | 574 | `Gray_Leaf_Spot/` |
-| 3 | Healthy | 1,162 | `Healthy/` |
-| **Total** | | **4,188** | |
+| Class | Disease | Images |
+|---|---|---|
+| 0 | NCLB — Northern Corn Leaf Blight | 1,146 |
+| 1 | Rust — Common Rust | 1,306 |
+| 2 | GLS — Gray Leaf Spot | 574 |
+| 3 | Healthy | 1,162 |
+| **Total** | | **4,188** |
 
-**Split**: 70% train / 15% val / 15% test (stratified)
+**Split:** 70% train / 15% val / 15% test (stratified by class)
 
-> **MSV (Maize Streak Virus)** is not available in PlantVillage. Add field photos to `data/raw/field_photos/MSV/` to enable it as a fifth class.
-
-### Augmentation (training only)
-
-- Random horizontal + vertical flip
-- Random rotation ±20°
-- Random zoom ±15%
-- Random brightness ±10%
-- Random contrast ±10%
+**Augmentation (train only):** Horizontal flip · Rotation ±20° · Zoom ±15° · Brightness ±10% · Contrast ±10%
 
 ---
 
@@ -124,219 +202,97 @@ This system is designed to run on a smartphone or edge device (Raspberry Pi 4 / 
 
 ```
 maize-disease-detection/
+├── mobile/                        ← React Native Android app (primary)
+│   ├── android/                   ← Android native project
+│   ├── src/
+│   │   ├── screens/               ← 9 screens
+│   │   ├── services/              ← TFLite · OCR · SQLite · Gemini
+│   │   ├── components/            ← Reusable UI components
+│   │   ├── navigation/            ← Stack + Tab navigators
+│   │   ├── hooks/                 ← useClassifier · useScans
+│   │   ├── store/                 ← Zustand app state
+│   │   ├── constants/             ← Colors · diseases · varieties
+│   │   └── types/                 ← TypeScript interfaces
+│   └── assets/models/             ← TFLite model files
 │
-├── PLAN.md                          # Live progress tracker for all phases
-├── run_all.sh                       # Pipeline orchestrator (quick + --full modes)
-├── setup_env.sh                     # One-command environment setup
-├── requirements.txt                 # Python dependencies
-│
-├── data/
-│   ├── raw/
-│   │   ├── plantvillage/data/       # Downloaded from Kaggle (gitignored)
-│   │   ├── field_photos/            # Your own farm photos (gitignored)
-│   │   └── seed_labels/             # Seed bag label photos for OCR
-│   └── annotations/
-│       ├── labels.csv               # image_path, label, class_name, source
-│       └── labels_with_metadata.csv # + crop_variety, batch_number, planting_date
-│
-├── src/
-│   ├── phase1_cnn/
-│   │   ├── data_pipeline.py         # tf.data loader, augmentation, splits
-│   │   ├── model.py                 # EfficientNetB3 + head + feature extractor
-│   │   ├── train.py                 # Two-stage training CLI
-│   │   └── evaluate.py              # Test set evaluation + confusion matrix
-│   │
-│   ├── phase2_ocr/
-│   │   ├── preprocessor.py          # Image preprocessing for OCR
-│   │   ├── extractor.py             # Tesseract OCR + field parsing
-│   │   └── encoder.py               # 17-d metadata vector
-│   │
-│   ├── phase3_fusion/
-│   │   ├── fusion_model.py          # Two-input Keras fusion model
-│   │   └── train_fusion.py          # Fusion training CLI
-│   │
-│   ├── phase4_edge/                 # TFLite conversion + inference (planned)
-│   └── phase5_uav/                  # UAV heatmap pipeline (planned)
-│
-├── models/
-│   ├── checkpoints/                 # Best epoch weights per stage (gitignored)
-│   └── exports/                     # Final .h5 models + confusion matrix PNG
+├── src/                           ← Python ML training pipeline
+│   ├── phase1_cnn/                ← EfficientNetB3 training
+│   ├── phase2_ocr/                ← Tesseract OCR pipeline
+│   ├── phase3_fusion/             ← Multimodal fusion model
+│   └── phase4_edge/               ← TFLite conversion + inference
 │
 ├── deployment/
-│   ├── android/                     # Flutter app (planned)
-│   ├── raspberry_pi/                # Tkinter GUI (planned)
-│   └── uav/                         # Flight planner + patch runner (planned)
+│   ├── raspberry_pi/              ← Tkinter GUI for edge devices
+│   └── uav/                       ← UAV mission + disease heatmap
 │
-├── scripts/
-│   └── generate_test_data.py        # Synthetic data generator for smoke tests
+├── data/
+│   ├── raw/plantvillage/          ← PlantVillage dataset images
+│   └── annotations/labels.csv    ← 4,188 labelled image paths
 │
-└── notebooks/                       # Exploratory notebooks
+├── models/
+│   └── exports/                   ← Trained .keras + .tflite files
+│
+├── REQUIREMENTS.md                ← Full software requirements spec
+├── DIAGRAMS.md                    ← System diagrams (ASCII)
+├── PLAN.md                        ← Phase-by-phase build checklist
+├── SYSTEM.md                      ← Architecture & developer guide
+└── WORKFLOW.md                    ← Git branching workflow
 ```
 
 ---
 
 ## Setup
 
-### Prerequisites
-
-- macOS (Apple Silicon) or Linux
-- [Homebrew](https://brew.sh) (macOS only)
-- Python 3.12 — install via brew if needed:
-  ```bash
-  brew install python@3.12
-  ```
-- Tesseract 5:
-  ```bash
-  brew install tesseract        # macOS
-  sudo apt install tesseract-ocr  # Ubuntu/Debian
-  ```
-- Kaggle account + API token (for dataset download)
-
-### 1. Clone and create environment
+### Python ML Environment
 
 ```bash
-git clone https://github.com/ahmaddev-codex/maize-disease-detection.git
-cd maize-disease-detection
 bash setup_env.sh
 source .venv/bin/activate
 ```
 
-### 2. Download the dataset
+**Requirements:** Python 3.12, TensorFlow 2.16, OpenCV, Tesseract 5
+
+### React Native App
 
 ```bash
-# Place your kaggle.json in ~/.kaggle/ first
-# Get it from: kaggle.com → Settings → API → Create New Token
-mkdir -p ~/.kaggle
-cp /path/to/kaggle.json ~/.kaggle/kaggle.json
-chmod 600 ~/.kaggle/kaggle.json
-
-# Download and unzip PlantVillage maize dataset
-.venv/bin/kaggle datasets download \
-  -d smaranjitghose/corn-or-maize-leaf-disease-dataset \
-  -p data/raw/plantvillage --unzip
+bash mobile/setup.sh
+cd mobile && npx react-native run-android
 ```
+
+**Requirements:** Node 18+, Android SDK (API 24+), JDK 17+
 
 ---
 
-## Usage
+## Diagrams
 
-### Quick run — verify pipeline (3 epochs, ~15 min)
+Full system diagrams — architecture, DFD (Level 0 & 1), ERD, CNN architecture, inference flowchart — are in [DIAGRAMS.md](DIAGRAMS.md).
 
-```bash
-bash run_all.sh
-```
-
-### Full training — target ≥90% accuracy (~3–4 hours)
-
-```bash
-bash run_all.sh --full
-```
-
-Both modes automatically:
-1. Build `data/annotations/labels.csv` from the real dataset
-2. Train Phase 1 CNN (Stage 1: frozen base → Stage 2: fine-tune)
-3. Evaluate on held-out test set + save confusion matrix
-4. Test the OCR pipeline on a seed label image
-5. Train Phase 3 fusion model
-
-### Run phases individually
-
-```bash
-# Phase 1 — train CNN only
-.venv/bin/python3 -m src.phase1_cnn.train \
-  --csv data/annotations/labels.csv \
-  --stage1-epochs 15 \
-  --stage2-epochs 20
-
-# Phase 1 — evaluate
-.venv/bin/python3 -m src.phase1_cnn.evaluate \
-  --model models/exports/efficientnetb3_maize.h5
-
-# Phase 2 — test OCR on a seed label image
-.venv/bin/python3 -c "
-from src.phase2_ocr.extractor import extract_fields_from_path
-from src.phase2_ocr.encoder import encode
-import json
-fields = extract_fields_from_path('data/raw/seed_labels/your_label.jpg')
-print(json.dumps({k:v for k,v in fields.items() if k!='raw_text'}, indent=2))
-print('Vector:', encode(fields))
-"
-
-# Phase 3 — train fusion model
-.venv/bin/python3 -m src.phase3_fusion.train_fusion \
-  --cnn-weights models/exports/efficientnetb3_maize.h5 \
-  --metadata-csv data/annotations/labels_with_metadata.csv \
-  --epochs 25
-```
-
-### TensorBoard
-
-```bash
-.venv/bin/tensorboard --logdir logs/
-```
-
----
-
-## Results
-
-> Results below are from a 3-epoch quick run. Full training targets are shown in parentheses.
-
-| Model | Test Accuracy | Notes |
-|---|---|---|
-| EfficientNetB3 (CNN only) | 27.8% | 3 epochs — underfitted |
-| Fusion (CNN + OCR) | 42.3% | 3 epochs — fusion signal already visible |
-| EfficientNetB3 (CNN only) | *(target ≥90%)* | Run `--full` |
-| Fusion (CNN + OCR) | *(target ≥95.8%)* | +5.8% over CNN baseline |
-
-**Confusion matrix** (quick run): [models/exports/confusion_matrix_phase1.png](models/exports/confusion_matrix_phase1.png)
+Software requirements specification is in [REQUIREMENTS.md](REQUIREMENTS.md).
 
 ---
 
 ## Roadmap
 
-| Phase | Description | Status |
+| Phase | Status | Description |
 |---|---|---|
-| 1 — CNN Classifier | EfficientNetB3 transfer learning | 🟡 Quick-trained, needs `--full` |
-| 2 — OCR Subsystem | Tesseract 5 + metadata encoder | ✅ Complete |
-| 3 — Multimodal Fusion | CNN + OCR feature fusion | 🟡 Quick-trained, needs `--full` |
-| 4 — Edge Deployment | TFLite INT8 → Raspberry Pi 4 + Jetson Nano | ⬜ Not started |
-| 5 — UAV Integration | OpenDroneMap + GPS disease heatmap | ⬜ Not started |
-| Flutter App | On-device inference, camera overlay | ⬜ Not started |
-
-See [PLAN.md](PLAN.md) for detailed task tracking.
-
-### Phase 4 — Edge Deployment (next)
-
-Convert the trained fusion model to TFLite INT8 and deploy to a Raspberry Pi 4:
-
-```bash
-# coming soon
-python -m src.phase4_edge.convert_tflite \
-  --model models/exports/fusion_model.h5 \
-  --output models/exports/fusion_model.tflite
-```
-
-Target: <2 second inference on Raspberry Pi 4.
-
-### Phase 5 — UAV Integration (planned)
-
-1. Fly a pre-programmed grid mission over a farm (DJI / ArduPilot)
-2. Stitch aerial images with [OpenDroneMap / WebODM](https://www.opendronemap.org/)
-3. Run TFLite model on each image patch
-4. Render GPS-tagged disease heatmap with [Folium](https://python-visualization.github.io/folium/)
+| Phase 1 — CNN | 🟡 In progress | Full training run needed for ≥90% accuracy |
+| Phase 2 — OCR | ✅ Complete | Tesseract + fuzzy matching implemented |
+| Phase 3 — Fusion | 🟡 In progress | Full training needed |
+| Phase 4 — Edge | ✅ Complete | TFLite INT8 + FP16 models exported |
+| Phase 5 — UAV | 🟡 Demo ready | Real orthomosaic testing pending |
+| Mobile App — Core | ✅ Complete | React Native, all 9 screens |
+| Mobile App — Polish | 🔲 Planned | PDF export, offline map tiles |
 
 ---
 
 ## Team
 
-| Name | Role |
+| Member | Role |
 |---|---|
-| Olapade | CNN / Computer Vision |
-| Tijani (sheutijani) | OCR Pipeline |
-| Oshodilawal | Edge Deployment + Flutter UI |
+| Olapade | CNN model training and evaluation (Phase 1 & 3) |
+| Tijani | OCR pipeline and metadata extraction (Phase 2) |
+| Oshodilawal | Edge deployment, React Native mobile app (Phase 4 & App) |
 
 ---
 
-## License
-
-MIT
+*For academic documentation see [REQUIREMENTS.md](REQUIREMENTS.md) and [DIAGRAMS.md](DIAGRAMS.md).*
