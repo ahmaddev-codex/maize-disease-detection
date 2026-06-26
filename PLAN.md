@@ -82,13 +82,10 @@ planting_date →  days-since-epoch or seasonal bucket
 
 ---
 
-## Phase 4 — Edge Deployment *(planned)*
-> Goal: TFLite INT8 model running <2s inference on Raspberry Pi 4 and Jetson Nano.
+## Phase 4 — TFLite Export ✅
+> Goal: Export quantized TFLite models for mobile deployment.
 
-- [x] `src/phase4_edge/convert_tflite.py` — INT8 quantization with representative dataset
-- [x] `src/phase4_edge/inference.py` — inference runner for Pi / Jetson
-- [x] `deployment/raspberry_pi/app.py` — Tkinter GUI
-- [ ] Inference time < 2 seconds on Pi 4 — benchmark with `--benchmark` flag on device
+- [x] `src/phase4_edge/convert_tflite.py` — INT8 + FP16 quantization with representative dataset
 
 ---
 
@@ -149,7 +146,6 @@ planting_date →  days-since-epoch or seasonal bucket
 ### D4 — Live video + real-time inference
 - [ ] RTSP stream from drone companion computer → Flutter video player
 - [ ] Frame capture → TFLite inference → overlay disease label on video
-- [ ] Requires companion computer (Raspberry Pi) on drone
 
 ---
 

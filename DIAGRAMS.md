@@ -267,10 +267,10 @@
         ▼
  ┌──────────────────────────────────────────────────────────────────────┐
  │  PHASE 4 — EDGE DEPLOYMENT                                           │
- │  Build: convert_tflite.py → inference.py                             │
+ │  Build: convert_tflite.py                                            │
  │  Output: INT8 (.tflite, ~13 MB) + FP16 (.tflite, ~23 MB)            │
  │  ────────────────────────────────────────────────────────────────    │
- │  GATE: Inference < 2 s on Raspberry Pi 4  ✔ / ✘                     │
+ │  GATE: Mobile app loads model and classifies leaf in < 500 ms  ✔ / ✘ │
  └──────┬───────────────────────────────────────────────────────────────┘
         │ PASS
         ▼

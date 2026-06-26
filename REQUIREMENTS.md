@@ -318,7 +318,7 @@ Fusion:
 **TFLite Quantisation:**
 | Format | Size | Target Device |
 |---|---|---|
-| INT8 (primary) | ~13MB | Android phones, Raspberry Pi 4 |
+| INT8 (primary) | ~13MB | Android phones |
 | FP16 (fallback) | ~23MB | Android phones (GPU fallback) |
 
 - INT8 calibration: 200 representative images from training set
@@ -329,7 +329,7 @@ Fusion:
 - Grid mission waypoint generation (QGC/Mission Planner `.waypoints` format)
 - Orthomosaic tiling → per-patch TFLite inference → disease classification per grid cell
 - Output: Folium interactive HTML heatmap + Matplotlib static PNG
-- Inference target: < 2s per 300×300 patch on Raspberry Pi 4
+- Inference target: < 2s per 300×300 patch on the UAV companion computer
 
 ---
 
@@ -463,7 +463,7 @@ Classifier  Pipeline    Model       Deployment   Integration
 | Phase 1 → 2 | Validation accuracy ≥ 90% on held-out test set |
 | Phase 2 → 3 | OCR extracts ≥ 80% of variety fields correctly on 10 seed label test images |
 | Phase 3 → 4 | Fusion model accuracy ≥ CNN-only + 5% |
-| Phase 4 → 5 | TFLite INT8 inference < 2s on Raspberry Pi 4 |
+| Phase 4 → 5 | TFLite INT8 model exported; mobile app loads and classifies in < 500ms |
 | Phase 5 | UAV demo generates disease heatmap from synthetic orthomosaic |
 
 **Why iterative over waterfall:**

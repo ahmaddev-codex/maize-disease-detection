@@ -15,15 +15,14 @@
 3. [Phase 1 — CNN Classifier](#3-phase-1--cnn-classifier)
 4. [Phase 2 — OCR Subsystem](#4-phase-2--ocr-subsystem)
 5. [Phase 3 — Multimodal Fusion](#5-phase-3--multimodal-fusion)
-6. [Phase 4 — Edge Deployment](#6-phase-4--edge-deployment)
+6. [Phase 4 — TFLite Export](#6-phase-4--tflite-export)
 7. [Phase 5 — UAV Integration](#7-phase-5--uav-integration)
-8. [React Native Mobile App](#8-react-native-mobile-app)
-9. [Raspberry Pi GUI](#9-raspberry-pi-gui)
-10. [Data Flow — End to End](#10-data-flow--end-to-end)
-11. [Running the Full Pipeline](#11-running-the-full-pipeline)
-12. [Environment Setup](#12-environment-setup)
-13. [Model Performance Targets](#13-model-performance-targets)
-14. [Team & Ownership](#14-team--ownership)
+8. [Flutter Mobile App](#8-react-native-mobile-app)
+9. [Data Flow — End to End](#9-data-flow--end-to-end)
+10. [Running the Full Pipeline](#10-running-the-full-pipeline)
+11. [Environment Setup](#11-environment-setup)
+12. [Model Performance Targets](#12-model-performance-targets)
+13. [Team & Ownership](#13-team--ownership)
 
 ---
 
@@ -95,8 +94,7 @@ maize-disease-detection/
 │   │   └── train_fusion.py     # End-to-end fusion training
 │   │
 │   └── phase4_edge/
-│       ├── convert_tflite.py   # INT8 + FP16 TFLite conversion with calibration
-│       └── inference.py        # TFLite inference runner (Pi / Jetson / desktop)
+│       └── convert_tflite.py   # INT8 + FP16 TFLite conversion with calibration
 │
 ├── deployment/
 │   ├── app/                    # Flutter mobile app (Android + macOS)
@@ -117,9 +115,6 @@ maize-disease-detection/
 │   │   ├── android/                      # Android native configuration
 │   │   ├── macos/                        # macOS native configuration + Podfile
 │   │   └── assets/models/               # TFLite model files (copied from models/exports/)
-│   │
-│   ├── raspberry_pi/
-│   │   └── app.py              # Tkinter dark-themed GUI for Pi 4 / Jetson
 │   │
 │   └── uav/
 │       ├── flight_planner.py   # Grid mission waypoint generator → .waypoints file
@@ -301,7 +296,7 @@ python -m src.phase3_fusion.train_fusion \
 
 ---
 
-## 6. Phase 4 — Edge Deployment
+## 6. Phase 4 — TFLite Export
 
 ### TFLite Conversion
 
@@ -317,27 +312,10 @@ to uint8.
 
 | Format | Size | Target |
 |--------|------|--------|
-| INT8 `.tflite` | ~13 MB | Raspberry Pi 4 · Android · Jetson Nano |
+| INT8 `.tflite` | ~13 MB | Android phones (primary) |
 | FP16 `.tflite` | ~23 MB | Fallback for devices without INT8 delegate |
 
-### Raspberry Pi Setup
-
-```bash
-# On the Pi:
-pip install tflite-runtime pillow numpy
-python deployment/raspberry_pi/app.py
-```
-
-### Benchmark
-
-```bash
-python -m src.phase4_edge.inference \
-  --image  path/to/leaf.jpg \
-  --model  models/exports/efficientnetb3_maize_int8.tflite \
-  --benchmark
-```
-
-Target: **< 2 seconds** on Raspberry Pi 4 (4GB RAM).
+Gate: Mobile app loads model and classifies a leaf image in **< 500 ms**.
 
 ---
 
@@ -420,7 +398,6 @@ with colour-coded disease markers and a confidence heatmap overlay.
 | Parrot Anafi | Adjust `--fov` for different sensor |
 | ArduPilot SITL | Use `--demo` mode to test pipeline without hardware |
 | Ground station laptop | Run inference post-flight using full TF |
-| Raspberry Pi 4 | Run inference in the field with tflite-runtime |
 
 ---
 
@@ -518,28 +495,7 @@ interpreter.run(input, output);
 
 ---
 
-## 9. Raspberry Pi GUI
-
-A standalone Tkinter application for field extension agents with desktop-class
-hardware (Pi 4 + touchscreen or monitor + keyboard).
-
-```bash
-# On the Raspberry Pi:
-pip install tflite-runtime pillow numpy
-python deployment/raspberry_pi/app.py
-```
-
-Features:
-- File browser to select leaf photo
-- PiCamera2 capture (graceful fallback if no camera attached)
-- Confidence bar (green ≥80%, amber ≥55%, red <55%)
-- Per-class score bars for all 4 classes
-- Treatment recommendation text
-- Inference runs in a background thread (UI stays responsive)
-
----
-
-## 10. Data Flow — End to End
+## 9. Data Flow — End to End
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -563,34 +519,34 @@ Features:
 │                  efficientnetb3_maize_int8.tflite  (13 MB)     │
 └───────────────────────────┬────────────────────────────────────┘
                             │  copy to deployment targets
-              ┌─────────────┼───────────────────────┐
-              │             │                       │
-              ▼             ▼                       ▼
-┌─────────────────┐  ┌─────────────┐   ┌──────────────────────┐
-│  Flutter App    │  │ Raspberry   │   │  UAV Pipeline        │
-│  assets/models/ │  │ Pi app.py   │   │  patch_runner.py     │
-│                 │  │             │   │                      │
-│  User picks a   │  │ User selects│   │ Orthomosaic tiled    │
-│  leaf photo from│  │ photo or    │   │ into 300×300 patches │
-│  gallery or     │  │ takes with  │   │                      │
-│  camera         │  │ PiCamera2   │   │  TFLite inference    │
-│       │         │  │      │      │   │  per patch           │
-│       ▼         │  │      ▼      │   │       │              │
-│  compute()      │  │  numpy      │   │  patch_predictions   │
-│  isolate:       │  │  resize     │   │  .csv                │
-│  PIL decode     │  │  [0,255]    │   │       │              │
-│  + resize       │  │      │      │   │  heatmap.py          │
-│  300×300 RGB    │  │      │      │   │       │              │
-│       │         │  │      │      │   │  disease_heatmap     │
-│       ▼         │  │      ▼      │   │  .html + .png        │
-│  interpreter    │  │ Interpreter │   └──────────────────────┘
-│  .run()         │  │ .invoke()   │
-│       │         │  │      │      │
-│       ▼         │  │      ▼      │
-│  dequantize     │  │ dequantize  │
-│  → confidence   │  │ → confidence│
-│  + class        │  │ + class     │
-│       │         │  └─────────────┘
+              ┌─────────────────────────┐
+              │                         │
+              ▼                         ▼
+┌─────────────────┐       ┌──────────────────────┐
+│  Flutter App    │       │  UAV Pipeline        │
+│  assets/models/ │       │  patch_runner.py     │
+│                 │       │                      │
+│  User picks a   │       │ Orthomosaic tiled    │
+│  leaf photo from│       │ into 300×300 patches │
+│  gallery or     │       │                      │
+│  camera         │       │  TFLite inference    │
+│       │         │       │  per patch           │
+│       ▼         │       │       │              │
+│  compute()      │       │  patch_predictions   │
+│  isolate:       │       │  .csv                │
+│  PIL decode     │       │       │              │
+│  + resize       │       │  heatmap.py          │
+│  300×300 RGB    │       │       │              │
+│       │         │       │  disease_heatmap     │
+│       ▼         │       │  .html + .png        │
+│  interpreter    │       └──────────────────────┘
+│  .run()         │
+│       │         │
+│       ▼         │
+│  dequantize     │
+│  → confidence   │
+│  + class        │
+│       │         │
 │       ▼         │
 │  ResultScreen   │
 │  + treatment    │
@@ -651,7 +607,7 @@ Key packages:
 | opencv-python | 4.9+ | Image preprocessing |
 | pytesseract | 0.3.10 | OCR (requires tesseract 5 binary) |
 | fuzzywuzzy | 0.18.0 | Variety name matching |
-| tflite-runtime | latest | Pi/Jetson inference (no full TF) |
+| tflite-runtime | latest | UAV companion computer inference |
 | folium | latest | UAV interactive heatmap |
 | rasterio | optional | GeoTIFF orthomosaic loading |
 | pillow | 10+ | Image I/O |
@@ -672,14 +628,6 @@ flutter run -d android
 flutter run -d macos
 ```
 
-### Raspberry Pi
-
-```bash
-pip install tflite-runtime pillow numpy
-# Optional PiCamera2:
-sudo apt install python3-picamera2
-python deployment/raspberry_pi/app.py
-```
 
 ---
 
@@ -704,10 +652,9 @@ python deployment/raspberry_pi/app.py
 | 1 — CNN Classifier | Olapade | 🟡 Run `--full` for 90%+ target |
 | 2 — OCR Subsystem | Tijani | ✅ Complete — test with real seed labels |
 | 3 — Multimodal Fusion | Olapade + Tijani | 🟡 Run `--full` to converge |
-| 4 — Edge Deployment | Oshodilawal | 🟡 Benchmark on Pi 4 |
+| 4 — TFLite Export | Oshodilawal | ✅ Complete |
 | 5 — UAV Integration | Oshodilawal | ✅ Code complete — test with real orthomosaic |
 | Flutter App | Oshodilawal | ✅ Android + macOS working |
-| Raspberry Pi GUI | Oshodilawal | ✅ Complete |
 
 ### Adding New Maize Varieties / Diseases
 
