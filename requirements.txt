@@ -17,9 +17,29 @@ pandas==2.2.2
 matplotlib==3.8.4
 seaborn==0.13.2
 
+# UAV mapping — interactive HTML heatmaps
+folium==0.16.0
+
+# UAV live web dashboard (live_server.py)
+flask==3.0.3
+flask-socketio==5.3.6
+gevent==24.2.1
+gevent-websocket==0.10.1
+
 # Utilities
 tqdm==4.66.4
 pyyaml==6.0.1
+requests==2.31.0
 
-# Edge inference (install separately on Pi/Jetson)
-# tflite-runtime
+# ── Drone / MAVLink (Phase 5 live connection) ─────────────────────────────────
+# Connects to Pixhawk / ArduCopter / PX4 via serial, UDP, or TCP
+pymavlink==2.4.41
+
+# ── GeoTIFF orthomosaic support (optional, Phase 5) ──────────────────────────
+# Install separately if you have real drone imagery:
+#   pip install rasterio==1.3.9
+# Requires GDAL — on macOS: brew install gdal
+# On Linux:      sudo apt install gdal-bin libgdal-dev
+
+# ── TFLite runtime (for UAV companion computer, if not using full TF) ─────────
+# pip install tflite-runtime

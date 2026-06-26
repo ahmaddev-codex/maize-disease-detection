@@ -1,41 +1,60 @@
-# Python
+# ── Python ────────────────────────────────────────────────────────────────────
 .venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
-docs/
-.claude/
 
-# Dataset — large files, download via Kaggle
+# ── Dataset — large files, download via Kaggle/PlantVillage ──────────────────
 data/raw/plantvillage/
 data/raw/synthetic/
 data/raw/field_photos/
 
-# Trained model weights — large .h5 files
+# ── Model weights — large binary files ───────────────────────────────────────
 models/checkpoints/
 models/exports/*.h5
+models/exports/*.keras
+models/exports/*.tflite
 
-# Keep confusion matrix and other small exports
+# Keep small exports (confusion matrix, heatmap summaries)
 !models/exports/*.png
+!models/exports/*.json
 
-# TensorBoard logs
+# ── TensorBoard / training logs ───────────────────────────────────────────────
 logs/
 
-# macOS
-.DS_Store
+# ── Mobile (Flutter) — see mobile/.gitignore for platform-specific rules ─────
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/pubspec.lock
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/.symlinks/
+mobile/ios/DerivedData/
+mobile/ios/Podfile.lock
+mobile/assets/models/*.tflite
 
-# Jupyter
-.ipynb_checkpoints/
+# ── UAV / deployment ─────────────────────────────────────────────────────────
+data/uav/patch_predictions.csv
+data/uav/disease_heatmap.html
 
-# IDE
-.idea/
-.vscode/
-
-# Old Flutter deployment app — replaced by mobile/ (React Native)
-deployment/app/
-
-# Environment files
+# ── Environment / secrets ─────────────────────────────────────────────────────
 .env
 .env.*
 !.env.example
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+.claude/
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
