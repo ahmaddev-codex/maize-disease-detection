@@ -1,0 +1,136 @@
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+# GoogleMLKit 6.x ships arm64-device + x86_64-sim slices only.
+# iOS 26 simulator requires arm64-sim, which these pre-built binaries lack.
+# Binary-patch each arm64 object file inside the static archive to change
+# LC_BUILD_VERSION platform from IOS(2) to IOSSIMULATOR(7), then repack.
+MLKIT_PATCH_PY = <<~PYTHON
+  import sys, struct
+
+  LC_BUILD_VERSION      = 0x32
+  IOS_PLATFORM          = 2
+  IOSSIMULATOR_PLATFORM = 7
+
+  for path in sys.argv[1:]:
+      with open(path, 'r+b') as f:
+          data = bytearray(f.read())
+      magic = struct.unpack_from('<I', data, 0)[0]
+      if magic != 0xFEEDFACF:
+          continue
+      ncmds     = struct.unpack_from('<I', data, 16)[0]
+      lc_offset = 32
+      for _ in range(ncmds):
+          cmd     = struct.unpack_from('<I', data, lc_offset)[0]
+          cmdsize = struct.unpack_from('<I', data, lc_offset + 4)[0]
+          if cmd == LC_BUILD_VERSION:
+              if struct.unpack_from('<I', data, lc_offset + 8)[0] == IOS_PLATFORM:
+                  struct.pack_into('<I', data, lc_offset + 8, IOSSIMULATOR_PLATFORM)
+          lc_offset += cmdsize
+      with open(path, 'wb') as f:
+          f.write(bytes(data))
+PYTHON
+
+def patch_mlkit_arm64_simulator(installer)
+  py_script = '/tmp/rn_mlkit_patch_sim.py'
+  File.write(py_script, MLKIT_PATCH_PY)
+
+  mlkit_pods = %w[
+    MLImage MLKitCommon MLKitTextRecognition
+    MLKitTextRecognitionChinese MLKitTextRecognitionCommon
+    MLKitTextRecognitionDevanagari MLKitTextRecognitionJapanese
+    MLKitTextRecognitionKorean MLKitVision
+  ]
+
+  mlkit_pods.each do |pod_name|
+    fw_dir = "#{installer.sandbox.root}/#{pod_name}/Frameworks"
+    next unless Dir.exist?(fw_dir)
+
+    Dir.glob("#{fw_dir}/*.framework") do |fw|
+      name   = File.basename(fw, '.framework')
+      binary = "#{fw}/#{name}"
+      next unless File.exist?(binary)
+
+      file_type = `file '#{binary}' 2>/dev/null`
+      unless file_type.include?('ar archive') || file_type.include?('Mach-O')
+        next
+      end
+
+      pid      = Process.pid
+      arm64a   = "/tmp/flutter_mlkit_#{name}_#{pid}_arm64.a"
+      patcha   = "/tmp/flutter_mlkit_#{name}_#{pid}_sim.a"
+      x86a     = "/tmp/flutter_mlkit_#{name}_#{pid}_x86.a"
+      objs_dir = "/tmp/flutter_mlkit_#{name}_#{pid}_objs"
+
+      begin
+        next unless system("lipo -thin arm64 '#{binary}' -output '#{arm64a}' 2>/dev/null")
+
+        FileUtils.mkdir_p(objs_dir)
+        system("cd '#{objs_dir}' && ar -x '#{arm64a}' 2>/dev/null")
+        obj_files = Dir.glob("#{objs_dir}/*.o")
+
+        if obj_files.empty?
+          next
+        end
+
+        args = obj_files.map { |f| "'#{f}'" }.join(' ')
+        system("python3 '#{py_script}' #{args}")
+        system("xcrun libtool -static -o '#{patcha}' #{args} 2>/dev/null")
+        next unless File.exist?(patcha)
+
+        if system("lipo -thin x86_64 '#{binary}' -output '#{x86a}' 2>/dev/null") && File.exist?(x86a)
+          system("lipo -create '#{patcha}' '#{x86a}' -output '#{binary}'")
+        else
+          FileUtils.cp(patcha, binary)
+        end
+        Pod::UI.puts "  [MLKit-patch] #{name} → arm64-iossim ✓"
+      ensure
+        [arm64a, patcha, x86a].each { |f| File.delete(f) rescue nil }
+        FileUtils.rm_rf(objs_dir) rescue nil
+      end
+    end
+  end
+end
+
+target 'Runner' do
+  use_frameworks!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    # iOS 26 simulator requires arm64; clear the exclusion Flutter's hook sets.
+    target.build_configurations.each do |config|
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = ''
+    end
+  end
+  patch_mlkit_arm64_simulator(installer)
+end

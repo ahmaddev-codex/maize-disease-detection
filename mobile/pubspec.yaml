@@ -1,0 +1,66 @@
+name: maizeguard
+description: AI-Powered Maize Disease Detection — on-device TFLite inference, OCR seed label scanning, GPS-tagged history, disease heatmaps.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ── ML / AI ────────────────────────────────────────────────────────────────
+  tflite_flutter: ^0.11.0
+  google_mlkit_text_recognition: ^0.13.1
+  image: ^4.1.7                         # image resize / pixel ops before inference
+
+  # ── Camera & Images ───────────────────────────────────────────────────────
+  camera: ^0.10.5+9
+  image_picker: ^1.1.2
+
+  # ── Database ──────────────────────────────────────────────────────────────
+  sqflite: ^2.3.3
+  path: ^1.9.0
+
+  # ── Location & Maps ───────────────────────────────────────────────────────
+  geolocator: ^11.0.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # ── State Management ──────────────────────────────────────────────────────
+  flutter_riverpod: ^2.5.1
+
+  # ── Storage ───────────────────────────────────────────────────────────────
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.3.1
+
+  # ── Charts ────────────────────────────────────────────────────────────────
+  fl_chart: ^0.68.0
+
+  # ── Networking ────────────────────────────────────────────────────────────
+  http: ^1.2.1
+
+  # ── Navigation ────────────────────────────────────────────────────────────
+  go_router: ^14.1.4
+
+  # ── Fonts ─────────────────────────────────────────────────────────────────
+  google_fonts: ^6.2.1
+
+  # ── Utilities ─────────────────────────────────────────────────────────────
+  intl: ^0.19.0
+  path_provider: ^2.1.4
+  permission_handler: ^11.3.1
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/models/

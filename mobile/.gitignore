@@ -1,43 +1,42 @@
-# Dependencies
-node_modules/
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
 
 # Build outputs
-android/app/build/
-android/build/
-ios/build/
+build/
+.pub-cache/
+.pub/
+
+# Android
+android/.gradle/
+android/captures/
+android/local.properties
+android/key.properties
+android/app/debug.keystore
+*.iml
+
+# iOS
 ios/Pods/
+ios/build/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
 ios/DerivedData/
-
-# Generated files
-android/app/src/main/assets/index.android.bundle
-android/app/src/main/assets/index.android.bundle.map
-ios/main.jsbundle
-
-# React Native
-.expo/
-.expo-shared/
-
-# Metro bundler
-.metro-health-check*
-
-# Env files
-.env
-.env.*
-!.env.example
+ios/Podfile.lock
 
 # macOS
 .DS_Store
 
-# Xcode
-*.xcuserstate
-xcuserdata/
+# IDE
+.idea/
+.vscode/
 
-# Android
-*.apk
-*.aab
-local.properties
-.gradle/
-
-# Keystore
-*.keystore
-!debug.keystore
+# Environment / secrets
+.env
+.env.*
+!.env.example
+.env.json
+!.env.json.example
