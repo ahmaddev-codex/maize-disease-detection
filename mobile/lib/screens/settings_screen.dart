@@ -1,12 +1,8 @@
-import 'dart:ui';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../config/app_env.dart';
-import '../constants/colors.dart';
+import '../design_system/design_system.dart';
 import '../providers/app_provider.dart';
 import '../services/database_service.dart';
-import '../widgets/ds.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -15,24 +11,33 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _keyCtrl = TextEditingController();
-  bool _obscure  = true;
-  bool _keySaved = false;
+  final _groqCtrl = TextEditingController();
+  final _yarnCtrl = TextEditingController();
+  bool _groqObscure = true;
+  bool _yarnObscure = true;
+  bool _groqKeySaved = false;
+  bool _yarnKeySaved = false;
   bool _clearing = false;
 
   @override
   void initState() {
     super.initState();
-    final key = ref.read(geminiKeyProvider);
-    if (key != null && key.isNotEmpty) {
-      _keyCtrl.text = key;
-      _keySaved = true;
+    final groq = ref.read(groqKeyProvider);
+    if (groq != null && groq.isNotEmpty) {
+      _groqCtrl.text = groq;
+      _groqKeySaved = true;
+    }
+    final yarn = ref.read(yarnGptKeyProvider);
+    if (yarn != null && yarn.isNotEmpty) {
+      _yarnCtrl.text = yarn;
+      _yarnKeySaved = true;
     }
   }
 
   @override
   void dispose() {
-    _keyCtrl.dispose();
+    _groqCtrl.dispose();
+    _yarnCtrl.dispose();
     super.dispose();
   }
 
@@ -41,260 +46,369 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final isDark = ref.watch(isDarkModeProvider);
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.canvasDark : AppColors.canvas,
-      body: CustomScrollView(
-        slivers: [
-          // ── Glass app bar ─────────────────────────────────────────────────
-          SliverAppBar(
-            pinned: true,
-            expandedHeight: 90,
-            backgroundColor: (isDark ? AppColors.surfaceDark : AppColors.surface)
-                .withOpacity(0.88),
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: const FlexibleSpaceBar(
-                  title: Text('Settings',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-                  titlePadding: EdgeInsets.only(left: 16, bottom: 14),
+      backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+      appBar: AppBar(
+        title: Row(
+          children: [
+            MaizeGuardLogo(size: 24, isDark: isDark),
+            const SizedBox(width: AppSpacing.sm),
+            const Text('System & Settings'),
+          ],
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 100),
+        children: [
+          // ── Executive Brand Overview ──────────────────────────────────────
+          const MaizeGuardBrandCard(),
+          const SizedBox(height: AppSpacing.lg),
+
+          // ── Groq AI Assistant Key Configuration ───────────────────────────
+          const _SectionTitle('AGRONOMIC AI ASSISTANT (GROQ)'),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.emeraldBase.withValues(alpha: 0.12),
+                        borderRadius: AppRadii.sm,
+                      ),
+                      child: const Icon(Icons.psychology_outlined, size: 20, color: AppColors.emeraldBase),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Groq API Key', style: AppTypography.h3),
+                          Text(
+                            'GPT OSS 120B Frontier Reasoning Model',
+                            style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_groqKeySaved)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.healthy.withValues(alpha: 0.12),
+                          borderRadius: AppRadii.full,
+                          border: Border.all(color: AppColors.healthy.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          'Active',
+                          style: AppTypography.caption.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.healthy,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Powering instant agronomic consultations, chemical treatment regimens, and localized farming recommendations using Groq\'s fastest 120B reasoning engine.',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: isDark ? AppColors.charcoal300 : AppColors.charcoal700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppTextField(
+                  label: 'Groq API Key',
+                  controller: _groqCtrl,
+                  hintText: 'gsk_...',
+                  obscureText: _groqObscure,
+                  prefixWidget: const Icon(Icons.lock_outline_rounded, size: 18),
+                  suffixIcon: IconButton(
+                    icon: Icon(_groqObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                    onPressed: () => setState(() => _groqObscure = !_groqObscure),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: 'Save Groq Key',
+                        icon: Icons.check_circle_outline_rounded,
+                        backgroundColor: AppColors.primary,
+                        onPressed: () async {
+                          final key = _groqCtrl.text.trim();
+                          if (key.isEmpty) return;
+                          await ref.read(groqKeyProvider.notifier).save(key);
+                          if (!context.mounted) return;
+                          setState(() => _groqKeySaved = true);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Groq API key encrypted & saved')),
+                          );
+                        },
+                      ),
+                    ),
+                    if (_groqKeySaved) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                        tooltip: 'Remove Key',
+                        onPressed: () async {
+                          await ref.read(groqKeyProvider.notifier).clear();
+                          _groqCtrl.clear();
+                          if (mounted) setState(() => _groqKeySaved = false);
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             ),
           ),
 
-          SliverPadding(
-            padding: AppSpacing.pagePad,
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // ── Appearance ─────────────────────────────────────────────
-                const SectionLabel('Appearance', topMargin: 8),
-                GlassCard(
-                  padding: EdgeInsets.zero,
-                  child: SwitchListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    title: const Text('Dark mode',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                    subtitle: const Text('Switch between light and dark theme',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                    secondary: DuotoneIcon(
-                      isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                      primaryColor: AppColors.accent,
-                      secondaryColor: AppColors.accentFg,
-                    ),
-                    value: isDark,
-                    activeColor: AppColors.accent,
-                    onChanged: (_) => ref.read(isDarkModeProvider.notifier).toggle(),
-                  ),
-                ),
+          const SizedBox(height: AppSpacing.lg),
 
-                // ── AI Advisor (production only — Gemini key) ──────────────
-                if (!kDebugMode) ...[
-                  const SectionLabel('AI Advisor'),
-                  GlassCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          const DuotoneIcon(Icons.auto_awesome_rounded,
-                              primaryColor: AppColors.attentionFg,
-                              secondaryColor: Color(0xFFFFD54F)),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text('Gemini API Key',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700))),
-                          if (_keySaved)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppColors.successFg.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text('Saved',
-                                  style: TextStyle(fontSize: 11,
-                                      color: AppColors.successFg,
-                                      fontWeight: FontWeight.w600)),
-                            ),
-                        ]),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Stored securely on this device — never sent to our servers.',
-                          style: TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(height: 14),
-                        TextField(
-                          controller: _keyCtrl,
-                          obscureText: _obscure,
-                          decoration: InputDecoration(
-                            labelText: 'Gemini API key',
-                            hintText: 'AIza…',
-                            prefixIcon: const Icon(Icons.key_rounded, size: 18),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscure
-                                    ? Icons.visibility_off_rounded
-                                    : Icons.visibility_rounded,
-                                size: 18,
-                              ),
-                              onPressed: () =>
-                                  setState(() => _obscure = !_obscure),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(children: [
-                          ElevatedButton(
-                            onPressed: () async {
-                              final key = _keyCtrl.text.trim();
-                              if (key.isEmpty) return;
-                              await ref.read(geminiKeyProvider.notifier).save(key);
-                              if (mounted) {
-                                setState(() => _keySaved = true);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('API key saved')));
-                              }
-                            },
-                            child: const Text('Save key'),
-                          ),
-                          const SizedBox(width: 12),
-                          if (_keySaved)
-                            TextButton(
-                              onPressed: () async {
-                                await ref.read(geminiKeyProvider.notifier).clear();
-                                _keyCtrl.clear();
-                                if (mounted) setState(() => _keySaved = false);
-                              },
-                              child: const Text('Remove',
-                                  style: TextStyle(color: AppColors.dangerFg)),
-                            ),
-                        ]),
-                      ],
+          // ── YarnGPT Voice Synthesis Key Configuration ─────────────────────
+          const _SectionTitle('LOCAL VOICE SYNTHESIS (YARNGPT)'),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.emeraldBase.withValues(alpha: 0.12),
+                        borderRadius: AppRadii.sm,
+                      ),
+                      child: const Icon(Icons.record_voice_over_outlined, size: 20, color: AppColors.emeraldBase),
                     ),
-                  ),
-                ],
-
-                // ── Developer (debug only — Ollama info from .env.json) ────
-                if (kDebugMode) ...[
-                  const SectionLabel('Developer'),
-                  GlassCard(
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        _DevRow(
-                          icon: Icons.psychology_rounded,
-                          iconColor: AppColors.successFg,
-                          label: 'AI backend',
-                          value: 'Ollama (debug)',
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _DevRow(
-                          icon: Icons.dns_rounded,
-                          iconColor: AppColors.accent,
-                          label: 'Host',
-                          value: AppEnv.ollamaHost,
-                        ),
-                        const Divider(height: 1, indent: 56),
-                        _DevRow(
-                          icon: Icons.model_training_rounded,
-                          iconColor: AppColors.attentionFg,
-                          label: 'Model',
-                          value: AppEnv.ollamaModel,
-                        ),
-                      ],
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('YarnGPT API Key', style: AppTypography.h3),
+                          Text(
+                            'Yoruba, Hausa, & Igbo Authentic Speech Engine',
+                            style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  GlassCard(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(children: [
-                      const Icon(Icons.info_rounded,
-                          size: 16, color: AppColors.textMuted),
-                      const SizedBox(width: 8),
-                      const Expanded(
+                    if (_yarnKeySaved)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.healthy.withValues(alpha: 0.12),
+                          borderRadius: AppRadii.full,
+                          border: Border.all(color: AppColors.healthy.withValues(alpha: 0.3)),
+                        ),
                         child: Text(
-                          'Edit mobile/.env.json and re-run with '
-                          '--dart-define-from-file=.env.json to change these values.',
-                          style: TextStyle(
-                              fontSize: 11, color: AppColors.textMuted, height: 1.5),
+                          'Active',
+                          style: AppTypography.caption.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.healthy,
+                          ),
                         ),
                       ),
-                    ]),
-                  ),
-                ],
-
-                // ── Data & Privacy ─────────────────────────────────────────
-                const SectionLabel('Data & Privacy'),
-                GlassCard(
-                  padding: EdgeInsets.zero,
-                  child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    leading: DuotoneIcon(Icons.delete_rounded,
-                        primaryColor: AppColors.dangerFg,
-                        secondaryColor: const Color(0xFFFF8A80)),
-                    title: const Text('Clear all scan data',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                    subtitle: const Text(
-                        'Permanently removes all scans from this device',
-                        style: TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
-                    trailing: _clearing
-                        ? const SizedBox(
-                            width: 20, height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.chevron_right,
-                            color: AppColors.textSecondary),
-                    onTap: _clearing ? null : () => _confirmClear(context),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Synthesizes natural Nigerian language diagnostic audio directly into Yoruba, Hausa, and Igbo voices for non-literate smallholder farmers.',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: isDark ? AppColors.charcoal300 : AppColors.charcoal700,
                   ),
                 ),
-
-                // ── About ──────────────────────────────────────────────────
-                const SectionLabel('About'),
-                GlassCard(
-                  padding: EdgeInsets.zero,
-                  child: Column(
-                    children: [
-                      _AboutTile(icon: Icons.agriculture_rounded,
-                          iconColor: AppColors.successFg,
-                          title: 'MaizeGuard', value: 'v1.0.0'),
-                      _Divider(),
-                      _AboutTile(icon: Icons.memory_rounded,
-                          iconColor: AppColors.accent,
-                          title: 'Model', value: 'EfficientNetB3 · INT8'),
-                      _Divider(),
-                      _AboutTile(icon: Icons.dataset_rounded,
-                          iconColor: AppColors.attentionFg,
-                          title: 'Training data',
-                          value: 'PlantVillage · 4,188 images'),
-                      _Divider(),
-                      _AboutTile(icon: Icons.category_rounded,
-                          iconColor: AppColors.rust,
-                          title: 'Classes',
-                          value: 'NCLB · Rust · GLS · Healthy'),
-                      _Divider(),
-                      _AboutTile(icon: Icons.public_rounded,
-                          iconColor: AppColors.nclb,
-                          title: 'Target region',
-                          value: 'Nigeria · Smallholder farmers'),
-                    ],
+                const SizedBox(height: AppSpacing.md),
+                AppTextField(
+                  label: 'YarnGPT API Key',
+                  controller: _yarnCtrl,
+                  hintText: 'sk_live_...',
+                  obscureText: _yarnObscure,
+                  prefixWidget: const Icon(Icons.key_outlined, size: 18),
+                  suffixIcon: IconButton(
+                    icon: Icon(_yarnObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                    onPressed: () => setState(() => _yarnObscure = !_yarnObscure),
                   ),
                 ),
-
-                const SizedBox(height: 8),
-                Center(
-                  child: Text(
-                    'Built with ❤ for Nigerian farmers',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textMuted,
-                      fontStyle: FontStyle.italic,
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: 'Save YarnGPT Key',
+                        icon: Icons.check_circle_outline_rounded,
+                        backgroundColor: AppColors.primary,
+                        onPressed: () async {
+                          final key = _yarnCtrl.text.trim();
+                          if (key.isEmpty) return;
+                          await ref.read(yarnGptKeyProvider.notifier).save(key);
+                          if (!context.mounted) return;
+                          setState(() => _yarnKeySaved = true);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('YarnGPT API key encrypted & saved')),
+                          );
+                        },
+                      ),
                     ),
+                    if (_yarnKeySaved) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                        tooltip: 'Remove Key',
+                        onPressed: () async {
+                          await ref.read(yarnGptKeyProvider.notifier).clear();
+                          _yarnCtrl.clear();
+                          if (mounted) setState(() => _yarnKeySaved = false);
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // ── Language Preferences ──────────────────────────────────────────
+          const _SectionTitle('ADVISORY & AUDIO LANGUAGE'),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Diagnostic Voice & Treatment Translation',
+                  style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Advisory and audio playback language for local farming communities',
+                  style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: DisplayLanguage.values.map((lang) {
+                    final currentLang = ref.watch(displayLanguageProvider);
+                    final isSelected = currentLang == lang;
+                    return ChoiceChip(
+                      label: Text(lang.label),
+                      selected: isSelected,
+                      selectedColor: AppColors.emeraldBase.withValues(alpha: 0.15),
+                      backgroundColor: isDark ? AppColors.charcoal900 : AppColors.charcoal100,
+                      labelStyle: TextStyle(
+                        color: isSelected ? AppColors.emeraldBase : (isDark ? Colors.white70 : AppColors.charcoal700),
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                      side: BorderSide(
+                        color: isSelected ? AppColors.emeraldBase : Colors.transparent,
+                      ),
+                      onSelected: (_) {
+                        ref.read(displayLanguageProvider.notifier).set(lang);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // ── Theme / Display Mode ──────────────────────────────────────────
+          const _SectionTitle('INTERFACE PREFERENCES'),
+          AppCard(
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('High Contrast Dark Field Mode', style: AppTypography.h3),
+              subtitle: Text(
+                'Optimized for direct sunlight outdoor farm readability',
+                style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
+              ),
+              value: isDark,
+              activeThumbColor: AppColors.emeraldBase,
+              onChanged: (_) => ref.read(isDarkModeProvider.notifier).toggle(),
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // ── Storage and Diagnostics ───────────────────────────────────────
+          const _SectionTitle('LOCAL DATA ENGINE'),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withValues(alpha: 0.12),
+                      borderRadius: AppRadii.sm,
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                  ),
+                  title: Text('Clear Local Diagnostic Records', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                    'Permanently purge all scan logs, GPS coordinates, and cached leaf images',
+                    style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
+                  ),
+                  trailing: _clearing
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.chevron_right_rounded),
+                  onTap: _clearing ? null : () => _confirmClear(context),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // ── System Metadata & Edge Runtime Specs ──────────────────────────
+          const _SectionTitle('EDGE RUNTIME SPECIFICATIONS'),
+          const AppCard(
+            child: Column(
+              children: [
+                _SpecRow('Neural Architecture', 'EfficientNetB3 Quantized (INT8 / FP16)'),
+                Divider(height: AppSpacing.md),
+                _SpecRow('Training Corpus', 'PlantVillage & Field Validation (4,188 Samples)'),
+                Divider(height: AppSpacing.md),
+                _SpecRow('Active Diagnostic Classes', 'NCLB, Rust, GLS, Healthy Foliage'),
+                Divider(height: AppSpacing.md),
+                _SpecRow('Edge Framework', 'TensorFlow Lite C++ Runtime via FFI'),
+                Divider(height: AppSpacing.md),
+                _SpecRow('Target Agro-Ecological Region', 'Sub-Saharan Africa · Nigeria Focus'),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
+
+          // ── Brand Identity Signature ──────────────────────────────────────
+          Center(
+            child: Column(
+              children: [
+                MaizeGuardWordmark(
+                  height: 26,
+                  isDark: isDark,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Autonomous On-Device Foliage Phenotyping',
+                  style: AppTypography.overline.copyWith(
+                    color: AppColors.charcoal500,
+                    letterSpacing: 0.5,
                   ),
                 ),
-              ]),
+              ],
             ),
           ),
         ],
@@ -306,101 +420,94 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final ok = await showDialog<bool>(
       context: ctx,
       builder: (dialogCtx) => AlertDialog(
-        title: const Text('Clear all data?'),
+        title: const Text('Purge All Diagnostic Data?'),
         content: const Text(
-            'All scan records will be permanently deleted. '
-            'This cannot be undone.'),
+          'All diagnostic records, geolocation coordinates, and captured leaf pictures will be permanently removed from this device.',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(dialogCtx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(dialogCtx, true),
-              child: const Text('Delete all',
-                  style: TextStyle(color: AppColors.dangerFg))),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Purge All', style: TextStyle(color: AppColors.danger)),
+          ),
         ],
       ),
     );
     if (ok != true || !mounted) return;
 
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _clearing = true);
     try {
       await DatabaseService.instance.clearAll();
       await ref.read(scanListProvider.notifier).load();
-      ref.read(lastResultProvider.notifier).state      = null;
-      ref.read(lastImagePathProvider.notifier).state   = null;
+      ref.read(lastResultProvider.notifier).state = null;
+      ref.read(lastImagePathProvider.notifier).state = null;
       ref.read(lastScanVarietyProvider.notifier).state = null;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('All scan data cleared')));
-      }
+      ref.read(activeScanIdProvider.notifier).state = null;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('All local diagnostic records purged')),
+      );
     } finally {
       if (mounted) setState(() => _clearing = false);
     }
   }
 }
 
-// ── Dev info row (read-only) ──────────────────────────────────────────────────
-class _DevRow extends StatelessWidget {
-  const _DevRow({required this.icon, required this.iconColor,
-      required this.label, required this.value});
-  final IconData icon;
-  final Color iconColor;
-  final String label, value;
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  const _SectionTitle(this.title);
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    child: Row(children: [
-      Container(
-        width: 36, height: 36,
-        decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(10),
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs, left: AppSpacing.xs),
+      child: Text(
+        title,
+        style: AppTypography.overline.copyWith(
+          color: AppColors.charcoal500,
+          letterSpacing: 1.1,
         ),
-        child: Icon(icon, size: 18, color: iconColor),
       ),
-      const SizedBox(width: 12),
-      Expanded(child: Text(label,
-          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-      Flexible(child: Text(value,
-          textAlign: TextAlign.end,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-              fontFamily: 'monospace'))),
-    ]),
-  );
+    );
+  }
 }
 
-class _AboutTile extends StatelessWidget {
-  const _AboutTile({required this.icon, required this.iconColor,
-      required this.title, required this.value});
-  final IconData icon;
-  final Color iconColor;
-  final String title, value;
+class _SpecRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _SpecRow(this.label, this.value);
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    child: Row(children: [
-      Container(
-        width: 36, height: 36,
-        decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, size: 18, color: iconColor),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              color: isDark ? AppColors.charcoal400 : AppColors.charcoal600,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: AppTypography.caption.copyWith(
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : AppColors.charcoal900,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
-      const SizedBox(width: 12),
-      Expanded(child: Text(title,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
-      Text(value,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-    ]),
-  );
-}
-
-class _Divider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      const Divider(height: 1, indent: 64, endIndent: 16);
+    );
+  }
 }

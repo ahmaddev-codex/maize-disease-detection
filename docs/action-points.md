@@ -76,3 +76,36 @@ Manual steps you need to complete at the end of each phase before moving to the 
 - [] **Open web dashboard** — http://localhost:5001 — confirm drone position marker appears
 - [] **Fly a test mission** — confirm patches are classified and disease markers appear on the heatmap
 - [] **Export heatmap** — confirm `data/uav/disease_heatmap.html` and `patch_predictions.csv` are generated
+
+---
+
+## Phase 9 — UX Refinement & Practical Deployment
+
+- [x] **F63 — Confidence gate** — `result_screen.dart`: if `result.confidence < 0.60`, amber warning banner shown above verdict card with lighting/framing/distance tips
+- [] **F64 — Multi-leaf scan mode** — add a "Scan 3 leaves" flow in `home_screen.dart`; accumulate 3 `ClassificationResult` objects, compute modal class + mean confidence, push a summary screen before saving to DB
+- [x] **F65 — Scan feedback loop** — `feedback` column (nullable int: 1=correct, 0=wrong, -1=unsure) added to `scan_records` (DB v2, `onUpgrade` migration); `DatabaseService.updateFeedback()` added; feedback prompt renders after AI advice loads in `result_screen.dart`
+- [x] **F66 + F67 + F68 — Unified screen** — `result_screen.dart` rewritten as `ConsumerStatefulWidget`; `recommendation_screen.dart` and `ai_advice_sheet.dart` deleted; `/recommendation` route aliases to `/result`; verdict card above fold, on-device sections below, AI advice inline with "AI-enhanced" badge; class scores + About are collapsible `AnimatedCrossFade` cards
+- [x] **F69 — OCR inline correction** — `ocr_screen.dart`: after extraction, `_EditableField` TextFields pre-filled with OCR values; `_attach()` reads corrected controller values instead of raw `OcrFields`; `_FieldRow` widget removed
+- [~] **F70 — Text-to-speech** — English: device TTS via `flutter_tts`; Yoruba/Igbo/Hausa: `YarnTtsService` (POST `https://yarngpt.ai/api/v1/tts`, Bearer auth, MP3 bytes played via `audioplayers ^6.0.0`); voices: Idera (Yoruba), Chinenye (Igbo), Zainab (Hausa); button shows spinner during API call, stop icon during playback; device-test required to verify authentic Yoruba pronunciation
+- [x] **Regression check** — `flutter analyze` passes with zero errors
+
+---
+
+## Phase 10 — Language & Translation
+
+- [x] **F71 — `displayLanguageProvider`** added to `app_provider.dart` — `DisplayLanguage` enum (english/yoruba/igbo/hausa), `DisplayLanguageNotifier` persists to SharedPreferences key `display_language`
+- [x] **F71 — Language selector in Settings** — `_LanguageSelector` `ConsumerWidget` with animated chip row; added between AI Advisor and Data & Privacy sections in `settings_screen.dart`
+- [x] **F72 — `AiAdvisor.getAdvice()` language param** — `_prompt()` appends "Respond entirely in $language" instruction when language ≠ English
+- [x] **F72 — Language passed to advice calls** — `recommendation_screen.dart` and `ai_advice_sheet.dart` both watch `displayLanguageProvider` and pass `lang.label` to `AiAdvisor.getAdvice()`
+- [x] **F73 — `AiAdvisor.translateResult()`** — new method wraps English content in translation prompt; routes through Gemini→Groq fallback chain
+- [x] **F73 — Translate button in recommendation_screen.dart** — when language ≠ English: shows "Translate advice to ${lang.label}" TextButton; on tap calls `_translateAdvice()`; translated text shown in `GlassCard` with "Translated · ${lang.label}" header
+- [] **Verify on device** — switch to Igbo, fetch advice, confirm Igbo response; switch to English, confirm it reverts; confirm translate button for on-device sections works
+
+---
+
+## Phase 11 — AI Reliability (Gemini → Groq Fallback)
+
+- [x] **F74 — `_groq()` in `AiAdvisor`** — added `_groq(String prompt)` using Groq's OpenAI-compatible endpoint (`https://api.groq.com/openai/v1/chat/completions`) with model `llama-3.3-70b-versatile`; same 512-token limit, 0.3 temperature
+- [x] **F74 — `_geminiWithFallback()`** — wraps `_gemini()` in try/catch; on any exception, calls `_groq()` automatically; both `getAdvice()` and `translateResult()` route through this in release builds
+- [x] **F75 — `AppEnv.groqApiKey`** — `String.fromEnvironment('GROQ_API_KEY')` compile-time constant; key already present in `.env.json`
+- [x] **`.env.json` fix** — corrected missing comma after GROQ_API_KEY line (invalid JSON that would have caused build failures)

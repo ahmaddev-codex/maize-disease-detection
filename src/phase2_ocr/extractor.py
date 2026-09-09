@@ -10,7 +10,7 @@ Fuzzy matching is used to correct common OCR errors in variety names.
 
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Optional, cast
 
 import pytesseract
 import numpy as np
@@ -60,7 +60,7 @@ def extract_fields_from_path(image_path: str) -> dict:
 # ── OCR ────────────────────────────────────────────────────────────────────────
 
 def _run_ocr(image: np.ndarray) -> str:
-    return pytesseract.image_to_string(image, config=TESSERACT_CONFIG)
+    return cast(str, pytesseract.image_to_string(image, config=TESSERACT_CONFIG))
 
 
 # ── Field parsers ──────────────────────────────────────────────────────────────
@@ -72,9 +72,9 @@ def _extract_variety(text: str) -> Optional[str]:
     """
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     for line in lines:
-        match, score = fw_process.extractOne(line.upper(), KNOWN_VARIETIES)
-        if score >= VARIETY_SCORE_THRESHOLD:
-            return match
+        result = fw_process.extractOne(line.upper(), KNOWN_VARIETIES)
+        if result and result[1] >= VARIETY_SCORE_THRESHOLD:
+            return str(result[0])
     return None
 
 

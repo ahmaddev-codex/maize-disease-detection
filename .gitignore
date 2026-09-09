@@ -1,60 +1,144 @@
-# ── Python ────────────────────────────────────────────────────────────────────
+# ── Python & Backend ──────────────────────────────────────────────────────────
 .venv/
+venv/
+env/
+ENV/
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
 .eggs/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 
-# ── Dataset — large files, download via Kaggle/PlantVillage ──────────────────
+# ── Datasets & Large Data ────────────────────────────────────────────────────
 data/raw/plantvillage/
 data/raw/synthetic/
 data/raw/field_photos/
+data/uav/patch_predictions.csv
+data/uav/disease_heatmap.html
+logs/
 
-# ── Model weights — large binary files ───────────────────────────────────────
+# ── Model Weights & Exports (Large Binary Files) ─────────────────────────────
 models/checkpoints/
 models/exports/*.h5
 models/exports/*.keras
 models/exports/*.tflite
+mobile/assets/models/*.tflite
+*.tflite
+*.h5
+*.keras
 
-# Keep small exports (confusion matrix, heatmap summaries)
+# Keep small export assets (confusion matrix, heatmap summaries)
 !models/exports/*.png
 !models/exports/*.json
 
-# ── TensorBoard / training logs ───────────────────────────────────────────────
-logs/
-
-# ── Mobile (Flutter) — see mobile/.gitignore for platform-specific rules ─────
-mobile/build/
-mobile/.dart_tool/
-mobile/.flutter-plugins
-mobile/.flutter-plugins-dependencies
+# ── Flutter & Dart (Cross-Platform) ──────────────────────────────────────────
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+**/.pub-cache/
+**/.pub/
 mobile/pubspec.lock
-mobile/android/.gradle/
-mobile/android/local.properties
-mobile/android/key.properties
-mobile/ios/Pods/
-mobile/ios/build/
-mobile/ios/.symlinks/
-mobile/ios/DerivedData/
+
+# ── Android ──────────────────────────────────────────────────────────────────
+**/.gradle/
+**/local.properties
+**/key.properties
+**/captures/
+**/.cxx/
+**/*.keystore
+!**/debug.keystore.example
+**/*.jks
+**/*.apk
+**/*.aab
+**/*.ap_
+**/*.dex
+
+# ── iOS & macOS (Apple Platforms) ────────────────────────────────────────────
+**/Pods/
+**/DerivedData/
+**/.symlinks/
+**/profile
+**/xcuserdata/
+**/*.xcuserdatad
+**/*.xccheckout
+**/*.xcscmblueprint
+**/*.mode1v3
+**/*.mode2v3
+**/*.moved-aside
+**/*.pbxuser
+**/*.perspectivev3
 mobile/ios/Podfile.lock
-mobile/assets/models/*.tflite
+mobile/ios/Flutter/Flutter.framework
+mobile/ios/Flutter/Flutter.podspec
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Flutter/app.flx
+mobile/ios/Flutter/ephemeral/
+mobile/macos/Flutter/ephemeral/
+mobile/macos/Pods/
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.mobileprovision
 
-# ── UAV / deployment ─────────────────────────────────────────────────────────
-data/uav/patch_predictions.csv
-data/uav/disease_heatmap.html
+# Architecture slices created by switch_mlkit_arch / build tools
+**/*.device
+**/*.sim
 
-# ── Environment / secrets ─────────────────────────────────────────────────────
+# ── Linux & Windows Platforms ────────────────────────────────────────────────
+mobile/linux/flutter/ephemeral/
+mobile/windows/flutter/ephemeral/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ── Audio Cache & Dynamic Runtime Media ──────────────────────────────────────
+**/yarn_audio_cache/
+**/*.mp3.cache
+
+# ── Environment & Secrets ────────────────────────────────────────────────────
 .env
 .env.*
+*.env
+.env.json
+mobile/.env.json
 !.env.example
+!.env.*.example
+!.env.json.example
+mobile/!.env.json.example
 
-# ── IDE ───────────────────────────────────────────────────────────────────────
+# ── Operating System Artifacts ───────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+Icon?
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# ── IDEs & Editors ───────────────────────────────────────────────────────────
 .idea/
 .vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+*~
 .claude/
-
-# ── macOS ─────────────────────────────────────────────────────────────────────
-.DS_Store
-
-# ── Jupyter ───────────────────────────────────────────────────────────────────
-.ipynb_checkpoints/
+.gemini/
+.antigravity/

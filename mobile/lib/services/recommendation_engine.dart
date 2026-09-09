@@ -27,6 +27,9 @@ class Recommendation {
   final String urgencyLabel;
   final String season;
   final List<RecommendationSection> sections;
+
+  List<String> get immediateActions => sections.isNotEmpty ? sections.first.items : const [];
+  List<String> get immediateAction => immediateActions;
 }
 
 class RecommendationEngine {
@@ -92,12 +95,12 @@ class RecommendationEngine {
     final urgency = _urgency(classId, confidence, trend);
 
     if (classId == 3) {
-      return '✓ No disease detected. Continue routine scouting every 7–10 days. '
+      return 'No disease detected. Continue routine scouting every 7–10 days. '
              'Risk ${_seasonRisk(season)} during ${_seasonName(season)} season.';
     }
 
     final buffer = StringBuffer();
-    buffer.writeln('⚠ ${disease.name} detected (${ (confidence * 100).toStringAsFixed(0)}% confidence)');
+    buffer.writeln('${disease.name} detected (${ (confidence * 100).toStringAsFixed(0)}% confidence)');
     buffer.writeln('Urgency: ${urgency.toUpperCase()}');
     buffer.writeln('');
     buffer.writeln('Immediate actions:');

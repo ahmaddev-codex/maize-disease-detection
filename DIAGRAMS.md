@@ -176,8 +176,8 @@
 ## Diagram 4 — Entity Relationship Diagram (ERD)
 
 ```
- ┌─────────────────────────────────────────────────────────────────┐
- │                        SCAN_RECORD                              │
+ ┌────────────────────────────────────────────────────────────────┐
+ │                        SCAN_RECORD                             │
  ├──────────────────┬──────────────┬──────────────────────────────┤
  │  ATTRIBUTE       │  DATA TYPE   │  NOTES                       │
  ├──────────────────┼──────────────┼──────────────────────────────┤
@@ -187,7 +187,7 @@
  │     class_name   │ TEXT         │ e.g. "Northern Corn Leaf…"   │
  │     short_name   │ TEXT         │ NCLB / Rust / GLS / Healthy  │
  │     confidence   │ REAL         │ [0.0, 1.0]                   │
- │     all_scores   │ TEXT (JSON)  │ "[0.12, 0.75, 0.08, 0.05]"  │
+ │     all_scores   │ TEXT (JSON)  │ "[0.12, 0.75, 0.08, 0.05]"   │
  │     latency_ms   │ REAL         │ Inference time               │
  │     latitude     │ REAL (null)  │ GPS — nullable               │
  │     longitude    │ REAL (null)  │ GPS — nullable               │
@@ -197,18 +197,18 @@
  │     scanned_at   │ TEXT         │ ISO 8601 datetime (UTC)      │
  │     notes        │ TEXT (null)  │ User notes — nullable        │
  └──────────────────┴──────────────┴──────────────────────────────┘
-          │
-          │ class_id references
-          ▼
+                            │
+                            │ class_id references
+                            ▼
  ┌─────────────────────────────────────────────────────────────────┐
  │                       DISEASE_CLASS  (lookup, not stored in DB) │
- ├──────────────────┬──────────────┬──────────────────────────────┤
- │ PK  id           │ INTEGER      │ 0, 1, 2, 3                   │
- │     short_name   │ TEXT         │ NCLB / Rust / GLS / Healthy  │
- │     full_name    │ TEXT         │ Northern Corn Leaf Blight…   │
- │     severity     │ TEXT         │ high / medium / low / none   │
- │     color_hex    │ TEXT         │ #F85149 / #E3B341 / …        │
- └──────────────────┴──────────────┴──────────────────────────────┘
+ ├──────────────────┬──────────────┬───────────────────────────────┤
+ │ PK  id           │ INTEGER      │ 0, 1, 2, 3                    │
+ │     short_name   │ TEXT         │ NCLB / Rust / GLS / Healthy   │
+ │     full_name    │ TEXT         │ Northern Corn Leaf Blight…    │
+ │     severity     │ TEXT         │ high / medium / low / none    │
+ │     color_hex    │ TEXT         │ #F85149 / #E3B341 / …     │
+ └──────────────────┴──────────────┴───────────────────────────────┘
 
   Relationship:
   SCAN_RECORD ──── (class_id) ──── DISEASE_CLASS
@@ -233,29 +233,29 @@
 │            MAIZEGUARD — ITERATIVE PHASED DEVELOPMENT MODEL               │
 └──────────────────────────────────────────────────────────────────────────┘
 
- ┌──────────────┐
- │   PLANNING   │  ← Dataset acquisition, system design, team role assignment
- └──────┬───────┘
-        │
-        ▼
- ┌──────────────────────────────────────────────────────────────────────┐
- │  PHASE 1 — CNN CLASSIFIER                                            │
+                            ┌──────────────┐
+                            │   PLANNING   │  ← Dataset acquisition, system design, team role assignment
+                            └──────┬───────┘
+                                   │
+                                   ▼
+ ┌─────────────────────────────────────────────────────────────────────┐
+ │  PHASE 1 — CNN CLASSIFIER                                           │
  │  Build: data_pipeline.py → model.py → train.py → evaluate.py        │
- │  Output: EfficientNetB3 trained model (.keras)                       │
- │  ────────────────────────────────────────────────────────────────    │
+ │  Output: EfficientNetB3 trained model (.keras)                      │
+ │  ────────────────────────────────────────────────────────────────   │
  │  GATE: Validation accuracy ≥ 90%  ✔ / ✘ → iterate (more epochs)     │
- └──────┬───────────────────────────────────────────────────────────────┘
-        │ PASS
-        ▼
- ┌──────────────────────────────────────────────────────────────────────┐
- │  PHASE 2 — OCR SUBSYSTEM                                             │
+ └─────────────────────────────────┬───────────────────────────────────┘
+                                   │ PASS
+                                   ▼
+ ┌─────────────────────────────────────────────────────────────────────┐
+ │  PHASE 2 — OCR SUBSYSTEM                                            │
  │  Build: preprocessor.py → extractor.py → encoder.py                 │
- │  Output: 24-d feature vector from seed label photos                  │
- │  ────────────────────────────────────────────────────────────────    │
+ │  Output: 24-d feature vector from seed label photos                 │
+ │  ────────────────────────────────────────────────────────────────   │
  │  GATE: ≥ 80% variety extraction accuracy on 10 test labels  ✔ / ✘   │
- └──────┬───────────────────────────────────────────────────────────────┘
-        │ PASS
-        ▼
+ └─────────────────────────────────┬───────────────────────────────────┘
+                                   │ PASS
+                                   ▼
  ┌──────────────────────────────────────────────────────────────────────┐
  │  PHASE 3 — MULTIMODAL FUSION                                         │
  │  Build: fusion_model.py → train_fusion.py                            │

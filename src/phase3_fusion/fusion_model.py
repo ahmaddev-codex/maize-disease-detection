@@ -12,6 +12,8 @@ Architecture:
 Total input dims: 256 + 24 = 280
 """
 
+from typing import Optional
+
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 
@@ -24,7 +26,7 @@ DROPOUT_RATE = 0.3
 
 
 def build_fusion_model(
-    cnn_weights_path: str = None,
+    cnn_weights_path: Optional[str] = None,
     freeze_cnn: bool = True,
 ) -> Model:
     """

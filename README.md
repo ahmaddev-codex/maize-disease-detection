@@ -19,7 +19,7 @@ A multimodal AI system for detecting maize crop diseases, targeting Nigerian sma
   - [B. Mobile App — iOS](#b-mobile-app--ios)
   - [C. UAV Dashboard — Demo (no drone)](#c-uav-dashboard--demo-no-drone)
   - [D. UAV Dashboard — Live Drone](#d-uav-dashboard--live-drone)
-  - [E. ML Training Pipeline](#e-ml-training-pipeline)
+  - [E. ML Training Pipeline](#e-ml-training-pipeline)t
 - [Mobile App Reference](#mobile-app-reference)
 - [UAV Reference](#uav-reference)
 - [Roadmap](#roadmap)
@@ -47,21 +47,21 @@ Maize (*Zea mays*) is a staple crop across sub-Saharan Africa. Disease outbreaks
 ### System Layers
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  PRESENTATION — Flutter (Android + iOS)                   │
-│  Home · Camera · Result · OCR · Dashboard                 │
-│  History · Map · Settings · AI Advice (bottom sheet)      │
-├──────────────────────────────────────────────────────────┤
-│  BUSINESS LOGIC — Dart Services                           │
-│  ClassifierService · OcrService · RecommendationEngine    │
-│  AiAdvisor · LocationService · DatabaseService            │
-├──────────────────────────────────────────────────────────┤
-│  DATA — Local Persistence                                 │
+┌──────────────────────────────────────────────────────────────┐
+│  PRESENTATION — Flutter (Android + iOS)                      │
+│  Home · Camera · Result · OCR · Dashboard                    │
+│  History · Map · Settings · AI Advice (bottom sheet)         │
+├──────────────────────────────────────────────────────────────┤
+│  BUSINESS LOGIC — Dart Services                              │
+│  ClassifierService · OcrService · RecommendationEngine       │
+│  AiAdvisor · LocationService · DatabaseService               │
+├──────────────────────────────────────────────────────────────┤
+│  DATA — Local Persistence                                    │
 │  sqflite (scan history) · FlutterSecureStorage · SharedPrefs │
-├──────────────────────────────────────────────────────────┤
-│  ML CORE — Bundled TFLite Models                          │
-│  EfficientNetB3 INT8 (~13 MB) · FP16 fallback (~23 MB)   │
-└──────────────────────────────────────────────────────────┘
+├──────────────────────────────────────────────────────────────┤
+│  ML CORE — Bundled TFLite Models                             │
+│  EfficientNetB3 INT8 (~13 MB) · FP16 fallback (~23 MB)       │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### ML Pipeline
@@ -581,8 +581,8 @@ All inference runs on-device — no internet required for core features.
 | Member | Role |
 |---|---|
 | Olapade | CNN model training and evaluation (Phase 1 & 3) |
-| Tijani | OCR pipeline and metadata extraction (Phase 2) |
-| Oshodilawal | Flutter mobile app, UAV pipeline, edge deployment |
+| Tijani | OCR pipeline and metadata extraction, Flutter mobile app, UAV pipeline (Phase 2) |
+| Oshodilawal | Edge deployment |
 
 ---
 

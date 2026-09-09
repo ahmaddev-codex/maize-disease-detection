@@ -7,97 +7,180 @@ class AiAdvisor {
   static final AiAdvisor instance = AiAdvisor._();
   AiAdvisor._();
 
-  static const _geminiEndpoint =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  static const _groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
 
-  String _prompt(int classId, double confidence, String? cropVariety) {
+  String _prompt(int classId, double confidence, String? cropVariety, String language) {
     final disease = diseaseForClass(classId);
     final variety = cropVariety != null ? 'Crop variety: $cropVariety.' : '';
-    return '''
-You are an agronomist advising a Nigerian smallholder maize farmer.
+    final langInstruction = language == 'English'
+        ? ''
+        : '\nRespond entirely in $language. Keep all fungicide brand names in '
+          'their original form (do not translate product names like Mancozeb, Ridomil Gold, etc.).';
 
-Diagnosis: ${disease.name} (confidence ${(confidence * 100).toStringAsFixed(0)}%).
+    return '''
+You are an expert agronomist advising a Nigerian smallholder maize farmer.
+
+Diagnosis: ${disease.name} (confidence ${(confidence * 100).toStringAsFixed(1)}%).
 $variety
 
-Provide:
-1. A brief explanation of the disease in plain language (2 sentences max).
-2. Three immediate treatment steps using fungicides available in Nigerian markets.
-3. Two prevention measures for the next planting season.
-4. When to re-inspect the crop.
+Provide a clear, practical, field-ready diagnosis structured as:
+1. Disease summary (2 sentences max in plain, accessible language).
+2. Three immediate treatment steps using fungicides available in Nigerian agro-dealer shops (e.g. Mancozeb, Ridomil Gold, Funguran, Dithane M-45, Azoxystrobin). Specify dosage and safety instructions.
+3. Two prevention practices for the next planting cycle (e.g. resistant seed varieties, crop rotation, debris burning).
+4. Re-inspection schedule.
 
-Keep the response concise and practical. Use Nigerian market fungicide names where possible
-(e.g. Mancozeb, Ridomil, Funguran, Dithane M-45).
+Keep formatting clean with clear bullet points.$langInstruction
 ''';
   }
 
-  /// Returns AI agronomic advice.
-  ///
-  /// Debug builds → Ollama (local, no key needed, config from .env.json).
-  /// Release builds → Gemini (uses [apiKey] if supplied, falls back to
-  ///   the GEMINI_API_KEY build define from .env.json).
+  String _translatePrompt(String language, String englishContent) => '''
+Translate the following agricultural advisory into $language for a Nigerian smallholder farmer.
+Keep all fungicide brand names (e.g. Mancozeb, Dithane M-45, Ridomil Gold, Funguran) unchanged.
+Keep the same structure and concise bullet points.
+
+---
+$englishContent
+---
+''';
+
+  /// Generates agronomic advice using Groq (Llama-3.3-70b-versatile).
+  /// Falls back seamlessly to built-in offline clinical rules if network or key fails.
   Future<String> getAdvice({
     required int classId,
     required double confidence,
     required String? cropVariety,
     String? apiKey,
-  }) {
-    final prompt = _prompt(classId, confidence, cropVariety);
-    return AppEnv.useOllama
-        ? _ollama(prompt)
-        : _gemini(prompt, apiKey);
+    String language = 'English',
+  }) async {
+    final key = (apiKey != null && apiKey.trim().isNotEmpty)
+        ? apiKey.trim()
+        : AppEnv.groqApiKey;
+
+    final prompt = _prompt(classId, confidence, cropVariety, language);
+
+    if (key.isNotEmpty) {
+      try {
+        final response = await _callGroq(prompt, key);
+        if (response.trim().isNotEmpty) return response.trim();
+      } catch (_) {
+        // Fall back to offline rule-based recommendation
+      }
+    }
+
+    return _buildOfflineAdvice(classId, confidence, cropVariety, language);
   }
 
-  // ── Gemini ─────────────────────────────────────────────────────────────────
-  Future<String> _gemini(String prompt, String? runtimeKey) async {
-    final key = (runtimeKey?.isNotEmpty == true)
-        ? runtimeKey!
-        : AppEnv.geminiApiKey;
-    if (key.isEmpty) throw Exception('No Gemini API key configured');
+  /// Translates result text into [language] via Groq.
+  Future<String> translateResult({
+    required String englishContent,
+    required String language,
+    String? apiKey,
+  }) async {
+    if (language == 'English') return englishContent;
 
-    final response = await http.post(
-      Uri.parse('$_geminiEndpoint?key=$key'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'contents': [
-          {'parts': [{'text': prompt}]}
-        ],
-        'generationConfig': {'maxOutputTokens': 512, 'temperature': 0.3},
-      }),
-    ).timeout(const Duration(seconds: 20));
+    final key = (apiKey != null && apiKey.trim().isNotEmpty)
+        ? apiKey.trim()
+        : AppEnv.groqApiKey;
 
-    if (response.statusCode != 200) {
-      throw Exception('Gemini ${response.statusCode}: ${response.body}');
+    if (key.isNotEmpty) {
+      try {
+        final prompt = _translatePrompt(language, englishContent);
+        final response = await _callGroq(prompt, key);
+        if (response.trim().isNotEmpty) return response.trim();
+      } catch (_) {
+        // Return original if translation service fails
+      }
     }
 
-    final json       = jsonDecode(response.body) as Map<String, dynamic>;
-    final candidates = json['candidates'] as List?;
-    if (candidates == null || candidates.isEmpty) {
-      throw Exception('Empty Gemini response');
-    }
-    return candidates.first['content']['parts'][0]['text'] as String;
+    return englishContent;
   }
 
-  // ── Ollama ─────────────────────────────────────────────────────────────────
-  Future<String> _ollama(String prompt) async {
-    final base = AppEnv.ollamaHost.replaceAll(RegExp(r'/+$'), '');
-    final response = await http.post(
-      Uri.parse('$base/api/generate'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'model':   AppEnv.ollamaModel,
-        'prompt':  prompt,
-        'stream':  false,
-        'options': {'temperature': 0.3, 'num_predict': 512},
-      }),
-    ).timeout(const Duration(seconds: 90));
+  Future<String> _callGroq(String prompt, String apiKey) async {
+    final candidateModels = <String>[
+      AppEnv.groqModel,
+      if (AppEnv.groqModel != 'openai/gpt-oss-120b') 'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
+      'qwen/qwen3.6-27b',
+    ];
 
-    if (response.statusCode != 200) {
-      throw Exception('Ollama ${response.statusCode}: ${response.body}');
+    String? lastError;
+
+    for (final model in candidateModels) {
+      try {
+        final response = await http.post(
+          Uri.parse(_groqEndpoint),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $apiKey',
+          },
+          body: jsonEncode({
+            'model': model,
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are an expert agronomist specializing in Nigerian maize farming and crop diseases. Provide direct, practical, field-tested guidance without filler.',
+              },
+              {'role': 'user', 'content': prompt},
+            ],
+            'temperature': 0.3,
+            'max_tokens': 1024,
+          }),
+        ).timeout(const Duration(seconds: 25));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final choice = data['choices']?[0];
+          String? text = choice?['message']?['content'] as String?;
+          if (text == null || text.trim().isEmpty) {
+            text = choice?['message']?['reasoning'] as String?;
+          }
+          if (text != null && text.trim().isNotEmpty) {
+            return text.trim();
+          }
+        }
+
+        lastError = 'Groq API (${response.statusCode}): ${response.body}';
+      } catch (e) {
+        lastError = e.toString();
+      }
     }
 
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-    final text = json['response'] as String?;
-    if (text == null || text.isEmpty) throw Exception('Empty Ollama response');
-    return text;
+    throw Exception(lastError ?? 'Failed to get response from Groq API');
+  }
+
+  /// Offline clinical fallback generated from verified agronomic knowledge in diseases.dart
+  String _buildOfflineAdvice(
+      int classId, double confidence, String? cropVariety, String language) {
+    final disease = diseaseForClass(classId);
+    final buf = StringBuffer();
+
+    buf.writeln('CLINICAL AGRONOMIC ADVICE (OFFLINE MODE)');
+    buf.writeln('Disease: ${disease.name} (${disease.shortName})');
+    buf.writeln('Confidence: ${(confidence * 100).toStringAsFixed(1)}%');
+    if (cropVariety != null) buf.writeln('Crop Variety: $cropVariety');
+    buf.writeln();
+
+    buf.writeln('1. OVERVIEW:');
+    buf.writeln(disease.description);
+    buf.writeln();
+
+    buf.writeln('2. IMMEDIATE FIELD ACTIONS:');
+    for (final t in disease.treatments) {
+      buf.writeln(' • $t');
+    }
+    buf.writeln();
+
+    buf.writeln('3. PREVENTION & RESISTANCE:');
+    for (final p in disease.prevention) {
+      buf.writeln(' • $p');
+    }
+    buf.writeln();
+
+    buf.writeln('4. RE-INSPECTION:');
+    buf.writeln(
+        'Inspect the field again in 5–7 days to assess disease progression after treatment.');
+
+    return buf.toString();
   }
 }

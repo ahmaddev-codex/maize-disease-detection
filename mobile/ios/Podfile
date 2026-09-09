@@ -79,37 +79,46 @@ def patch_mlkit_arm64_simulator(installer)
         next
       end
 
-      pid      = Process.pid
-      arm64a   = "/tmp/flutter_mlkit_#{name}_#{pid}_arm64.a"
-      patcha   = "/tmp/flutter_mlkit_#{name}_#{pid}_sim.a"
-      x86a     = "/tmp/flutter_mlkit_#{name}_#{pid}_x86.a"
-      objs_dir = "/tmp/flutter_mlkit_#{name}_#{pid}_objs"
+      device_bin = "#{binary}.device"
+      sim_bin    = "#{binary}.sim"
 
-      begin
-        next unless system("lipo -thin arm64 '#{binary}' -output '#{arm64a}' 2>/dev/null")
+      # Preserve original device binary (with platform 2) if not already saved
+      if !File.exist?(device_bin)
+        FileUtils.cp(binary, device_bin)
+      end
 
-        FileUtils.mkdir_p(objs_dir)
-        system("cd '#{objs_dir}' && ar -x '#{arm64a}' 2>/dev/null")
-        obj_files = Dir.glob("#{objs_dir}/*.o")
+      # Generate simulator binary if not already generated
+      if !File.exist?(sim_bin)
+        pid      = Process.pid
+        arm64a   = "/tmp/flutter_mlkit_#{name}_#{pid}_arm64.a"
+        patcha   = "/tmp/flutter_mlkit_#{name}_#{pid}_sim.a"
+        x86a     = "/tmp/flutter_mlkit_#{name}_#{pid}_x86.a"
+        objs_dir = "/tmp/flutter_mlkit_#{name}_#{pid}_objs"
 
-        if obj_files.empty?
-          next
+        begin
+          if system("lipo -thin arm64 '#{device_bin}' -output '#{arm64a}' 2>/dev/null")
+            FileUtils.mkdir_p(objs_dir)
+            system("cd '#{objs_dir}' && ar -x '#{arm64a}' 2>/dev/null")
+            obj_files = Dir.glob("#{objs_dir}/*.o")
+
+            unless obj_files.empty?
+              args = obj_files.map { |f| "'#{f}'" }.join(' ')
+              system("python3 '#{py_script}' #{args}")
+              system("xcrun libtool -static -o '#{patcha}' #{args} 2>/dev/null")
+              if File.exist?(patcha)
+                if system("lipo -thin x86_64 '#{device_bin}' -output '#{x86a}' 2>/dev/null") && File.exist?(x86a)
+                  system("lipo -create '#{patcha}' '#{x86a}' -output '#{sim_bin}'")
+                else
+                  FileUtils.cp(patcha, sim_bin)
+                end
+                Pod::UI.puts "  [MLKit-patch] #{name} → arm64-iossim generated ✓"
+              end
+            end
+          end
+        ensure
+          [arm64a, patcha, x86a].each { |f| File.delete(f) rescue nil }
+          FileUtils.rm_rf(objs_dir) rescue nil
         end
-
-        args = obj_files.map { |f| "'#{f}'" }.join(' ')
-        system("python3 '#{py_script}' #{args}")
-        system("xcrun libtool -static -o '#{patcha}' #{args} 2>/dev/null")
-        next unless File.exist?(patcha)
-
-        if system("lipo -thin x86_64 '#{binary}' -output '#{x86a}' 2>/dev/null") && File.exist?(x86a)
-          system("lipo -create '#{patcha}' '#{x86a}' -output '#{binary}'")
-        else
-          FileUtils.cp(patcha, binary)
-        end
-        Pod::UI.puts "  [MLKit-patch] #{name} → arm64-iossim ✓"
-      ensure
-        [arm64a, patcha, x86a].each { |f| File.delete(f) rescue nil }
-        FileUtils.rm_rf(objs_dir) rescue nil
       end
     end
   end

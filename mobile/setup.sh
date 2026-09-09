@@ -90,13 +90,28 @@ if $ANDROID; then
   info "Checking Android…"
   command -v java &>/dev/null || warn "Java not found — Android build requires JDK 17+"
 
-  GRADLE_FILE="android/app/build.gradle"
-  if [[ -f "$GRADLE_FILE" ]]; then
-    CURRENT_MIN=$(grep "minSdkVersion" "$GRADLE_FILE" 2>/dev/null \
+  GRADLE_KTS="android/app/build.gradle.kts"
+  GRADLE_GROOVY="android/app/build.gradle"
+
+  if [[ -f "$GRADLE_KTS" ]]; then
+    if grep -q "minSdk = flutter.minSdkVersion" "$GRADLE_KTS"; then
+      success "minSdk configured via Flutter Gradle Plugin ($GRADLE_KTS)"
+    elif grep -q "minSdk = [0-9]*" "$GRADLE_KTS"; then
+      CURRENT_MIN=$(grep -oE "minSdk = [0-9]+" "$GRADLE_KTS" | grep -oE '[0-9]+' || echo "0")
+      if [[ "${CURRENT_MIN:-0}" -lt 21 ]]; then
+        warn "minSdk=$CURRENT_MIN — bumping to 21 for tflite_flutter"
+        sed -i.bak 's/minSdk = [0-9]*/minSdk = 21/' "$GRADLE_KTS"
+        success "minSdk patched to 21"
+      else
+        success "minSdk=$CURRENT_MIN (OK)"
+      fi
+    fi
+  elif [[ -f "$GRADLE_GROOVY" ]]; then
+    CURRENT_MIN=$(grep "minSdkVersion" "$GRADLE_GROOVY" 2>/dev/null \
                   | grep -oE '[0-9]+' | head -1 || echo "0")
     if [[ "${CURRENT_MIN:-0}" -lt 21 ]]; then
       warn "minSdkVersion=$CURRENT_MIN — bumping to 21 (required by tflite_flutter)"
-      sed -i.bak 's/minSdkVersion [0-9]*/minSdkVersion 21/' "$GRADLE_FILE"
+      sed -i.bak 's/minSdkVersion [0-9]*/minSdkVersion 21/' "$GRADLE_GROOVY"
       success "minSdkVersion patched to 21"
     else
       success "minSdkVersion=$CURRENT_MIN (OK)"
@@ -149,7 +164,6 @@ echo "    flutter build ios --dart-define-from-file=.env.json   # release iOS ar
 echo "    flutter pub get                                        # after adding packages"
 echo ""
 echo "  .env.json keys:"
-echo "    GEMINI_API_KEY  — production Gemini key (release builds)"
-echo "    OLLAMA_HOST     — Ollama server URL     (debug builds, default: http://localhost:11434)"
-echo "    OLLAMA_MODEL    — model name             (debug builds, default: llama3.1:8b)"
+echo "    GROQ_API_KEY     — Groq API key for Llama 3.3 70B agronomic advice"
+echo "    YARNGPT_API_KEY  — YarnGPT key for authentic Yoruba/Igbo/Hausa audio"
 echo "============================================================"

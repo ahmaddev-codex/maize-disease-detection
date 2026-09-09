@@ -1,60 +1,32 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../constants/colors.dart';
+import '../design_system/design_system.dart';
 
-// ── Spacing tokens ─────────────────────────────────────────────────────────────
-abstract class AppSpacing {
-  static const double xs  = 4.0;
-  static const double sm  = 8.0;
-  static const double md  = 16.0;
-  static const double lg  = 24.0;
-  static const double xl  = 32.0;
-  static const double xxl = 48.0;
+// ── Re-export new design system tokens ─────────────────────────────────────────
+export '../design_system/tokens/app_spacing.dart';
+export '../design_system/tokens/app_radii.dart';
+export '../design_system/components/app_card.dart';
+export '../design_system/components/app_button.dart';
+export '../design_system/components/severity_badge.dart';
+export '../design_system/components/confidence_meter.dart';
+export '../design_system/components/audio_advisory_bar.dart';
+export '../design_system/components/app_text_field.dart';
+export '../design_system/components/state_views.dart';
 
-  static const EdgeInsets pagePad  = EdgeInsets.fromLTRB(16, 0, 16, 100);
-  static const EdgeInsets cardPad  = EdgeInsets.all(16);
-  static const EdgeInsets cardPadH = EdgeInsets.symmetric(horizontal: 16, vertical: 12);
-}
-
-// ── Radius tokens ──────────────────────────────────────────────────────────────
-abstract class AppRadius {
-  static const double sm   = 8.0;
-  static const double md   = 12.0;
-  static const double card = 16.0;
-  static const double lg   = 20.0;
-  static const double xl   = 24.0;
-  static const double pill = 36.0;
-
-  static BorderRadius get smBR   => BorderRadius.circular(sm);
-  static BorderRadius get mdBR   => BorderRadius.circular(md);
-  static BorderRadius get cardBR => BorderRadius.circular(card);
-  static BorderRadius get lgBR   => BorderRadius.circular(lg);
-  static BorderRadius get xlBR   => BorderRadius.circular(xl);
-  static BorderRadius get pillBR => BorderRadius.circular(pill);
-}
-
-// ── Animation durations ────────────────────────────────────────────────────────
-abstract class AppDuration {
-  static const Duration fast   = Duration(milliseconds: 150);
-  static const Duration normal = Duration(milliseconds: 250);
-  static const Duration slow   = Duration(milliseconds: 400);
-}
-
-// ── Glassmorphic card ──────────────────────────────────────────────────────────
+/// Clean card wrapper replacing legacy blur/glassmorphism with crisp AgTech surface.
 class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
     required this.child,
     this.margin,
     this.padding,
-    this.radius = AppRadius.card,
-    this.blur = 10,
-    this.opacity = 0.85,
+    this.radius = 16.0,
+    this.blur = 0,
+    this.opacity = 1.0,
   });
 
   final Widget child;
-  final EdgeInsets? margin;
-  final EdgeInsets? padding;
+  final EdgeInsetsGeometry? margin;
+  final EdgeInsetsGeometry? padding;
   final double radius;
   final double blur;
   final double opacity;
@@ -62,87 +34,41 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
+    final borderColor = isDark ? AppColors.borderDark : AppColors.border;
+
     return Container(
       margin: margin,
-      child: ClipRRect(
+      padding: padding ?? const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(radius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-          child: Container(
-            padding: padding ?? AppSpacing.cardPad,
-            decoration: BoxDecoration(
-              color: (isDark ? AppColors.surfaceDark : Colors.white).withOpacity(opacity),
-              borderRadius: BorderRadius.circular(radius),
-              border: Border.all(
-                color: (isDark ? AppColors.borderDark : AppColors.border).withOpacity(0.65),
-              ),
-              boxShadow: AppColors.cardShadow,
-            ),
-            child: child,
-          ),
-        ),
+        border: Border.all(color: borderColor, width: 1.0),
+        boxShadow: AppColors.cardShadow,
       ),
+      child: child,
     );
   }
 }
 
-// ── Section label ──────────────────────────────────────────────────────────────
+/// Legacy SectionLabel mapping to SectionHeader
 class SectionLabel extends StatelessWidget {
   const SectionLabel(this.text, {super.key, this.topMargin = 16});
   final String text;
   final double topMargin;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(top: topMargin, bottom: 10),
-    child: Text(
-      text.toUpperCase(),
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.3,
-        color: AppColors.textSecondary,
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => SectionHeader(text, topSpacing: topMargin);
 }
 
-// ── Bullet card ────────────────────────────────────────────────────────────────
-class BulletCard extends StatelessWidget {
-  const BulletCard({super.key, required this.items, required this.bulletColor});
-  final List<String> items;
-  final Color bulletColor;
-
-  @override
-  Widget build(BuildContext context) => GlassCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: items.asMap().entries.map((e) => Padding(
-        padding: EdgeInsets.only(bottom: e.key < items.length - 1 ? 8 : 0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 6, height: 6,
-              margin: const EdgeInsets.only(top: 6, right: 10),
-              decoration: BoxDecoration(color: bulletColor, shape: BoxShape.circle),
-            ),
-            Expanded(child: Text(e.value,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5))),
-          ],
-        ),
-      )).toList(),
-    ),
-  );
-}
-
-// ── Solid icon — single colour, no gradient or glow ───────────────────────────
+/// Solid, crisp icon (no glowing shadows)
 class DuotoneIcon extends StatelessWidget {
   const DuotoneIcon(
     this.icon, {
     super.key,
     this.size = 24,
-    this.primaryColor = AppColors.accent,
-    this.secondaryColor = AppColors.accentFg, // kept for API compat, unused
+    this.primaryColor = AppColors.primary,
+    this.secondaryColor = AppColors.primaryLight,
   });
 
   final IconData icon;
@@ -151,18 +77,17 @@ class DuotoneIcon extends StatelessWidget {
   final Color secondaryColor;
 
   @override
-  Widget build(BuildContext context) =>
-      Icon(icon, color: primaryColor, size: size);
+  Widget build(BuildContext context) => Icon(icon, color: primaryColor, size: size);
 }
 
-// ── Quick stat chip ────────────────────────────────────────────────────────────
+/// Quick stat chip with high contrast
 class StatChip extends StatelessWidget {
   const StatChip({
     super.key,
     required this.value,
     required this.label,
     this.icon,
-    this.color = AppColors.accent,
+    this.color = AppColors.primary,
   });
 
   final String value;
@@ -171,49 +96,52 @@ class StatChip extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) => GlassCard(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (icon != null) ...[
-          Icon(icon, color: color, size: 18),
-          const SizedBox(height: 6),
-        ],
-        Text(value,
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.border,
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 6),
+          ],
+          Text(
+            value,
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: FontWeight.w800,
               color: color,
               height: 1.1,
-            )),
-        const SizedBox(height: 3),
-        Text(label,
-            style: const TextStyle(
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
               fontSize: 11,
-              color: AppColors.textSecondary,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
               fontWeight: FontWeight.w500,
-            )),
-      ],
-    ),
-  );
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// ── Disease colour dot ─────────────────────────────────────────────────────────
-class DiseaseDot extends StatelessWidget {
-  const DiseaseDot(this.color, {super.key, this.size = 10});
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: size, height: size,
-    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-  );
-}
-
-// ── Empty state ────────────────────────────────────────────────────────────────
+/// Legacy EmptyState mapping
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
@@ -229,26 +157,47 @@ class EmptyState extends StatelessWidget {
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 68, color: AppColors.textMuted),
-        const SizedBox(height: 16),
-        Text(title,
-            style: const TextStyle(fontSize: 16, color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600)),
-        if (subtitle != null) ...[
-          const SizedBox(height: 6),
-          Text(subtitle!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
-        ],
-        if (action != null) ...[
-          const SizedBox(height: 20),
-          action!,
-        ],
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 56,
+              color: isDark ? AppColors.textMutedDark : AppColors.textMuted,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                subtitle!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                ),
+              ),
+            ],
+            if (action != null) ...[
+              const SizedBox(height: 20),
+              action!,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

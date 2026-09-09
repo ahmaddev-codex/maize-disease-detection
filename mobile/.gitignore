@@ -1,42 +1,81 @@
-# Flutter / Dart
+# ── Flutter & Dart ────────────────────────────────────────────────────────────
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 pubspec.lock
-
-# Build outputs
 build/
 .pub-cache/
 .pub/
 
-# Android
+# ── Android ──────────────────────────────────────────────────────────────────
 android/.gradle/
 android/captures/
 android/local.properties
 android/key.properties
 android/app/debug.keystore
+android/app/release.keystore
+android/.cxx/
+android/app/.cxx/
 *.iml
+*.jks
+*.keystore
+*.apk
+*.aab
 
-# iOS
+# ── iOS & macOS ──────────────────────────────────────────────────────────────
 ios/Pods/
 ios/build/
 ios/.symlinks/
-ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
 ios/DerivedData/
 ios/Podfile.lock
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/ephemeral/
+macos/Flutter/ephemeral/
+macos/Pods/
+xcuserdata/
+*.xcuserdatad
+*.device
+*.sim
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.mobileprovision
 
-# macOS
-.DS_Store
+# ── Desktop Ephemeral ────────────────────────────────────────────────────────
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
 
-# IDE
-.idea/
-.vscode/
+# ── TFLite Models (Downloaded / exported via setup.sh) ───────────────────────
+assets/models/*.tflite
+*.tflite
 
-# Environment / secrets
+# ── Audio Cache ──────────────────────────────────────────────────────────────
+yarn_audio_cache/
+*.mp3.cache
+
+# ── Environment & Secrets ────────────────────────────────────────────────────
 .env
 .env.*
-!.env.example
+*.env
 .env.json
+!.env.example
 !.env.json.example
+
+# ── Operating System ─────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# ── IDEs ─────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

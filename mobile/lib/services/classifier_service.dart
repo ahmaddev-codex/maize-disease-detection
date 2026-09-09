@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import '../models/scan_record.dart';
@@ -12,7 +11,7 @@ class ClassifierService {
 
   Interpreter? _interpreter;
   bool _isLoaded  = false;
-  bool _isInt8    = true; // false → FP16 fallback was loaded
+  bool _isInt8    = true; // false -> FP16 fallback was loaded
 
   static const String _int8Model = 'assets/models/efficientnetb3_maize_int8.tflite';
   static const String _fp16Model = 'assets/models/efficientnetb3_maize_fp16.tflite';
@@ -67,36 +66,58 @@ class ClassifierService {
 
     final resized = img.copyResize(decoded, width: _inputSize, height: _inputSize);
 
-    // Build [1, 300, 300, 3] uint8 input tensor
-    final input = Uint8List(_inputSize * _inputSize * 3);
-    int idx = 0;
-    for (int y = 0; y < _inputSize; y++) {
-      for (int x = 0; x < _inputSize; x++) {
-        final pixel = resized.getPixel(x, y);
-        input[idx++] = pixel.r.toInt();
-        input[idx++] = pixel.g.toInt();
-        input[idx++] = pixel.b.toInt();
+    // Inspect actual input tensor type to prevent buffer length mismatch crashes
+    final inputTensorInfo = _interpreter!.getInputTensor(0);
+    final isFloatInput = inputTensorInfo.type == TensorType.float32;
+
+    dynamic inputTensor;
+
+    if (isFloatInput) {
+      // FP16 / Float32 model: expects [1, 300, 300, 3] float32
+      final floatBuffer = Float32List(_inputSize * _inputSize * 3);
+      int idx = 0;
+      for (int y = 0; y < _inputSize; y++) {
+        for (int x = 0; x < _inputSize; x++) {
+          final pixel = resized.getPixel(x, y);
+          floatBuffer[idx++] = pixel.r.toDouble();
+          floatBuffer[idx++] = pixel.g.toDouble();
+          floatBuffer[idx++] = pixel.b.toDouble();
+        }
       }
+      inputTensor = floatBuffer.reshape([1, _inputSize, _inputSize, 3]);
+    } else {
+      // INT8 / Uint8 model: expects [1, 300, 300, 3] uint8
+      final uintBuffer = Uint8List(_inputSize * _inputSize * 3);
+      int idx = 0;
+      for (int y = 0; y < _inputSize; y++) {
+        for (int x = 0; x < _inputSize; x++) {
+          final pixel = resized.getPixel(x, y);
+          uintBuffer[idx++] = pixel.r.toInt();
+          uintBuffer[idx++] = pixel.g.toInt();
+          uintBuffer[idx++] = pixel.b.toInt();
+        }
+      }
+      inputTensor = uintBuffer.reshape([1, _inputSize, _inputSize, 3]);
     }
 
-    final inputTensor = input.reshape([1, _inputSize, _inputSize, 3]);
+    // ── Output buffer — dynamically match output tensor type ──────────────────
+    final outputTensorInfo = _interpreter!.getOutputTensor(0);
+    final isFloatOutput = outputTensorInfo.type == TensorType.float32;
 
-    // ── Output buffer — type depends on loaded model ───────────────────────────
-    // INT8 → int buffer; FP16 → double buffer. Mixing types causes a cast error.
-    final outputTensor = _isInt8
-        ? List.filled(_numClasses, 0).reshape([1, _numClasses])
-        : List.filled(_numClasses, 0.0).reshape([1, _numClasses]);
+    final outputTensor = isFloatOutput
+        ? List.filled(_numClasses, 0.0).reshape([1, _numClasses])
+        : List.filled(_numClasses, 0).reshape([1, _numClasses]);
 
     _interpreter!.run(inputTensor, outputTensor);
     stopwatch.stop();
 
     // ── Dequantise / normalise ────────────────────────────────────────────────
     List<double> scores;
-    if (_isInt8) {
+    if (!isFloatOutput) {
       final raw = (outputTensor[0] as List).cast<int>();
       scores = raw.map((v) => (v - _zeroPoint) * _scale).toList();
     } else {
-      // FP16 model already outputs float probabilities
+      // FP16/FP32 model already outputs float probabilities
       scores = (outputTensor[0] as List).cast<double>();
     }
 

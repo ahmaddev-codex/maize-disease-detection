@@ -1,14 +1,14 @@
-import 'dart:ui';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
-import '../constants/colors.dart';
+import '../design_system/design_system.dart';
 import '../models/scan_record.dart';
 import '../providers/app_provider.dart';
-import '../widgets/ds.dart';
+import '../services/path_resolver.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -21,57 +21,58 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scans    = ref.watch(scanListProvider);
-    final geoScans = scans.where(
-        (s) => s.latitude != null && s.longitude != null).toList();
+    final scans = ref.watch(scanListProvider);
+    final geoScans = scans.where((s) => s.latitude != null && s.longitude != null).toList();
 
     final centre = geoScans.isNotEmpty
         ? LatLng(
             geoScans.map((s) => s.latitude!).reduce((a, b) => a + b) / geoScans.length,
             geoScans.map((s) => s.longitude!).reduce((a, b) => a + b) / geoScans.length,
           )
-        : const LatLng(9.0820, 8.6753); // Nigeria centre
+        : const LatLng(9.0820, 8.6753); // Center of Nigeria
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: AppBar(
-              title: const Text('Farm Map'),
-              backgroundColor: AppColors.surface.withOpacity(0.80),
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 14),
-                  child: Center(
-                    child: Text('${geoScans.length} pinned',
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            MaizeGuardLogo(size: 22, isDark: Theme.of(context).brightness == Brightness.dark),
+            const SizedBox(width: AppSpacing.sm),
+            const Text('Geospatial Farm Map'),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.md),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: AppRadii.full,
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                ),
+                child: Text(
+                  '${geoScans.length} GPS Pinned',
+                  style: AppTypography.caption.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
       body: geoScans.isEmpty
-          ? EmptyState(
-              icon: Icons.map_rounded,
-              title: 'No GPS data yet',
-              subtitle: 'Scan leaves while GPS is enabled\nto pin disease locations on your farm.',
-              action: ElevatedButton.icon(
-                onPressed: () => context.push('/camera'),
-                icon: const Icon(Icons.camera_alt_rounded, size: 16),
-                label: const Text('Start scanning'),
-              ),
+          ? EmptyStateView(
+              illustration: const MaizeGuardLogo(size: 56),
+              title: 'No Geospatial Data Yet',
+              message: 'Leaf scans taken with device GPS enabled will be georeferenced and mapped across your farmland.',
+              actionLabel: 'Scan Field',
+              onAction: () => context.push('/camera'),
             )
           : Stack(
               children: [
-                // ── Map ─────────────────────────────────────────────────
                 FlutterMap(
                   options: MapOptions(
                     initialCenter: centre,
@@ -84,24 +85,63 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       userAgentPackageName: 'com.maizeguard.app',
                     ),
                     MarkerLayer(
-                      markers: geoScans.map((scan) => Marker(
-                        width: 40, height: 40,
-                        point: LatLng(scan.latitude!, scan.longitude!),
-                        child: GestureDetector(
-                          onTap: () => setState(() =>
-                              _selected = _selected?.id == scan.id ? null : scan),
-                          child: _DiseasePin(scan: scan,
-                              selected: _selected?.id == scan.id),
-                        ),
-                      )).toList(),
+                      markers: geoScans.map((scan) {
+                        final isSelected = _selected?.id == scan.id;
+                        final pinColor = switch (scan.classId) {
+                          0 => AppColors.nclb,
+                          1 => AppColors.rust,
+                          2 => AppColors.gls,
+                          3 => AppColors.healthy,
+                          _ => AppColors.charcoal500,
+                        };
+
+                        return Marker(
+                          width: 44,
+                          height: 44,
+                          point: LatLng(scan.latitude!, scan.longitude!),
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selected = isSelected ? null : scan),
+                            child: AnimatedScale(
+                              scale: isSelected ? 1.3 : 1.0,
+                              duration: const Duration(milliseconds: 150),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: pinColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: isSelected ? 3 : 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: pinColor.withValues(alpha: 0.5),
+                                      blurRadius: isSelected ? 12 : 6,
+                                      spreadRadius: isSelected ? 2 : 1,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  scan.classId == 3
+                                      ? Icons.check_rounded
+                                      : Icons.warning_amber_rounded,
+                                  color: Colors.white,
+                                  size: isSelected ? 24 : 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
                 ),
 
-                // ── Detail popup on marker tap ───────────────────────────
+                // Interactive Bottom Detail Sheet
                 if (_selected != null)
                   Positioned(
-                    bottom: 24, left: 16, right: 16,
+                    bottom: AppSpacing.lg,
+                    left: AppSpacing.md,
+                    right: AppSpacing.md,
                     child: _ScanDetailCard(
                       scan: _selected!,
                       onClose: () => setState(() => _selected = null),
@@ -113,130 +153,106 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 }
 
-class _DiseasePin extends StatelessWidget {
-  const _DiseasePin({required this.scan, required this.selected});
-  final ScanRecord scan;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = AppColors.forClass(scan.classId);
-    return AnimatedScale(
-      scale: selected ? 1.25 : 1.0,
-      duration: const Duration(milliseconds: 150),
-      child: Container(
-        decoration: BoxDecoration(
-          color: selected ? color : color.withOpacity(0.85),
-          shape: BoxShape.circle,
-          border: Border.all(
-              color: Colors.white, width: selected ? 3 : 2),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(selected ? 0.5 : 0.3),
-              blurRadius: selected ? 12 : 6,
-              spreadRadius: selected ? 2 : 1,
-            ),
-          ],
-        ),
-        child: Icon(
-          scan.classId == 3
-              ? Icons.check_rounded
-              : Icons.warning_amber_rounded,
-          color: Colors.white,
-          size: selected ? 22 : 18,
-        ),
-      ),
-    );
-  }
-}
-
-class _ScanDetailCard extends StatelessWidget {
-  const _ScanDetailCard({required this.scan, required this.onClose});
+class _ScanDetailCard extends ConsumerWidget {
   final ScanRecord scan;
   final VoidCallback onClose;
 
+  const _ScanDetailCard({required this.scan, required this.onClose});
+
   @override
-  Widget build(BuildContext context) {
-    final color = AppColors.forClass(scan.classId);
-    return GlassCard(
-      radius: AppRadius.lg,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final absPath = PathResolver.resolve(scan.imagePath);
+    final hasImage = scan.imagePath.isNotEmpty && File(absPath).existsSync();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final badgeColor = switch (scan.classId) {
+      0 => AppColors.nclb,
+      1 => AppColors.rust,
+      2 => AppColors.gls,
+      3 => AppColors.healthy,
+      _ => AppColors.charcoal500,
+    };
+
+    return AppCard(
+      surfaceColor: isDark ? AppColors.surfaceDark : Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                shape: BoxShape.circle,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasImage)
+                ClipRRect(
+                  borderRadius: AppRadii.md,
+                  child: Image.file(
+                    File(absPath),
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              else
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: badgeColor.withValues(alpha: 0.15),
+                    borderRadius: AppRadii.md,
+                  ),
+                  child: Icon(Icons.eco_outlined, color: badgeColor, size: 24),
+                ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scan.className,
+                      style: AppTypography.h3.copyWith(
+                        color: isDark ? Colors.white : AppColors.charcoal900,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${DateFormat('d MMM yyyy · HH:mm').format(scan.scannedAt)} · ${(scan.confidence * 100).toStringAsFixed(0)}% Confidence',
+                      style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
+                    ),
+                  ],
+                ),
               ),
-              child: Icon(
-                scan.classId == 3 ? Icons.check_circle_rounded : Icons.warning_rounded,
-                color: color, size: 20,
+              IconButton(
+                icon: const Icon(Icons.close_rounded, size: 20),
+                onPressed: onClose,
+                color: AppColors.charcoal400,
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(scan.shortName,
-                    style: TextStyle(fontWeight: FontWeight.w800,
-                        fontSize: 15, color: color)),
-                Text(DateFormat('d MMM yyyy · HH:mm').format(scan.scannedAt),
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary)),
-              ],
-            )),
-            IconButton(
-              icon: const Icon(Icons.close_rounded,
-                  size: 18, color: AppColors.textSecondary),
-              onPressed: onClose,
-            ),
-          ]),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-          Row(children: [
-            _DetailChip('Confidence',
-                '${(scan.confidence * 100).toStringAsFixed(0)}%', color),
-            const SizedBox(width: 10),
-            if (scan.cropVariety != null)
-              _DetailChip('Variety', scan.cropVariety!, AppColors.successFg),
-          ]),
-          if (scan.latitude != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              '${scan.latitude!.toStringAsFixed(5)}, ${scan.longitude!.toStringAsFixed(5)}',
-              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-            ),
-          ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined, size: 14, color: AppColors.emeraldBase),
+              const SizedBox(width: 4),
+              Text(
+                'Lat: ${scan.latitude!.toStringAsFixed(5)}, Lon: ${scan.longitude!.toStringAsFixed(5)}',
+                style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppButton(
+            label: 'View Detailed Diagnosis & Treatment',
+            icon: Icons.assignment_outlined,
+            backgroundColor: AppColors.forestDark,
+            onPressed: () {
+              ref.read(activeScanIdProvider.notifier).state = scan.id;
+              context.push('/result');
+            },
+          ),
         ],
       ),
     );
   }
-}
-
-class _DetailChip extends StatelessWidget {
-  const _DetailChip(this.label, this.value, this.color);
-  final String label, value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.10),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-        Text(value,
-            style: TextStyle(fontSize: 13,
-                fontWeight: FontWeight.w700, color: color)),
-      ],
-    ),
-  );
 }

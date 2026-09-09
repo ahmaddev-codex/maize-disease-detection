@@ -1,15 +1,12 @@
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../constants/colors.dart';
-import '../models/scan_record.dart';
+import '../design_system/design_system.dart';
 import '../providers/app_provider.dart';
 import '../services/classifier_service.dart';
 import '../services/path_resolver.dart';
-import '../widgets/ds.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -33,370 +30,413 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   String _greeting() {
     final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return 'Good Morning';
+    if (h < 17) return 'Good Afternoon';
+    return 'Good Evening';
   }
 
   @override
   Widget build(BuildContext context) {
     final scans   = ref.watch(scanListProvider);
     final isReady = ref.watch(classifierReadyProvider);
-    final isDark  = ref.watch(isDarkModeProvider);
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
     final recent  = scans.take(5).toList();
 
-    // Stats derived from all scans
     final total      = scans.length;
     final healthy    = scans.where((s) => s.classId == 3).length;
     final healthPct  = total == 0 ? 100 : (healthy / total * 100).round();
     final diseased   = total - healthy;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.canvasDark : AppColors.canvas,
+      backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
       body: CustomScrollView(
         slivers: [
-          // ── Glass app bar ────────────────────────────────────────────────
+          // ── Atmospheric Header ───────────────────────────────────────────
           SliverAppBar(
             pinned: true,
-            expandedHeight: 110,
-            backgroundColor:
-                (isDark ? AppColors.surfaceDark : AppColors.surface).withOpacity(0.88),
-            surfaceTintColor: Colors.transparent,
+            expandedHeight: 120,
+            backgroundColor: AppColors.forestDark,
+            foregroundColor: Colors.white,
             elevation: 0,
             actions: [
               IconButton(
-                icon: const DuotoneIcon(Icons.map_rounded,
-                    size: 20,
-                    primaryColor: AppColors.successFg,
-                    secondaryColor: Color(0xFF69F0AE)),
-                tooltip: 'Farm Map',
+                icon: const Icon(Icons.map_outlined, color: Colors.white),
+                tooltip: 'Geospatial Farm Map',
                 onPressed: () => context.push('/map'),
               ),
-              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Icons.document_scanner_outlined, color: Colors.white),
+                tooltip: 'Seed Label OCR',
+                onPressed: () => context.push('/ocr'),
+              ),
+              const SizedBox(width: AppSpacing.xs),
             ],
-            flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: FlexibleSpaceBar(
-                  titlePadding: const EdgeInsets.only(left: 16, bottom: 12),
-                  title: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_greeting(),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w400,
-                            color: AppColors.textSecondary,
-                          )),
-                      const Text('MaizeGuard',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          )),
-                    ],
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.only(left: AppSpacing.md, bottom: AppSpacing.md),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _greeting(),
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.charcoal400,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 3),
+                  const MaizeGuardWordmark(
+                    height: 20,
+                    isDark: true,
+                  ),
+                ],
               ),
             ),
           ),
 
+          // ── Main Body ────────────────────────────────────────────────────
           SliverPadding(
-            padding: AppSpacing.pagePad,
+            padding: const EdgeInsets.all(AppSpacing.md),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                const SizedBox(height: 12),
+                // 1. Edge Neural Engine Status Pill
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: isReady ? AppColors.emeraldLight : AppColors.charcoal400,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      isReady ? 'EfficientNetB3 Edge Runtime Ready' : 'Loading Neural Checkpoint…',
+                      style: AppTypography.caption.copyWith(
+                        color: isDark ? AppColors.charcoal400 : AppColors.charcoal600,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
 
-                // ── Model status ─────────────────────────────────────────
-                _ModelStatusChip(isReady: isReady),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
 
-                // ── Hero scan card ───────────────────────────────────────
-                _ScanHeroCard(),
-                const SizedBox(height: 12),
+                // 2. Primary Scan Hero Card
+                AppCard(
+                  surfaceColor: AppColors.forestDark,
+                  borderColor: AppColors.primaryLight.withValues(alpha: 0.3),
+                  onTap: () => context.push('/camera'),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                borderRadius: AppRadii.sm,
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                              ),
+                              child: Text(
+                                'REAL-TIME DIAGNOSIS',
+                                style: AppTypography.overline.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              'Diagnose Maize Foliage',
+                              style: AppTypography.h2.copyWith(color: Colors.white),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Instant edge inference for NCLB, Rust, and GLS. Works fully offline.',
+                              style: AppTypography.bodySmall.copyWith(color: AppColors.charcoal300),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.emeraldBase,
+                                    borderRadius: AppRadii.md,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Open Camera',
+                                        style: AppTypography.bodySmall.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                        ),
+                        child: const Center(
+                          child: MaizeGuardLogo(
+                            size: 42,
+                            isDark: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-                // ── Seed label shortcut ─────────────────────────────────
-                _OcrCard(),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.md),
 
-                // ── Quick stats ─────────────────────────────────────────
-                const SectionLabel('Farm Overview', topMargin: 0),
-                Row(children: [
-                  Expanded(child: StatChip(
-                    value: '$total',
-                    label: 'Total scans',
-                    icon: Icons.qr_code_scanner_rounded,
-                    color: AppColors.accent,
-                  )),
-                  const SizedBox(width: 10),
-                  Expanded(child: StatChip(
-                    value: '$healthPct%',
-                    label: 'Healthy',
-                    icon: Icons.favorite_rounded,
-                    color: AppColors.successFg,
-                  )),
-                  const SizedBox(width: 10),
-                  Expanded(child: StatChip(
-                    value: '$diseased',
-                    label: 'Diseased',
-                    icon: Icons.warning_rounded,
-                    color: AppColors.dangerFg,
-                  )),
-                ]),
+                // 3. Quick Utility Actions Grid (Seed OCR & Farm Map)
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppCard(
+                        onTap: () => context.push('/ocr'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.qr_code_scanner_rounded, color: AppColors.emeraldBase, size: 28),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text('Seed Label OCR', style: AppTypography.h3),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Extract lot number & crop variety',
+                              style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: AppCard(
+                        onTap: () => context.push('/map'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.pin_drop_outlined, color: AppColors.emeraldBase, size: 28),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text('Field Disease Map', style: AppTypography.h3),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Geospatial farm tracking',
+                              style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
 
-                // ── Recent scans ─────────────────────────────────────────
-                if (recent.isNotEmpty) ...[
-                  const SectionLabel('Recent Scans'),
-                  GlassCard(
+                const SizedBox(height: AppSpacing.lg),
+
+                // 4. Farm Health Overview Bar
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('FARM HEALTH STATUS', style: AppTypography.overline.copyWith(color: AppColors.charcoal500)),
+                    GestureDetector(
+                      onTap: () => context.go('/dashboard'),
+                      child: Text(
+                        'Detailed Analytics →',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.emeraldBase,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('$total', style: AppTypography.h2),
+                            Text('Total Scans', style: AppTypography.caption.copyWith(color: AppColors.charcoal500)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$healthPct%',
+                              style: AppTypography.h2.copyWith(color: AppColors.healthy),
+                            ),
+                            Text('Healthy Rate', style: AppTypography.caption.copyWith(color: AppColors.charcoal500)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$diseased',
+                              style: AppTypography.h2.copyWith(color: AppColors.rust),
+                            ),
+                            Text('Infections', style: AppTypography.caption.copyWith(color: AppColors.charcoal500)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: AppSpacing.lg),
+
+                // 5. Recent Diagnoses Section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('RECENT FIELD DIAGNOSES', style: AppTypography.overline.copyWith(color: AppColors.charcoal500)),
+                    if (recent.isNotEmpty)
+                      GestureDetector(
+                        onTap: () => context.go('/history'),
+                        child: Text(
+                          'View All (${scans.length})',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.emeraldBase,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+
+                if (recent.isEmpty)
+                  AppCard(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            const Icon(Icons.grass_rounded, size: 40, color: AppColors.charcoal300),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text('No Diagnoses Recorded Yet', style: AppTypography.h3),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Tap "Diagnose Maize Foliage" above to scan your first leaf.',
+                              style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  AppCard(
                     padding: EdgeInsets.zero,
                     child: Column(
                       children: recent.asMap().entries.map((e) {
                         final scan = e.value;
                         final isLast = e.key == recent.length - 1;
+                        final absPath = PathResolver.resolve(scan.imagePath);
+                        final hasImage = scan.imagePath.isNotEmpty && File(absPath).existsSync();
+
+                        final badgeColor = switch (scan.classId) {
+                          0 => AppColors.nclb,
+                          1 => AppColors.rust,
+                          2 => AppColors.gls,
+                          3 => AppColors.healthy,
+                          _ => AppColors.charcoal500,
+                        };
+
                         return Column(
                           children: [
-                            _ScanRow(scan: scan),
-                            if (!isLast)
-                              const Divider(height: 1, indent: 72, endIndent: 16),
+                            ListTile(
+                              onTap: () {
+                                ref.read(activeScanIdProvider.notifier).state = scan.id;
+                                ref.read(lastResultProvider.notifier).state = scan.toResult();
+                                ref.read(lastImagePathProvider.notifier).state = absPath;
+                                ref.read(lastScanVarietyProvider.notifier).state = scan.cropVariety;
+                                context.push('/result');
+                              },
+                              leading: ClipRRect(
+                                borderRadius: AppRadii.sm,
+                                child: hasImage
+                                    ? Image.file(File(absPath), width: 44, height: 44, fit: BoxFit.cover)
+                                    : Container(
+                                        width: 44,
+                                        height: 44,
+                                        color: badgeColor.withValues(alpha: 0.12),
+                                        child: Icon(Icons.eco_outlined, color: badgeColor, size: 20),
+                                      ),
+                              ),
+                              title: Text(
+                                scan.className,
+                                style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.w700),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                DateFormat('d MMM · HH:mm').format(scan.scannedAt),
+                                style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
+                              ),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: badgeColor.withValues(alpha: 0.15),
+                                  borderRadius: AppRadii.sm,
+                                ),
+                                child: Text(
+                                  '${(scan.confidence * 100).toStringAsFixed(0)}%',
+                                  style: AppTypography.caption.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: badgeColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (!isLast) const Divider(height: 1, indent: 70),
                           ],
                         );
                       }).toList(),
                     ),
                   ),
-                ],
+
+                const SizedBox(height: AppSpacing.xxl),
               ]),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Model status chip ─────────────────────────────────────────────────────────
-class _ModelStatusChip extends StatelessWidget {
-  const _ModelStatusChip({required this.isReady});
-  final bool isReady;
-
-  @override
-  Widget build(BuildContext context) => Row(children: [
-    Container(
-      width: 7, height: 7,
-      decoration: BoxDecoration(
-        color: isReady ? AppColors.successFg : AppColors.attentionFg,
-        shape: BoxShape.circle,
-        boxShadow: [BoxShadow(
-          color: (isReady ? AppColors.successFg : AppColors.attentionFg)
-              .withOpacity(0.5),
-          blurRadius: 6,
-        )],
-      ),
-    ),
-    const SizedBox(width: 6),
-    Text(
-      isReady
-          ? ClassifierService.instance.modelStatus
-          : 'Loading model…',
-      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-    ),
-  ]);
-}
-
-// ── Hero scan card ─────────────────────────────────────────────────────────────
-class _ScanHeroCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: () => context.push('/camera'),
-    child: GlassCard(
-      radius: AppRadius.lg,
-      padding: const EdgeInsets.all(20),
-      child: Row(children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.accentLight,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text('AI DETECTION',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.accent,
-                      letterSpacing: 0.8,
-                    )),
-              ),
-              const SizedBox(height: 8),
-              Text('Scan a Leaf',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  )),
-              const SizedBox(height: 4),
-              const Text('Camera or gallery · <2s on-device',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.accent, AppColors.accentFg],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.accent.withOpacity(0.30),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
-                    SizedBox(width: 8),
-                    Text('Scan Now',
-                        style: TextStyle(color: Colors.white,
-                            fontWeight: FontWeight.w700, fontSize: 14)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        // Decorative icon graphic
-        Container(
-          width: 80, height: 80,
-          decoration: BoxDecoration(
-            color: AppColors.accentLight,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Icon(Icons.grass_rounded,
-              size: 46, color: AppColors.accent),
-        ),
-      ]),
-    ),
-  );
-}
-
-// ── OCR shortcut card ─────────────────────────────────────────────────────────
-class _OcrCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: () => context.push('/ocr'),
-    child: GlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(children: [
-        Container(
-          width: 44, height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.doneFg.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const DuotoneIcon(Icons.document_scanner_rounded,
-              size: 22,
-              primaryColor: AppColors.doneFg,
-              secondaryColor: Color(0xFFB39DDB)),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Scan Seed Label',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700)),
-              const SizedBox(height: 2),
-              const Text('Extract variety, batch & planting date via OCR',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-            ],
-          ),
-        ),
-        const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
-      ]),
-    ),
-  );
-}
-
-// ── Scan row in recent list ───────────────────────────────────────────────────
-class _ScanRow extends ConsumerWidget {
-  const _ScanRow({super.key, required this.scan});
-  final ScanRecord scan;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final color      = AppColors.forClass(scan.classId);
-    final absPath    = PathResolver.resolve(scan.imagePath);
-    final hasImage   = scan.imagePath.isNotEmpty && File(absPath).existsSync();
-
-    return InkWell(
-      onTap: () {
-        final result = ClassificationResult(
-          classId:    scan.classId,
-          className:  scan.className,
-          shortName:  scan.shortName,
-          confidence: scan.confidence,
-          allScores:  scan.allScores,
-          latencyMs:  scan.latencyMs,
-        );
-        ref.read(lastResultProvider.notifier).state       = result;
-        ref.read(lastImagePathProvider.notifier).state    = absPath;
-        ref.read(lastScanVarietyProvider.notifier).state  = scan.cropVariety;
-        context.push('/recommendation');
-      },
-      borderRadius: BorderRadius.circular(0),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(children: [
-          // Thumbnail
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: hasImage
-                ? Image.file(File(absPath),
-                    width: 48, height: 48, fit: BoxFit.cover)
-                : Container(
-                    width: 48, height: 48,
-                    color: color.withOpacity(0.12),
-                    child: Icon(Icons.grass_rounded,
-                        color: color.withOpacity(0.5), size: 24),
-                  ),
-          ),
-          const SizedBox(width: 12),
-          // Disease + date
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  DiseaseDot(color),
-                  const SizedBox(width: 6),
-                  Text(scan.shortName,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                ]),
-                const SizedBox(height: 2),
-                Text(DateFormat('d MMM, HH:mm').format(scan.scannedAt),
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          // Confidence badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.10),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text('${(scan.confidence * 100).toStringAsFixed(0)}%',
-                style: TextStyle(
-                    fontSize: 12, color: color, fontWeight: FontWeight.w700)),
-          ),
-        ]),
       ),
     );
   }

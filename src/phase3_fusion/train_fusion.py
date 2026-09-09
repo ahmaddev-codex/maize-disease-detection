@@ -64,9 +64,10 @@ def compute_or_load_metadata(df: pd.DataFrame) -> np.ndarray:
 
 def _load_image(path: str) -> tf.Tensor:
     raw   = tf.io.read_file(path)
-    image = tf.image.decode_jpeg(raw, channels=3)
-    image = tf.image.resize(image, IMG_SIZE)
-    return tf.cast(image, tf.float32)   # keep [0, 255]; EfficientNetB3 rescales internally
+    image = tf.image.decode_image(raw, channels=3, expand_animations=False)
+    image = tf.image.resize(image, [IMG_SIZE, IMG_SIZE])
+    image = tf.cast(image, tf.float32)   # keep [0, 255]; EfficientNetB3 rescales internally
+    return image
 
 
 def build_fusion_dataset(

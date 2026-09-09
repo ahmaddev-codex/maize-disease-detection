@@ -16,6 +16,8 @@ class ScanRecord {
   final String? plantingDate;
   final DateTime scannedAt;
   final String? notes;
+  // 1 = correct, 0 = incorrect, -1 = unsure, null = no feedback
+  final int? feedback;
 
   const ScanRecord({
     this.id,
@@ -33,6 +35,7 @@ class ScanRecord {
     this.plantingDate,
     required this.scannedAt,
     this.notes,
+    this.feedback,
   });
 
   bool get hasGps => latitude != null && longitude != null;
@@ -52,9 +55,19 @@ class ScanRecord {
     'crop_variety':  cropVariety,
     'batch_number':  batchNumber,
     'planting_date': plantingDate,
-    'scanned_at':    scannedAt.toIso8601String(),
+    'scanned_at':    scannedAt.toUtc().toIso8601String(),
     'notes':         notes,
+    'feedback':      feedback,
   };
+
+  ClassificationResult toResult() => ClassificationResult(
+    classId: classId,
+    className: className,
+    shortName: shortName,
+    confidence: confidence,
+    allScores: allScores,
+    latencyMs: latencyMs,
+  );
 
   factory ScanRecord.fromMap(Map<String, dynamic> m) => ScanRecord(
     id:            m['id'] as int?,
@@ -72,11 +85,12 @@ class ScanRecord {
     cropVariety:   m['crop_variety'] as String?,
     batchNumber:   m['batch_number'] as String?,
     plantingDate:  m['planting_date'] as String?,
-    scannedAt:     DateTime.parse(m['scanned_at'] as String),
+    scannedAt:     DateTime.parse(m['scanned_at'] as String).toUtc(),
     notes:         m['notes'] as String?,
+    feedback:      m['feedback'] as int?,
   );
 
-  ScanRecord copyWith({String? notes}) => ScanRecord(
+  ScanRecord copyWith({String? notes, int? feedback}) => ScanRecord(
     id:            id,
     imagePath:     imagePath,
     classId:       classId,
@@ -92,6 +106,7 @@ class ScanRecord {
     plantingDate:  plantingDate,
     scannedAt:     scannedAt,
     notes:         notes ?? this.notes,
+    feedback:      feedback ?? this.feedback,
   );
 }
 

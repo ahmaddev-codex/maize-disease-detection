@@ -136,3 +136,46 @@ Features from `features.md` split into logical, sequential phases. Each phase bu
 | [~] | F47 | REST API endpoints |
 
 **Gate:** Drone telemetry appears on live map; at least one patch classified and pinned.
+
+---
+
+## [~] Phase 9 — UX Refinement & Practical Deployment
+**Goal:** Fix the duplicate recommendation confusion, unify the result→advice flow, add confidence gating, and add feedback collection — making the app genuinely usable for low-resource field deployment.
+
+| Status | Feature | Description |
+|--------|---------|-------------|
+| [~] | F63 | Confidence gate — low-confidence banner + retake tips |
+| []  | F64 | Multi-leaf scan mode — 3-leaf aggregation |
+| [~] | F65 | Scan feedback — "Was this correct?" stored to DB (v2 migration) |
+| [~] | F66 | Unified result + advice screen — recommendation_screen deleted |
+| [~] | F67 | Single AI advice card with "AI-enhanced" source badge |
+| [~] | F68 | Redesigned ResultScreen — verdict above fold, scores collapsible |
+| [~] | F69 | OCR inline correction — editable Review & Correct form |
+| [~] | F70 | Text-to-speech via flutter_tts — speaker button on verdict card |
+
+**Gate:** Result screen shows diagnosis + advice in one view with no duplicate content; low-confidence scans show retake tips; feedback prompt appears after AI advice loads.
+
+---
+
+## [~] Phase 10 — Language & Translation
+**Goal:** Farmers who are more comfortable in Yoruba, Igbo, or Hausa can read both the diagnosis result and the AI advice in their language with one setting change.
+
+| Status | Feature | Description |
+|--------|---------|-------------|
+| [~] | F71 | Display language setting — English / Yoruba / Igbo / Hausa in Settings |
+| [~] | F72 | AI advice generated in selected language — language instruction in prompt |
+| [~] | F73 | Recommendation screen translate button — rewrites on-device advice in selected language via AI |
+
+**Gate:** Switching to Hausa and tapping "Get AI Advice" returns the full advice in Hausa; tapping "Translate advice to Hausa" rewrites the on-device recommendation text in Hausa.
+
+---
+
+## [x] Phase 11 — AI Reliability (Gemini → Groq Fallback)
+**Goal:** Prevent complete AI advice failure when Gemini is unavailable (no key, rate-limit, network error) by automatically retrying with Groq — transparent to the farmer.
+
+| Status | Feature | Description |
+|--------|---------|-------------|
+| [x] | F74 | Gemini → Groq automatic fallback in `AiAdvisor` |
+| [x] | F75 | `GROQ_API_KEY` compile-time constant via `AppEnv` |
+
+**Gate:** With GEMINI_API_KEY intentionally blank and a valid GROQ_API_KEY in .env.json, "Get AI Advice" returns a valid response using the Groq backend.

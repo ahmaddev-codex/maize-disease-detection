@@ -48,9 +48,7 @@ All features of the MaizeGuard platform across mobile, backend, model, and UAV.
 - [x] F23 — Nigerian farming season detection (main Apr–Jul / off Aug–Nov / dry Dec–Mar)
 - [x] F24 — Gemini 2.0 Flash AI agronomic advice (production backend; requires API key)
 - [x] F25 — Gemini API key stored in FlutterSecureStorage (never leaves device)
-- [x] F60 — Ollama local AI backend for development (auto-selected in debug builds; no API key needed)
-- [x] F61 — AI backend toggle in Settings — switch between Ollama and Gemini at any time
-- [x] F62 — Ollama host and model configurable in Settings (default: `localhost:11434`, `llama3.1:8b`)
+- [x] F60 — Ollama local AI backend for development (auto-selected in debug builds via `kDebugMode`; no API key needed)
 
 ### Settings & UX
 - [x] F26 — Dark / light theme toggle (persisted to SharedPreferences)
@@ -105,3 +103,36 @@ All features of the MaizeGuard platform across mobile, backend, model, and UAV.
 - [x] F51 — Class imbalance handling: weighted loss or oversampling
 - [x] F52 — EarlyStopping + ReduceLROnPlateau callbacks
 - [x] F53 — TFLite export (INT8 + FP16) after training
+
+---
+
+## UX Refinement & Practical Deployment
+
+### Confidence & Diagnosis Quality
+- [~] F63 — Confidence gate: if top-class score < 60%, a warning banner appears above the verdict card with retake tips (lighting, framing, distance); full result still shown below
+- [] F64 — Multi-leaf scan mode: scan 3 leaves in one session, aggregate predictions (modal class + averaged confidence), show a summary card before committing the record
+- [~] F65 — Scan feedback loop: "Was this diagnosis correct?" (Yes / No / Unsure) appears after AI advice loads; answer stored in DB `feedback` column (v2 migration); confirmed with a thank-you message
+
+### Unified Recommendation Flow
+- [~] F66 — ResultScreen is the unified screen: verdict card + on-device recommendation sections + inline AI advice in one scrollable view; `recommendation_screen.dart` and `ai_advice_sheet.dart` deleted; `/recommendation` now aliases `/result`
+- [~] F67 — Single AI advice card with "AI-enhanced" source badge; on-device sections shown first with no duplicate treatment/prevention lists; AI card loads in-place below them
+- [~] F68 — Redesigned ResultScreen: verdict card above the fold (disease name, urgency label, confidence + latency); "About this disease" and "Class scores" are collapsible cards at the bottom
+
+### OCR Improvements
+- [~] F69 — OCR inline correction: "Review & Correct" section shows editable TextFields pre-filled with OCR output; corrected values (not raw OCR) are attached to the next scan
+
+### Accessibility
+- [~] F70 — Text-to-speech: English → device TTS (`flutter_tts ^4.0.2`); Yoruba / Igbo / Hausa → YarnGPT API (`yarn_tts_service.dart`) with language-appropriate voices (Idera / Chinenye / Zainab); speaker icon on verdict card shows spinner while API loads, stop icon while playing; priority: translated sections → AI advice → English verdict fallback
+
+### Language & Translation
+- [~] F71 — "Display language" setting: English / Yoruba / Igbo / Hausa — persisted to SharedPreferences, selectable from Settings
+- [~] F72 — AI advice generated in the selected display language — language instruction added to the Gemini/Groq/Ollama prompt so the full response arrives in the farmer's language
+- [~] F73 — Recommendation screen translation: when a non-English display language is selected, a "Translate advice" button calls AI to rewrite the on-device recommendation text in the chosen language; translated text appears below the English content for that session
+
+---
+
+## AI Reliability
+
+### Gemini → Groq Fallback
+- [x] F74 — Groq as automatic fallback: in release builds, if Gemini fails for any reason (no key, rate-limit, network error, non-200 response), AiAdvisor automatically retries the same prompt against Groq (`llama-3.3-70b-versatile`) before surfacing an error to the user — zero extra user interaction required
+- [x] F75 — GROQ_API_KEY in AppEnv: compile-time constant injected via `--dart-define-from-file=.env.json`; baked into the release build so farmers do not need to manage a second API key
