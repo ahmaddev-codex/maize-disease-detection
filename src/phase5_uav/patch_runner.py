@@ -106,7 +106,7 @@ def load_image(path: str) -> Tuple[np.ndarray, GeoTransform]:
             arr = np.moveaxis(arr, 0, -1)      # → (H, W, 3)
             if arr.dtype != np.uint8:
                 arr = (arr / arr.max() * 255).astype(np.uint8)
-            t: Affine = src.transform
+            t = src.transform
             gt = GeoTransform(t.c, t.f, t.a, t.e)
         return arr, gt
 

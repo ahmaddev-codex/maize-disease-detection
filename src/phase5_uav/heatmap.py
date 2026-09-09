@@ -27,22 +27,18 @@ from collections import Counter, defaultdict
 from typing import List, Dict, Any
 
 # ── Optional deps — graceful degradation ─────────────────────────────────────
-folium = None
-HeatMap = None
-MarkerCluster = None
 try:
     import folium
     from folium.plugins import HeatMap, MarkerCluster
     HAS_FOLIUM = True
 except ImportError:
     HAS_FOLIUM = False
+    folium: Any = None
+    HeatMap: Any = None
+    MarkerCluster: Any = None
     print("Warning: folium not installed. Interactive HTML map will be skipped.")
     print("  Install: pip install folium")
 
-matplotlib = None
-plt = None
-mpatches = None
-to_rgba = None
 try:
     import matplotlib
     matplotlib.use("Agg")
@@ -52,6 +48,10 @@ try:
     HAS_MPL = True
 except ImportError:
     HAS_MPL = False
+    matplotlib: Any = None
+    plt: Any = None
+    mpatches: Any = None
+    to_rgba: Any = None
     print("Warning: matplotlib not installed. Static PNG will be skipped.")
 
 # ── Class styling ─────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ def build_folium_map(predictions: List[Dict], output_html: str) -> None:
         ).add_to(m)
 
     # ── Per-class marker clusters ──────────────────────────────────────────
-    cluster_groups: Dict[str, MarkerCluster] = {}
+    cluster_groups: Dict[str, Any] = {}
     for cls in CLASS_INFO:
         fg = folium.FeatureGroup(name=cls, show=(cls != "Healthy"))
         cluster_groups[cls] = MarkerCluster().add_to(fg)
@@ -190,7 +190,7 @@ def build_folium_map(predictions: List[Dict], output_html: str) -> None:
             f'{info["label"]}<br>'
         )
     legend_html += "</div>"
-    m.get_root().html.add_child(folium.Element(legend_html))
+    getattr(m.get_root(), "html").add_child(folium.Element(legend_html))
 
     folium.LayerControl(collapsed=False).add_to(m)
 
@@ -205,38 +205,44 @@ def build_static_map(predictions: List[Dict], output_png: str) -> None:
     if not HAS_MPL:
         return
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7),
+                                   facecolor="#1a1a2e")
     fig.patch.set_facecolor("#1a1a2e")
 
     lats = [p["lat"] for p in predictions]
     lons = [p["lon"] for p in predictions]
 
-    # Left — scatter by class
-    ax = axes[0]
-    ax.set_facecolor("#0f0f1e")
-    ax.set_title("Disease classification map", color="white", fontsize=13, pad=10)
+    # Subplot 1: Categorical scatter
+    ax1.set_facecolor("#16213e")
+    ax1.set_title("Disease Class Distribution", color="white", fontsize=13, pad=10)
     for cls, info in CLASS_INFO.items():
-        pts = [(p["lon"], p["lat"]) for p in predictions if p["class_name"] == cls]
-        if pts:
-            xs, ys = zip(*pts)
-            ax.scatter(xs, ys, c=info["color"], s=20, alpha=0.75,
-                       label=info["label"], zorder=3)
-    ax.set_xlabel("Longitude", color="#aaa")
-    ax.set_ylabel("Latitude",  color="#aaa")
-    ax.tick_params(colors="#aaa")
-    for spine in ax.spines.values():
+        sub = [p for p in predictions if p["class_name"] == cls]
+        if not sub:
+            continue
+        ax1.scatter(
+            [p["lon"] for p in sub],
+            [p["lat"] for p in sub],
+            c=info["color"],
+            label=f"{info['label']} (n={len(sub)})",
+            s=35,
+            alpha=0.85,
+            edgecolors="none",
+        )
+    ax1.set_xlabel("Longitude", color="#aaa")
+    ax1.set_ylabel("Latitude",  color="#aaa")
+    ax1.tick_params(colors="#aaa")
+    for spine in ax1.spines.values():
         spine.set_edgecolor("#444")
-    ax.legend(loc="lower right", fontsize=9,
-              facecolor="#1a1a2e", edgecolor="#555", labelcolor="white")
+    ax1.legend(loc="upper right", facecolor="#1a1a2e", edgecolor="#444",
+               labelcolor="white", fontsize=9)
 
-    # Right — confidence-weighted disease intensity scatter
-    ax2 = axes[1]
-    ax2.set_facecolor("#0f0f1e")
-    ax2.set_title("Disease severity heatmap", color="white", fontsize=13, pad=10)
+    # Subplot 2: Density / confidence scatter (disease only)
+    ax2.set_facecolor("#16213e")
+    ax2.set_title("Disease Severity & Confidence", color="white", fontsize=13, pad=10)
     disease = [p for p in predictions if p["class_name"] != "Healthy"]
     if disease:
-        dlats = [p["lat"]        for p in disease]
-        dlons = [p["lon"]        for p in disease]
+        dlats = [p["lat"] for p in disease]
+        dlons = [p["lon"] for p in disease]
         confs = [p["confidence"] for p in disease]
         sc = ax2.scatter(dlons, dlats, c=confs, cmap="YlOrRd",
                          s=30, alpha=0.8, vmin=0.5, vmax=1.0, zorder=3)

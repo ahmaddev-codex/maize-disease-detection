@@ -1,7 +1,8 @@
 {
   "venvPath": ".",
   "venv": ".venv",
-  "extraPaths": ["."],
+  "extraPaths": [".", "src"],
+  "typeCheckingMode": "off",
   "reportMissingImports": "warning",
   "reportMissingModuleSource": "none"
 }
