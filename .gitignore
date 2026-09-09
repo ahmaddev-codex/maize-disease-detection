@@ -47,6 +47,8 @@ mobile/assets/models/*.tflite
 **/.pub-cache/
 **/.pub/
 mobile/pubspec.lock
+devtools_options.yaml
+**/devtools_options.yaml
 
 # ── Android ──────────────────────────────────────────────────────────────────
 **/.gradle/

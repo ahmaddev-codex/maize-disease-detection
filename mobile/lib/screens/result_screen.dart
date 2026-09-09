@@ -100,12 +100,51 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
     await _stopAudio();
 
-    if (text.trim().isEmpty) return;
+    final cleanText = _cleanMarkdownForSpeech(text);
+    if (cleanText.trim().isEmpty) return;
 
     if (mounted) {
       setState(() => _activeLoadingSection = section);
     }
 
+    final key = ref.read(yarnGptKeyProvider) ?? AppEnv.yarnGptApiKey;
+
+    // 1. Prioritize YarnGPT high-fidelity voice when API key is available
+    if (key.isNotEmpty) {
+      try {
+        await YarnTtsService.instance.speak(
+          text: cleanText,
+          apiKey: key,
+          voice: lang.yarnVoice,
+          onComplete: () {
+            if (mounted && _activePlayingSection == section) {
+              setState(() => _activePlayingSection = null);
+            }
+          },
+        );
+        if (mounted) {
+          setState(() {
+            _activeLoadingSection = null;
+            _activePlayingSection = section;
+          });
+        }
+        return;
+      } catch (e) {
+        debugPrint('[Audio] YarnGPT playback error: $e');
+        if (!lang.isEnglish) {
+          if (mounted) {
+            setState(() {
+              _activeLoadingSection = null;
+              _activePlayingSection = null;
+            });
+          }
+          _showSnack('YarnGPT error: $e');
+          return;
+        }
+      }
+    }
+
+    // 2. Fallback to device TTS for English if YarnGPT is unconfigured or unavailable
     if (lang.isEnglish) {
       if (!_ttsAvailable) {
         if (mounted) setState(() => _activeLoadingSection = null);
@@ -121,7 +160,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             _activePlayingSection = section;
           });
         }
-        await _tts.speak(text);
+        await _tts.speak(cleanText);
       } catch (e) {
         if (mounted) {
           setState(() {
@@ -133,38 +172,8 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         _showSnack('Audio playback error: $e');
       }
     } else {
-      final key = ref.read(yarnGptKeyProvider) ?? AppEnv.yarnGptApiKey;
-      if (key.isEmpty) {
-        if (mounted) setState(() => _activeLoadingSection = null);
-        _showSnack('YarnGPT API key required for local languages. Configure in Settings or .env.json.');
-        return;
-      }
-      try {
-        await YarnTtsService.instance.speak(
-          text: text,
-          apiKey: key,
-          voice: lang.yarnVoice,
-          onComplete: () {
-            if (mounted && _activePlayingSection == section) {
-              setState(() => _activePlayingSection = null);
-            }
-          },
-        );
-        if (mounted) {
-          setState(() {
-            _activeLoadingSection = null;
-            _activePlayingSection = section;
-          });
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() {
-            _activeLoadingSection = null;
-            _activePlayingSection = null;
-          });
-        }
-        _showSnack('YarnGPT playback error: $e');
-      }
+      if (mounted) setState(() => _activeLoadingSection = null);
+      _showSnack('YarnGPT API key required for local languages. Configure in Settings or .env.json.');
     }
   }
 
@@ -242,13 +251,22 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
   String _cleanMarkdownForSpeech(String markdown) {
     var text = markdown;
+    // Strip markdown hashtags
     text = text.replaceAll(RegExp(r'#+\s*'), '');
+    // Strip bold and italics markers
     text = text.replaceAll(RegExp(r'\*\*|__'), '');
     text = text.replaceAll(RegExp(r'[\*_]'), '');
     text = text.replaceAll(RegExp(r'`+[^`]*`+'), '');
     text = text.replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'$1');
-    text = text.replaceAll(RegExp(r'^[0-9]+\.\s*', multiLine: true), '');
+    // Strip markdown table borders and pipe delimiters
+    text = text.replaceAll(RegExp(r'\|[-:\s|]+\|'), '');
+    text = text.replaceAll(RegExp(r'\|'), ' ');
+    // Strip leading bullet icons
     text = text.replaceAll(RegExp(r'^[•\-\*]\s*', multiLine: true), '');
+    text = text.replaceAll('•', '');
+    // Ensure section titles pause naturally
+    text = text.replaceAll(RegExp(r'([0-9]+\.\s+[A-Z\s]+):'), r'$1. ');
+    // Replace newlines with natural pauses
     text = text.replaceAll(RegExp(r'\n+'), '. ');
     text = text.replaceAll(RegExp(r'\s+'), ' ');
     text = text.replaceAll(RegExp(r'\.{2,}'), '.');
@@ -261,47 +279,12 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     ClassificationResult result,
     DisplayLanguage lang,
   ) {
+    // Deliver the exact clinical response produced by the assistant
     final cleaned = _cleanMarkdownForSpeech(advice);
-
-    if (lang.isEnglish) {
-      if (cleaned.length > 380) {
-        final cut = cleaned.substring(0, 380);
-        final lastPeriod = cut.lastIndexOf('.');
-        if (lastPeriod > 100) {
-          return cut.substring(0, lastPeriod + 1);
-        }
-        return '$cut.';
-      }
+    if (cleaned.isNotEmpty) {
       return cleaned;
     }
-
-    final lower = advice.toLowerCase();
-    final isAlreadyLocal = (lang == DisplayLanguage.yoruba && (lower.contains('arun') || lower.contains('oko') || lower.contains('agbado'))) ||
-        (lang == DisplayLanguage.hausa && (lower.contains('cutar') || lower.contains('gona') || lower.contains('masara'))) ||
-        (lang == DisplayLanguage.igbo && (lower.contains('oria') || lower.contains('ubi') || lower.contains('oka')));
-
-    if (isAlreadyLocal) {
-      if (cleaned.length > 350) {
-        final cut = cleaned.substring(0, 350);
-        final lastPeriod = cut.lastIndexOf('.');
-        if (lastPeriod > 80) {
-          return cut.substring(0, lastPeriod + 1);
-        }
-        return '$cut.';
-      }
-      return cleaned;
-    }
-
-    switch (lang) {
-      case DisplayLanguage.yoruba:
-        return 'Imoran agbe lati odo Oluranlowo AI: Fun arun ${disease.name}, e lo ogun olu bii Mancozeb tabi Ridomil Gold leekanna. E rii daju pe e fa koriko kuro, ki e si yago fun bomirin oko ni ale. E se ayewo oko yin leekansi leyin ojo marun.';
-      case DisplayLanguage.hausa:
-        return 'Shawarar masanin aikin gona na AI: Don cutar ${disease.name}, a fesa maganin Mancozeb ko Ridomil Gold da wuri. A tabbatar da bada tazara tsakanin shuke-shuke kuma a guji zuba ruwa da yamma. A sake duba gonar bayan kwanaki biyar.';
-      case DisplayLanguage.igbo:
-        return 'Ndumodu oru ugbo sitere n\'aka AI: Maka oria ${disease.name}, jiri ogwu dika Mancozeb ma o bu Ridomil Gold fesaa n\'isi ututu. Wepu ahihia na akwukwo ndi oria biara na ha. Nyochaa ubi gi ozo mgbe uboci ise gachara.';
-      case DisplayLanguage.english:
-        return cleaned;
-    }
+    return 'Agronomic advisory for ${disease.name}. Follow immediate fungicide and prevention practices.';
   }
 
   void _showSnack(String msg) {
@@ -336,7 +319,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       );
       if (mounted) {
         setState(() {
-          _aiAdvice = advice;
+          _aiAdvice = AiAdvisor.sanitizeAiText(advice);
           _loadingAi = false;
         });
       }
@@ -418,6 +401,15 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _activePlayingSection == null && _activeLoadingSection == null) {
           _playSectionAudio(AudioSection.result, resultAudioText, lang);
+        }
+      });
+    }
+
+    // Auto-fetch Groq agronomic advice so it is loaded and ready with zero farmer friction
+    if (_aiAdvice == null && !_loadingAi && _aiError == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _aiAdvice == null && !_loadingAi && _aiError == null) {
+          _fetchGroqAdvice(result, cropVariety, groqKey, lang.label);
         }
       });
     }
@@ -833,7 +825,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                             border: Border.all(color: isDark ? AppColors.charcoal800 : AppColors.charcoal200),
                           ),
                           child: SelectableText(
-                            _aiAdvice!,
+                            AiAdvisor.sanitizeAiText(_aiAdvice!),
                             style: AppTypography.bodyMedium.copyWith(
                               color: isDark ? AppColors.charcoal100 : AppColors.charcoal900,
                               height: 1.6,
