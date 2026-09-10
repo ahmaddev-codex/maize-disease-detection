@@ -1,4 +1,4 @@
-package com.example.maizeguard
+package com.ahmaddev.maizeguard
 
 import io.flutter.embedding.android.FlutterActivity
 

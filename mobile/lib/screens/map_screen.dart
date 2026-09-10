@@ -82,7 +82,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   children: [
                     TileLayer(
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.maizeguard.app',
+                      userAgentPackageName: 'com.ahmaddev.maizeguard',
                     ),
                     MarkerLayer(
                       markers: geoScans.map((scan) {
@@ -132,6 +132,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           ),
                         );
                       }).toList(),
+                    ),
+                    const SimpleAttributionWidget(
+                      source: Text('OpenStreetMap contributors'),
                     ),
                   ],
                 ),
