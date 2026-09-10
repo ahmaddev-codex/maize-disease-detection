@@ -46,7 +46,6 @@ mobile/assets/models/*.tflite
 **/build/
 **/.pub-cache/
 **/.pub/
-mobile/pubspec.lock
 devtools_options.yaml
 **/devtools_options.yaml
 
