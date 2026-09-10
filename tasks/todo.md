@@ -15,8 +15,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [ ] **Checkpoint 0:** ADRs approved; baseline metrics committed; tests green
 
 ## Phase 1: Mobile release blockers
-- [ ] T04 Android release has network, GPS, app ID, signing and OSM attribution [T02 · M]
-- [ ] T05 Model load state visible and recoverable [T03 · M]
+- [x] T04 Android release has network, GPS, app ID, signing and OSM attribution [T02 · M]
+- [x] T05 Model load state visible and recoverable [T03 · M]
 - [ ] T06 Result screen renders exactly one resolved scan [T03 · M]
 - [ ] T07 Home, History and Map use `openScan`; legacy providers removed [T06 · M]
 - [ ] T08 Feedback highlight updates; History no-feedback label [T06 · S]
@@ -53,7 +53,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [ ] **Checkpoint 4:** online/offline × English/Hausa; Healthy scan gets no spray advice; agronomist review
 
 ## Phase 5: ML pipeline integrity (parallel with Phases 1–4)
-- [ ] T30 Fusion training crash fixed (Prove-It) [— · S]
+- [x] T30 Fusion training crash fixed (Prove-It) [— · S]
 - [ ] T31 Fusion metadata policy and ablation (ADR-002) [T30, T01 · M]
 - [ ] T32 Model provenance and train-only INT8 calibration [T01 · M]
 - [ ] T33 Shared Python labels and post-processing [T01 · M]
