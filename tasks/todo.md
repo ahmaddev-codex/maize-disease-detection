@@ -29,6 +29,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [ ] T12 On-device latency benchmark → `device_benchmark.json` [T10, T11, device · S]
 - [x] T13 OCR parser fixes (dates, varieties, batch numbers) with shared fixtures [— · M]
 - [x] T14 Python extractor parity, `--image` CLI, Tesseract check [T13 · S]
+- [x] T56 OCR deskew no longer rotates labels 90° (found in T14) [T14 · S]
 - [ ] T15 One threshold set; urgency uses confidence and trend [T06 · M]
 - [ ] T16 Farm stats by `class_id`; Home = Dashboard; empty state; local-day buckets [T03 · M]
 - [ ] T17 Local time display helper [T16 · M]

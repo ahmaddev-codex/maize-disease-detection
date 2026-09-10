@@ -455,6 +455,30 @@ Changes:
 **Files likely touched:** `mobile/lib/utils/time_format.dart`, `mobile/lib/screens/home_screen.dart`, `mobile/lib/screens/history_screen.dart`, `mobile/lib/screens/map_screen.dart`, `mobile/test/time_format_test.dart`
 **Estimated scope:** Medium
 
+### Task T56: OCR preprocessing no longer rotates labels sideways (found during T14)
+
+**Description:** `src/phase2_ocr/preprocessor.py::_deskew` computes `cv2.minAreaRect` over every white pixel after thresholding. That is the background, 99% of the image. On OpenCV 4.9 the angle comes back as 90.0, because the angle convention changed in 4.5, so the whole label is rotated 90° before OCR.
+
+Measured on `data/raw/seed_labels/sample_label.jpg`:
+- Resize + threshold only: Tesseract reads "SAMMAZ 15 | Batch No BN-2024-042 | Planting Date: 15/03/2024".
+- Full pipeline: Tesseract reads "- 3".
+
+This is why notebook 2 and the OCR demo extract nothing.
+
+Fix: estimate skew from text pixels only (inverted binary), normalise the minAreaRect angle for OpenCV ≥ 4.5 to [-45, 45], and skip corrections beyond a sane limit.
+
+**Acceptance criteria:**
+- [ ] Deskew leaves an upright label unrotated, and corrects a label rotated by a few degrees back to within 1°.
+- [ ] End-to-end on the synthetic sample label: variety SAMMAZ 15, batch BN-2024-042, date 2024-03-15 (skipped when Tesseract is absent).
+
+**Verification:**
+- [ ] `.venv/bin/python -m pytest -q tests/test_ocr_preprocessor.py`: RED on current deskew, then GREEN.
+- [ ] `python -m src.phase2_ocr.extractor --image data/raw/seed_labels/sample_label.jpg` prints all three fields.
+
+**Dependencies:** T14
+**Files likely touched:** `src/phase2_ocr/preprocessor.py`, `tests/test_ocr_preprocessor.py`
+**Estimated scope:** Small
+
 ### Checkpoint 2: Diagnosis correctness
 - [ ] `flutter test` and `pytest` green; `metrics.json` app mode ≈ python mode.
 - [ ] Manual: a seed label with `15/03/2024` parses; dashboard bars match actual scans; times are local; the model status shows the ADR-001 variant.
