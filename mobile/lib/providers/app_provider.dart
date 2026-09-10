@@ -58,12 +58,6 @@ final activeScanRecordProvider = FutureProvider<ScanRecord?>((ref) async {
   return ref.watch(databaseServiceProvider).getScanById(id);
 });
 
-// ── Last classification result ─────────────────────────────────────────────────
-final lastResultProvider       = StateProvider<ClassificationResult?>((ref) => null);
-final lastImagePathProvider    = StateProvider<String?>((ref) => null);
-// Crop variety from the scan that produced lastResultProvider (not scans.first)
-final lastScanVarietyProvider  = StateProvider<String?>((ref) => null);
-
 // ── Pending OCR fields (from seed label scan, linked to next disease scan) ─────
 final pendingOcrProvider = StateProvider<OcrFields?>((ref) => null);
 

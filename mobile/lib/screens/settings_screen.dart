@@ -443,9 +443,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       await DatabaseService.instance.clearAll();
       await ref.read(scanListProvider.notifier).load();
-      ref.read(lastResultProvider.notifier).state = null;
-      ref.read(lastImagePathProvider.notifier).state = null;
-      ref.read(lastScanVarietyProvider.notifier).state = null;
       ref.read(activeScanIdProvider.notifier).state = null;
       messenger.showSnackBar(
         const SnackBar(content: Text('All local diagnostic records purged')),

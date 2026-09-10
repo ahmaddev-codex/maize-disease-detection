@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:maizeguard/models/scan_record.dart';
 import 'package:maizeguard/providers/app_provider.dart';
 import 'package:maizeguard/providers/service_providers.dart';
+import 'package:maizeguard/screens/history_screen.dart';
+import 'package:maizeguard/screens/home_screen.dart';
 import 'package:maizeguard/screens/result_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -33,16 +36,34 @@ ScanRecord _record({
       scannedAt: DateTime.utc(2026, 9, 10, 9),
     );
 
+class _FixedScanList extends ScanListNotifier {
+  _FixedScanList(List<ScanRecord> scans) {
+    state = scans;
+  }
+
+  @override
+  Future<void> load({int? classFilter}) async {}
+}
+
 Iterable<String> _shownImagePaths(WidgetTester tester) => tester
     .widgetList<Image>(find.byType(Image))
     .map((image) => image.image)
     .whereType<FileImage>()
     .map((fileImage) => fileImage.file.path);
 
+Future<void> _settle(WidgetTester tester) async {
+  for (var i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+}
+
 void main() {
   late Directory tmp;
   late ScanRecord scanA;
   late ScanRecord scanB;
+  late FakeDatabaseService db;
+  late FakeAiAdvisor ai;
+  late ProviderContainer container;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -54,69 +75,84 @@ void main() {
         imagePath: '${tmp.path}/a.jpg', variety: 'SAMMAZ 15');
     scanB = _record(id: 2, classId: 2, className: 'Gray Leaf Spot',
         imagePath: '${tmp.path}/b.jpg', variety: 'OBA SUPER 2');
-  });
 
-  tearDown(() => tmp.deleteSync(recursive: true));
-
-  Future<(ProviderContainer, FakeAiAdvisor)> pumpResult(
-    WidgetTester tester, {
-    required FakeDatabaseService db,
-    required int activeScanId,
-    bool afterCameraScanOfA = false,
-  }) async {
-    final ai = FakeAiAdvisor();
-    final container = ProviderContainer(overrides: [
+    db = FakeDatabaseService({1: scanA, 2: scanB});
+    ai = FakeAiAdvisor();
+    container = ProviderContainer(overrides: [
       databaseServiceProvider.overrideWithValue(db),
       aiAdvisorProvider.overrideWithValue(ai),
+      scanListProvider.overrideWith((ref) => _FixedScanList([scanB, scanA])),
     ]);
-    addTearDown(container.dispose);
+  });
 
-    if (afterCameraScanOfA) {
-      // State the camera flow leaves behind after scanning A.
-      container.read(lastResultProvider.notifier).state = scanA.toResult();
-      container.read(lastImagePathProvider.notifier).state = scanA.imagePath;
-      container.read(lastScanVarietyProvider.notifier).state = scanA.cropVariety;
-    }
-    container.read(activeScanIdProvider.notifier).state = activeScanId;
+  tearDown(() {
+    container.dispose();
+    tmp.deleteSync(recursive: true);
+  });
 
+  Future<void> pumpRoutes(WidgetTester tester, Widget start) async {
+    final router = GoRouter(routes: [
+      GoRoute(path: '/', builder: (_, __) => start),
+      GoRoute(path: '/result', builder: (_, __) => const ResultScreen()),
+      GoRoute(path: '/camera', builder: (_, __) => const SizedBox()),
+    ]);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const MaterialApp(home: ResultScreen()),
+        child: MaterialApp.router(routerConfig: router),
       ),
     );
-    return (container, ai);
+    await _settle(tester);
   }
 
-  testWidgets('opening scan B after a camera scan of A shows and advises on B only', (tester) async {
-    final (_, ai) = await pumpResult(
-      tester,
-      db: FakeDatabaseService({2: scanB}),
-      activeScanId: 2,
-      afterCameraScanOfA: true,
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+  testWidgets('switching the active scan from A to B shows and advises on B', (tester) async {
+    container.read(activeScanIdProvider.notifier).state = 1;
+    await pumpRoutes(tester, const ResultScreen());
+    expect(ai.calls.map((c) => c.classId), [1]);
 
-    expect(ai.calls.map((c) => c.classId), [2]);
-    expect(ai.calls.single.cropVariety, 'OBA SUPER 2');
+    container.read(activeScanIdProvider.notifier).state = 2;
+    await _settle(tester);
+
+    expect(ai.calls.map((c) => c.classId), [1, 2]);
+    expect(ai.calls.last.cropVariety, 'OBA SUPER 2');
     expect(_shownImagePaths(tester), contains(scanB.imagePath));
     expect(_shownImagePaths(tester), isNot(contains(scanA.imagePath)));
-    expect(find.text('Gray Leaf Spot'), findsWidgets);
   });
 
   testWidgets('nothing is fetched while the scan record is still loading', (tester) async {
-    final db = FakeDatabaseService({2: scanB})..lookupGate = Completer<void>();
-    final (_, ai) = await pumpResult(tester, db: db, activeScanId: 2, afterCameraScanOfA: true);
-    await tester.pump();
+    db.lookupGate = Completer<void>();
+    container.read(activeScanIdProvider.notifier).state = 2;
+    await pumpRoutes(tester, const ResultScreen());
 
     expect(find.byKey(const Key('result-loading')), findsOneWidget);
     expect(ai.calls, isEmpty);
 
     db.lookupGate!.complete();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+    await _settle(tester);
 
     expect(ai.calls.map((c) => c.classId), [2]);
+  });
+
+  testWidgets('tapping a History record opens that scan', (tester) async {
+    await pumpRoutes(tester, const HistoryScreen());
+
+    await tester.tap(find.text('Gray Leaf Spot'));
+    await _settle(tester);
+
+    expect(container.read(activeScanIdProvider), 2);
+    expect(ai.calls.map((c) => c.classId), [2]);
+  });
+
+  testWidgets('tapping a recent scan on Home opens that scan', (tester) async {
+    await pumpRoutes(tester, const HomeScreen());
+
+    // Recent scans sit below the fold in the test viewport.
+    await tester.scrollUntilVisible(find.text('Common Rust'), 200,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('Common Rust'));
+    await _settle(tester);
+
+    expect(container.read(activeScanIdProvider), 1);
+    expect(ai.calls.map((c) => c.classId), [1]);
   });
 }

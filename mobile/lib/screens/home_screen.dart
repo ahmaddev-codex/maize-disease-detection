@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../design_system/design_system.dart';
+import '../navigation/open_scan.dart';
 import '../providers/app_provider.dart';
 import '../providers/classifier_state.dart';
 import '../services/path_resolver.dart';
@@ -414,13 +415,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         return Column(
                           children: [
                             ListTile(
-                              onTap: () {
-                                ref.read(activeScanIdProvider.notifier).state = scan.id;
-                                ref.read(lastResultProvider.notifier).state = scan.toResult();
-                                ref.read(lastImagePathProvider.notifier).state = absPath;
-                                ref.read(lastScanVarietyProvider.notifier).state = scan.cropVariety;
-                                context.push('/result');
-                              },
+                              onTap: () => openScan(context, ref, scan.id!),
                               leading: ClipRRect(
                                 borderRadius: AppRadii.sm,
                                 child: hasImage

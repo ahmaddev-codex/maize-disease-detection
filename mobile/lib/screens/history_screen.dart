@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../design_system/design_system.dart';
 import '../models/scan_record.dart';
+import '../navigation/open_scan.dart';
 import '../providers/app_provider.dart';
 import '../services/database_service.dart';
 import '../services/path_resolver.dart';
@@ -114,11 +115,7 @@ class _ScanCard extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: AppCard(
-        onTap: () {
-          // Open scan details in ResultScreen
-          ref.read(activeScanIdProvider.notifier).state = scan.id;
-          context.push('/result');
-        },
+        onTap: () => openScan(context, ref, scan.id!),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

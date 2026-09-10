@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../design_system/design_system.dart';
 import '../models/scan_record.dart';
+import '../navigation/open_scan.dart';
 import '../providers/app_provider.dart';
 import '../services/path_resolver.dart';
 
@@ -249,10 +250,7 @@ class _ScanDetailCard extends ConsumerWidget {
             label: 'View Detailed Diagnosis & Treatment',
             icon: Icons.assignment_outlined,
             backgroundColor: AppColors.forestDark,
-            onPressed: () {
-              ref.read(activeScanIdProvider.notifier).state = scan.id;
-              context.push('/result');
-            },
+            onPressed: () => openScan(context, ref, scan.id!),
           ),
         ],
       ),
