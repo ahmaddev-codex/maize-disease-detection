@@ -351,9 +351,10 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
   Future<void> _recordFeedback(int scanId, int value) async {
     await ref.read(scanListProvider.notifier).setFeedback(scanId, value);
+    // Re-read the record so the selected option reflects what was saved.
+    ref.invalidate(activeScanRecordProvider);
     if (mounted) {
       _showSnack('Clinical feedback recorded for model calibration');
-      setState(() {});
     }
   }
 
@@ -365,7 +366,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
     // Render nothing scan-specific (and start no audio or advice) until the
     // record for the active scan has loaded.
-    if (activeScanAsync.isLoading) {
+    if (activeScanAsync.isLoading && !activeScanAsync.hasValue) {
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(
@@ -1004,6 +1005,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           _FeedbackOption(
+                            key: const Key('feedback-correct'),
                             icon: Icons.check_circle_outline_rounded,
                             label: 'Correct',
                             selected: existingFeedback == 1,
@@ -1013,6 +1015,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                                 : null,
                           ),
                           _FeedbackOption(
+                            key: const Key('feedback-incorrect'),
                             icon: Icons.highlight_off_rounded,
                             label: 'Incorrect',
                             selected: existingFeedback == 0,
@@ -1022,6 +1025,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                                 : null,
                           ),
                           _FeedbackOption(
+                            key: const Key('feedback-uncertain'),
                             icon: Icons.help_outline_rounded,
                             label: 'Uncertain',
                             selected: existingFeedback == -1,
@@ -1246,6 +1250,7 @@ class _FeedbackOption extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _FeedbackOption({
+    super.key,
     required this.icon,
     required this.label,
     required this.selected,
@@ -1255,7 +1260,12 @@ class _FeedbackOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(
@@ -1284,6 +1294,7 @@ class _FeedbackOption extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

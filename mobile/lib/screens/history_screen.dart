@@ -246,14 +246,15 @@ class _ScanCard extends ConsumerWidget {
                             : (scan.feedback == 0 ? AppColors.danger : AppColors.charcoal400),
                       ),
                     if (scan.feedback != null) const SizedBox(width: 4),
-                    Text(
-                      scan.feedback == 1
-                          ? 'Verified'
-                          : (scan.feedback == 0 ? 'Refuted' : 'Uncertain'),
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.charcoal400,
+                    if (scan.feedback != null)
+                      Text(
+                        scan.feedback == 1
+                            ? 'Verified'
+                            : (scan.feedback == 0 ? 'Refuted' : 'Uncertain'),
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.charcoal400,
+                        ),
                       ),
-                    ),
                   ],
                 ),
                 Row(

@@ -10,18 +10,22 @@ import 'service_providers.dart';
 
 // ── Scan history ──────────────────────────────────────────────────────────────
 final scanListProvider = StateNotifierProvider<ScanListNotifier, List<ScanRecord>>(
-  (ref) => ScanListNotifier(),
+  (ref) => ScanListNotifier(ref.watch(databaseServiceProvider)),
 );
 
 class ScanListNotifier extends StateNotifier<List<ScanRecord>> {
-  ScanListNotifier() : super([]);
+  ScanListNotifier([DatabaseService? db])
+      : _db = db ?? DatabaseService.instance,
+        super([]);
+
+  final DatabaseService _db;
 
   Future<void> load({int? classFilter}) async {
-    state = await DatabaseService.instance.getScans(classIdFilter: classFilter);
+    state = await _db.getScans(classIdFilter: classFilter);
   }
 
   Future<int> add(ScanRecord record) async {
-    final id = await DatabaseService.instance.insertScan(record);
+    final id = await _db.insertScan(record);
     final saved = ScanRecord(
       id: id, imagePath: record.imagePath, classId: record.classId,
       className: record.className, shortName: record.shortName,
@@ -36,7 +40,7 @@ class ScanListNotifier extends StateNotifier<List<ScanRecord>> {
   }
 
   Future<void> setFeedback(int id, int feedback) async {
-    await DatabaseService.instance.updateFeedback(id, feedback);
+    await _db.updateFeedback(id, feedback);
     state = [
       for (final r in state)
         if (r.id == id) r.copyWith(feedback: feedback) else r,
@@ -44,7 +48,7 @@ class ScanListNotifier extends StateNotifier<List<ScanRecord>> {
   }
 
   Future<void> delete(int id) async {
-    await DatabaseService.instance.deleteScan(id);
+    await _db.deleteScan(id);
     state = state.where((r) => r.id != id).toList();
   }
 }
