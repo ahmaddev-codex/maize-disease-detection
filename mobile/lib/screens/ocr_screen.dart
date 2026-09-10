@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../design_system/design_system.dart';
 import '../models/scan_record.dart';
 import '../providers/app_provider.dart';
+import '../services/ocr_parser.dart';
 import '../services/ocr_service.dart';
 
 class OcrScreen extends ConsumerStatefulWidget {
@@ -17,6 +18,7 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
   OcrFields? _fields;
   bool _isProcessing = false;
   String? _error;
+  String? _dateError;
 
   final _varietyCtrl = TextEditingController();
   final _batchCtrl   = TextEditingController();
@@ -56,6 +58,10 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
 
   void _attach() {
     if (_fields == null) return;
+    if (!isValidPlantingDate(_dateCtrl.text)) {
+      setState(() => _dateError = 'Enter a real date as YYYY-MM-DD, e.g. 2024-03-15');
+      return;
+    }
     final corrected = OcrFields(
       cropVariety: _varietyCtrl.text.trim().isEmpty ? null : _varietyCtrl.text.trim(),
       batchNumber: _batchCtrl.text.trim().isEmpty ? null : _batchCtrl.text.trim(),
@@ -244,6 +250,10 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
                     hint: 'YYYY-MM-DD',
                     controller: _dateCtrl,
                     prefixIcon: Icons.calendar_today_rounded,
+                    errorText: _dateError,
+                    onChanged: (_) {
+                      if (_dateError != null) setState(() => _dateError = null);
+                    },
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   AppButton(

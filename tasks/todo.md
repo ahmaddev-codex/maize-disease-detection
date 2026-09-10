@@ -27,7 +27,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [ ] T10 Inference off the UI thread; model vs total latency [T09 · M]
 - [ ] T11 Ship the primary model chosen in ADR-001 [T02, T05, T09 · S]
 - [ ] T12 On-device latency benchmark → `device_benchmark.json` [T10, T11, device · S]
-- [ ] T13 OCR parser fixes (dates, varieties, batch numbers) with shared fixtures [— · M]
+- [x] T13 OCR parser fixes (dates, varieties, batch numbers) with shared fixtures [— · M]
 - [ ] T14 Python extractor parity, `--image` CLI, Tesseract check [T13 · S]
 - [ ] T15 One threshold set; urgency uses confidence and trend [T06 · M]
 - [ ] T16 Farm stats by `class_id`; Home = Dashboard; empty state; local-day buckets [T03 · M]
