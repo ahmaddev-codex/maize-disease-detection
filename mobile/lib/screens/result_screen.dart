@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../config/app_env.dart';
 import '../constants/diseases.dart';
@@ -72,7 +73,18 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       _tts.stop();
     } catch (_) {}
     YarnTtsService.instance.stop();
+    _hasAutoPlayed = false;
+    _activePlayingSection = null;
+    _activeLoadingSection = null;
     super.dispose();
+  }
+
+  /// Navigate back to home, stopping all audio first.
+  Future<void> _navigateHome() async {
+    await _stopAudio();
+    if (mounted) {
+      context.go('/');
+    }
   }
 
   Future<void> _stopAudio() async {
@@ -379,7 +391,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           title: 'No Active Scan',
           message: 'Point your camera at a maize leaf or select an image from your library to diagnose.',
           actionLabel: 'Back to Field',
-          onAction: () => Navigator.of(context).pop(),
+          onAction: () => context.go('/'),
         ),
       );
     }
@@ -416,8 +428,13 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      body: CustomScrollView(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _navigateHome();
+      },
+      child: Scaffold(
+        body: CustomScrollView(
         slivers: [
           // ── Hero Banner with Leaf Sample Image ─────────────────────────────
           SliverAppBar(
@@ -426,6 +443,10 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             backgroundColor: AppColors.forestDark,
             foregroundColor: Colors.white,
             elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              onPressed: _navigateHome,
+            ),
             title: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1027,6 +1048,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

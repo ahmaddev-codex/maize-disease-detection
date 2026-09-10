@@ -13,6 +13,7 @@ import '../models/scan_record.dart';
 import '../providers/app_provider.dart';
 import '../services/classifier_service.dart';
 import '../services/location_service.dart';
+import '../services/yarn_tts_service.dart';
 
 class CameraScreen extends ConsumerStatefulWidget {
   const CameraScreen({super.key});
@@ -150,6 +151,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   Future<void> _classify(String tempPath) async {
     if (!mounted) return;
+    // Stop any audio from a previous scan result to prevent stale playback
+    YarnTtsService.instance.stop();
     final overlay = _showProcessing();
     bool success = false;
 
