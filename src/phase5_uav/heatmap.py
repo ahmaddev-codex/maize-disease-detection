@@ -110,9 +110,9 @@ def make_demo_predictions(n: int = 200) -> List[Dict[str, Any]]:
 
 # ── Folium interactive map ────────────────────────────────────────────────────
 
-def build_folium_map(predictions: List[Dict], output_html: str) -> None:
+def build_folium_map(predictions: List[Dict], output_html: str = "") -> Any:
     if not HAS_FOLIUM:
-        return
+        return None
 
     lats = [p["lat"] for p in predictions]
     lons = [p["lon"] for p in predictions]
@@ -194,9 +194,11 @@ def build_folium_map(predictions: List[Dict], output_html: str) -> None:
 
     folium.LayerControl(collapsed=False).add_to(m)
 
-    os.makedirs(os.path.dirname(output_html) or ".", exist_ok=True)
-    m.save(output_html)
-    print(f"Interactive map saved: {output_html}")
+    if output_html:
+        os.makedirs(os.path.dirname(output_html) or ".", exist_ok=True)
+        m.save(output_html)
+        print(f"Interactive map saved: {output_html}")
+    return m
 
 
 # ── Static matplotlib figure ──────────────────────────────────────────────────
