@@ -8,6 +8,7 @@ import '../constants/diseases.dart';
 import '../design_system/design_system.dart';
 import '../models/scan_record.dart';
 import '../providers/app_provider.dart';
+import '../providers/service_providers.dart';
 import '../services/ai_advisor.dart';
 import '../services/path_resolver.dart';
 import '../services/yarn_tts_service.dart';
@@ -26,6 +27,9 @@ enum AudioSection {
 }
 
 class _ResultScreenState extends ConsumerState<ResultScreen> {
+  // Scan whose advice and audio state this screen currently holds
+  int? _renderedScanId;
+
   // AI Agronomic Advice (Groq Frontier Model)
   String? _aiAdvice;
   bool _loadingAi = false;
@@ -322,7 +326,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     });
 
     try {
-      final advice = await AiAdvisor.instance.getAdvice(
+      final advice = await ref.read(aiAdvisorProvider).getAdvice(
         classId: result.classId,
         confidence: result.confidence,
         cropVariety: variety,
@@ -355,35 +359,26 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final lastResult = ref.watch(lastResultProvider);
-    final lastImagePath = ref.watch(lastImagePathProvider);
     final lang = ref.watch(displayLanguageProvider);
     final groqKey = ref.watch(groqKeyProvider);
-    final cropVariety = ref.watch(lastScanVarietyProvider);
-
-    // Check if we are viewing a specific past scan from database
-    final activeScanId = ref.watch(activeScanIdProvider);
     final activeScanAsync = ref.watch(activeScanRecordProvider);
 
-    final ScanRecord? activeRecord = activeScanAsync.valueOrNull;
+    // Render nothing scan-specific (and start no audio or advice) until the
+    // record for the active scan has loaded.
+    if (activeScanAsync.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            key: Key('result-loading'),
+            color: AppColors.emeraldBase,
+          ),
+        ),
+      );
+    }
 
-    // Resolve the active result to show
-    final ClassificationResult? result = activeRecord?.toResult() ?? lastResult;
-    final String? rawImagePath = (lastImagePath != null && lastImagePath.isNotEmpty)
-        ? lastImagePath
-        : activeRecord?.imagePath;
-    final String? resolvedImagePath = (rawImagePath != null && rawImagePath.isNotEmpty)
-        ? PathResolver.resolve(rawImagePath)
-        : null;
-    final bool hasImage = resolvedImagePath != null &&
-        resolvedImagePath.isNotEmpty &&
-        File(resolvedImagePath).existsSync();
+    final ScanRecord? record = activeScanAsync.valueOrNull;
 
-    final int? currentScanId = activeRecord?.id ?? activeScanId ??
-        (ref.watch(scanListProvider).isNotEmpty ? ref.watch(scanListProvider).first.id : null);
-    final int? existingFeedback = activeRecord?.feedback;
-
-    if (result == null) {
+    if (record == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Diagnosis')),
         body: EmptyStateView(
@@ -395,6 +390,22 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         ),
       );
     }
+
+    // Advice and audio state belong to one scan; start fresh when it changes.
+    if (record.id != _renderedScanId) {
+      _renderedScanId = record.id;
+      _aiAdvice = null;
+      _aiError = null;
+      _loadingAi = false;
+      _hasAutoPlayed = false;
+    }
+
+    final ClassificationResult result = record.toResult();
+    final String? cropVariety = record.cropVariety;
+    final String resolvedImagePath = PathResolver.resolve(record.imagePath);
+    final bool hasImage = record.imagePath.isNotEmpty && File(resolvedImagePath).existsSync();
+    final int? currentScanId = record.id;
+    final int? existingFeedback = record.feedback;
 
     final disease = diseaseForClass(result.classId);
     final recs = RecommendationEngine.generate(result);

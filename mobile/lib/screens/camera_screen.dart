@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../design_system/design_system.dart';
+import '../navigation/open_scan.dart';
 import '../services/path_resolver.dart';
 import '../constants/diseases.dart';
 import '../models/scan_record.dart';
@@ -154,7 +155,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     // Stop any audio from a previous scan result to prevent stale playback
     YarnTtsService.instance.stop();
     final overlay = _showProcessing();
-    bool success = false;
+    int? scanId;
 
     try {
       final path     = await _persistImage(tempPath);
@@ -179,14 +180,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         scannedAt:    DateTime.now().toUtc(),
       );
 
-      ref.read(lastResultProvider.notifier).state      = result;
-      ref.read(lastImagePathProvider.notifier).state   = path;
-      ref.read(lastScanVarietyProvider.notifier).state = pending?.cropVariety;
-      ref.read(pendingOcrProvider.notifier).state      = null;
+      ref.read(pendingOcrProvider.notifier).state = null;
 
-      final id = await ref.read(scanListProvider.notifier).add(record);
-      ref.read(activeScanIdProvider.notifier).state = id;
-      success = true;
+      scanId = await ref.read(scanListProvider.notifier).add(record);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -195,8 +191,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       }
     } finally {
       overlay.remove();
-      if (mounted && success) {
-        context.push('/result');
+      if (mounted && scanId != null) {
+        openScan(context, ref, scanId);
       }
     }
   }

@@ -17,7 +17,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 ## Phase 1: Mobile release blockers
 - [x] T04 Android release has network, GPS, app ID, signing and OSM attribution [T02 · M]
 - [x] T05 Model load state visible and recoverable [T03 · M]
-- [ ] T06 Result screen renders exactly one resolved scan [T03 · M]
+- [x] T06 Result screen renders exactly one resolved scan [T03 · M]
 - [ ] T07 Home, History and Map use `openScan`; legacy providers removed [T06 · M]
 - [ ] T08 Feedback highlight updates; History no-feedback label [T06 · S]
 - [ ] **Checkpoint 1:** release APK on a real phone — GPS pin, Groq advice, correct scan from History/Map

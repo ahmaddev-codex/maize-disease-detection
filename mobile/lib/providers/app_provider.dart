@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_env.dart';
 import '../models/scan_record.dart';
 import '../services/database_service.dart';
+import 'service_providers.dart';
 
 // ── Scan history ──────────────────────────────────────────────────────────────
 final scanListProvider = StateNotifierProvider<ScanListNotifier, List<ScanRecord>>(
@@ -54,7 +55,7 @@ final activeScanIdProvider = StateProvider<int?>((ref) => null);
 final activeScanRecordProvider = FutureProvider<ScanRecord?>((ref) async {
   final id = ref.watch(activeScanIdProvider);
   if (id == null) return null;
-  return DatabaseService.instance.getScanById(id);
+  return ref.watch(databaseServiceProvider).getScanById(id);
 });
 
 // ── Last classification result ─────────────────────────────────────────────────
