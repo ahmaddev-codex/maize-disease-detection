@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'design_system/design_system.dart';
 import 'providers/app_provider.dart';
+import 'providers/classifier_state.dart';
 import 'screens/home_screen.dart';
 import 'screens/camera_screen.dart';
 import 'screens/result_screen.dart';
@@ -143,15 +144,23 @@ class _GroundedAgTechNav extends StatelessWidget {
   }
 }
 
-class _CenterScanTrigger extends StatelessWidget {
+class _CenterScanTrigger extends ConsumerWidget {
   const _CenterScanTrigger();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final modelFailed = ref.watch(classifierStateProvider).isFailed;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: GestureDetector(
-        onTap: () => context.push('/camera'),
+        onTap: modelFailed
+            ? () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Disease model failed to load. Tap Retry on the Field tab.'),
+                  ),
+                )
+            : () => context.push('/camera'),
         child: Container(
           width: 52,
           height: 52,

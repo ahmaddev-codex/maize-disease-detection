@@ -5,8 +5,57 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../design_system/design_system.dart';
 import '../providers/app_provider.dart';
-import '../services/classifier_service.dart';
+import '../providers/classifier_state.dart';
 import '../services/path_resolver.dart';
+
+class _ModelStatusPill extends StatelessWidget {
+  const _ModelStatusPill({
+    required this.state,
+    required this.isDark,
+    required this.onRetry,
+  });
+
+  final ClassifierState state;
+  final bool isDark;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final (dotColor, label) = switch (state.phase) {
+      ClassifierPhase.loading => (AppColors.charcoal400, 'Loading disease model…'),
+      ClassifierPhase.ready   => (AppColors.emeraldLight, state.status ?? 'Disease model ready'),
+      ClassifierPhase.failed  => (AppColors.danger, 'Disease model failed to load'),
+    };
+
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              color: state.isFailed
+                  ? AppColors.danger
+                  : (isDark ? AppColors.charcoal400 : AppColors.charcoal600),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (state.isFailed)
+          TextButton(
+            key: const Key('model-retry-button'),
+            onPressed: onRetry,
+            child: const Text('Retry'),
+          ),
+      ],
+    );
+  }
+}
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -21,10 +70,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _init();
   }
 
+  // The model is loaded once by the splash screen (classifierStateProvider).
   Future<void> _init() async {
-    await ClassifierService.instance.loadModel();
-    if (!mounted) return;
-    ref.read(classifierReadyProvider.notifier).state = true;
     await ref.read(scanListProvider.notifier).load();
   }
 
@@ -38,7 +85,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final scans   = ref.watch(scanListProvider);
-    final isReady = ref.watch(classifierReadyProvider);
+    final modelState = ref.watch(classifierStateProvider);
     final isDark  = Theme.of(context).brightness == Brightness.dark;
     final recent  = scans.take(5).toList();
 
@@ -99,26 +146,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             padding: const EdgeInsets.all(AppSpacing.md),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // 1. Edge Neural Engine Status Pill
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: isReady ? AppColors.emeraldLight : AppColors.charcoal400,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      isReady ? 'EfficientNetB3 Edge Runtime Ready' : 'Loading Neural Checkpoint…',
-                      style: AppTypography.caption.copyWith(
-                        color: isDark ? AppColors.charcoal400 : AppColors.charcoal600,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                // 1. Model status (real variant, or a retry when loading failed)
+                _ModelStatusPill(
+                  state: modelState,
+                  isDark: isDark,
+                  onRetry: () => ref.read(classifierStateProvider.notifier).load(),
                 ),
 
                 const SizedBox(height: AppSpacing.md),
@@ -127,7 +159,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 AppCard(
                   surfaceColor: AppColors.forestDark,
                   borderColor: AppColors.primaryLight.withValues(alpha: 0.3),
-                  onTap: () => context.push('/camera'),
+                  onTap: modelState.isFailed ? null : () => context.push('/camera'),
                   child: Row(
                     children: [
                       Expanded(

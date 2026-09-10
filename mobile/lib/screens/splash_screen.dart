@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../design_system/design_system.dart';
 import '../providers/app_provider.dart';
-import '../services/classifier_service.dart';
+import '../providers/classifier_state.dart';
 
 /// Minimalist, serene animated splash screen for MaizeGuard.
 ///
@@ -54,15 +54,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _startInitialization() async {
     final stopwatch = Stopwatch()..start();
 
-    // Background pre-warming
-    try {
-      await ClassifierService.instance.loadModel();
-      if (mounted) {
-        ref.read(classifierReadyProvider.notifier).state = true;
-      }
-    } catch (e) {
-      debugPrint('[Splash] Model load notice: $e');
-    }
+    // Background pre-warming; a failure becomes a retryable state shown on Home.
+    await ref.read(classifierStateProvider.notifier).load();
 
     try {
       await ref.read(scanListProvider.notifier).load();

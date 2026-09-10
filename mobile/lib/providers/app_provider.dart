@@ -257,9 +257,6 @@ class DisplayLanguageNotifier extends StateNotifier<DisplayLanguage> {
   }
 }
 
-// ── Classifier readiness ───────────────────────────────────────────────────────
-final classifierReadyProvider = StateProvider<bool>((ref) => false);
-
 // ── Health trend (delta health rate: >0.1 improving, <-0.1 worsening) ─────────
 final healthTrendProvider = FutureProvider<double>((ref) async {
   ref.watch(scanListProvider);

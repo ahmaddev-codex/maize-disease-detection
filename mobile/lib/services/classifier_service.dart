@@ -27,8 +27,15 @@ class ClassifierService {
     return 'EfficientNetB3 · ${_isInt8 ? "INT8" : "FP16"}';
   }
 
-  Future<void> loadModel() async {
-    if (_isLoaded) return; // guard against double-load
+  Future<void>? _loading;
+
+  /// Loads the model once; concurrent callers share the same in-flight load.
+  Future<void> loadModel() {
+    if (_isLoaded) return Future.value();
+    return _loading ??= _load().whenComplete(() => _loading = null);
+  }
+
+  Future<void> _load() async {
     try {
       _interpreter = await _loadWithDelegate(_int8Model);
       _isInt8  = true;

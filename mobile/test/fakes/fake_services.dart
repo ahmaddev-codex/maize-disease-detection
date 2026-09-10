@@ -9,11 +9,13 @@ class FakeClassifierService implements ClassifierService {
     this.status = 'EfficientNetB3 · FP16',
     this.result,
     this.loadError,
+    this.loadDelay = Duration.zero,
   });
 
   final String status;
   final ClassificationResult? result;
-  final Object? loadError;
+  Object? loadError;
+  final Duration loadDelay;
 
   int loadCalls = 0;
   final List<String> classifiedPaths = [];
@@ -24,6 +26,9 @@ class FakeClassifierService implements ClassifierService {
   @override
   Future<void> loadModel() async {
     loadCalls++;
+    // Only schedule a timer when asked: testWidgets' fake clock never fires
+    // timers unless the test pumps, so an unconditional delay hangs the test.
+    if (loadDelay > Duration.zero) await Future<void>.delayed(loadDelay);
     if (loadError != null) throw loadError!;
   }
 
