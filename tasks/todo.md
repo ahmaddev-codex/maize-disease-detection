@@ -11,7 +11,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 ## Phase 0: Baseline and decisions
 - [x] T01 Reproducible TFLite evaluation → `metrics.json` [— · S]
 - [x] T02 ADR-001…006 recorded, and `pubspec.lock` committed [T01 · S]
-- [ ] T03 Service providers and test fakes [— · S]
+- [x] T03 Service providers and test fakes [— · S]
 - [ ] **Checkpoint 0:** ADRs approved; baseline metrics committed; tests green
 
 ## Phase 1: Mobile release blockers
