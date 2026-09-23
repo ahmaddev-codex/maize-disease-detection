@@ -42,7 +42,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [ ] T20 Camera stream lifecycle and real luma brightness hint [— · M]
 - [ ] T21 Delete/Clear remove images, audio cache and stale state [T07 · M]
 - [x] T22 Back returns to origin; Retake button [T07 · S]
-- [ ] T23 Seed metadata chip on camera and fields on Result [T06 · S]
+- [x] T23 Seed metadata chip on camera and fields on Result [T06 · S]
 - [ ] T58 Release APK size: 148 MB vs the 80 MB requirement (found in T04) [T04, T11 · S]
 - [ ] **Checkpoint 3:** full scan journey verified on a device
 
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T23: a scanned seed label is shown on the camera before capture (with a clear action) and on the result of the scan it was attached to; the camera screen now degrades to a message instead of a blank spinner when no camera is available.
 - T22: back returns to the screen a scan was opened from, low-confidence results offer a retake, and navigation no longer waits on the audio engine.
 - T18: results appear immediately and the GPS fix is attached afterwards, so scan-to-result latency no longer includes a location wait.
 - T10: preprocessing and inference run off the UI thread; stored latency_ms is now model-only (papers must not quote it as capture-to-result).

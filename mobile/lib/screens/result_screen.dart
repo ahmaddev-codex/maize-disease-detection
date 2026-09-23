@@ -629,6 +629,50 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
                 const SizedBox(height: AppSpacing.md),
 
+                // Seed label captured before this scan (T23)
+                if (record.cropVariety != null ||
+                    record.batchNumber != null ||
+                    record.plantingDate != null) ...[
+                  AppCard(
+                    key: const Key('result-seed-label'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.qr_code_rounded, size: 18, color: AppColors.emeraldBase),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              'SEED LABEL ON THIS SCAN',
+                              style: AppTypography.overline.copyWith(
+                                color: AppColors.emeraldBase,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        for (final field in [
+                          ('Variety', record.cropVariety),
+                          ('Batch', record.batchNumber),
+                          ('Planted', record.plantingDate),
+                        ])
+                          if (field.$2 != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              child: Text(
+                                '${field.$1}: ${field.$2}',
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: isDark ? AppColors.charcoal200 : AppColors.charcoal800,
+                                ),
+                              ),
+                            ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+
                 // 2. Low-Confidence Retake Alert
                 if (isLowConf) ...[
                   Container(

@@ -26,6 +26,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   bool _isCapturing = false;
   bool _isFlashOn = false;
   String? _brightnessHint;
+  String? _cameraError;
 
   @override
   void initState() {
@@ -35,19 +36,27 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   Future<void> _initCamera() async {
-    _cameras = await availableCameras();
-    if (_cameras.isEmpty) return;
-    _controller = CameraController(
-      _cameras.first,
-      ResolutionPreset.high,
-      enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.jpeg,
-    );
-    await _controller!.initialize();
-    if (!mounted) return;
-    setState(() {});
+    try {
+      _cameras = await availableCameras();
+      if (_cameras.isEmpty) {
+        if (mounted) setState(() => _cameraError = 'No camera found on this device.');
+        return;
+      }
+      _controller = CameraController(
+        _cameras.first,
+        ResolutionPreset.high,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
+      await _controller!.initialize();
+      if (!mounted) return;
+      setState(() => _cameraError = null);
 
-    _startBrightnessStream();
+      _startBrightnessStream();
+    } catch (e) {
+      debugPrint('[Camera] unavailable: $e');
+      if (mounted) setState(() => _cameraError = 'Camera unavailable. Use Gallery to pick a photo.');
+    }
   }
 
   void _startBrightnessStream() {
@@ -203,6 +212,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   Widget build(BuildContext context) {
     final isInit = _controller?.value.isInitialized ?? false;
     final topPadding = MediaQuery.of(context).padding.top;
+    final pendingSeedLabel = ref.watch(pendingOcrProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -212,6 +222,17 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           // Camera Preview
           if (isInit)
             Center(child: CameraPreview(_controller!))
+          else if (_cameraError != null)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Text(
+                  _cameraError!,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.bodyMedium.copyWith(color: Colors.white70),
+                ),
+              ),
+            )
           else
             const Center(
               child: CircularProgressIndicator(color: AppColors.emeraldBase),
@@ -273,10 +294,48 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             ),
           ),
 
+          // Seed label that will be attached to the next scan (T23)
+          if (pendingSeedLabel != null)
+            Positioned(
+              top: topPadding + 64,
+              left: AppSpacing.lg,
+              right: AppSpacing.lg,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.forestDark.withValues(alpha: 0.92),
+                  borderRadius: AppRadii.md,
+                  border: Border.all(color: AppColors.emeraldBase.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.qr_code_rounded, size: 16, color: AppColors.emeraldBase),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        'Seed label linked: ${pendingSeedLabel.cropVariety ?? pendingSeedLabel.batchNumber ?? 'details only'}',
+                        style: AppTypography.caption.copyWith(color: Colors.white),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton(
+                      key: const Key('camera-clear-seed-label'),
+                      onPressed: () => ref.read(pendingOcrProvider.notifier).state = null,
+                      child: const Text('Clear'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Dynamic Ambient Guidance Banner
           if (_brightnessHint != null)
             Positioned(
-              top: topPadding + 64,
+              top: topPadding + (pendingSeedLabel != null ? 118 : 64),
               left: AppSpacing.lg,
               right: AppSpacing.lg,
               child: Container(
