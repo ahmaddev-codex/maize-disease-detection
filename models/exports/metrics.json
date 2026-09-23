@@ -2,7 +2,7 @@
   "models": {
     "efficientnetb3_maize_int8.tflite": {
       "path": "models/exports/efficientnetb3_maize_int8.tflite",
-      "sha256": "f7c4103e18c67a77df08a1d378f62ddcaa36c1ace69406277d45258cbad24f9a",
+      "sha256": "31b5a71b83f0ee17ce4e495dd74b13aadfed61542e80812ac9ee7e98be43c090",
       "input": {
         "dtype": "uint8",
         "quantization": [
@@ -19,125 +19,140 @@
       },
       "python": {
         "n": 628,
-        "accuracy": 0.8726,
+        "accuracy": 0.8774,
         "per_class": {
           "NCLB": {
-            "precision": 0.7606,
-            "recall": 0.8314,
-            "f1": 0.7944,
+            "precision": 0.8125,
+            "recall": 0.7558,
+            "f1": 0.7831,
             "support": 172
           },
           "Rust": {
-            "precision": 0.9254,
-            "recall": 0.949,
-            "f1": 0.937,
+            "precision": 0.9353,
+            "recall": 0.9592,
+            "f1": 0.9471,
             "support": 196
           },
           "GLS": {
-            "precision": 0.7077,
-            "recall": 0.5349,
-            "f1": 0.6093,
+            "precision": 0.6593,
+            "recall": 0.6977,
+            "f1": 0.678,
             "support": 86
           },
           "Healthy": {
-            "precision": 0.9943,
+            "precision": 0.983,
             "recall": 0.9943,
-            "f1": 0.9943,
+            "f1": 0.9886,
             "support": 174
           }
         },
         "confusion_matrix": [
           [
-            143,
+            130,
             10,
-            18,
+            30,
+            2
+          ],
+          [
+            6,
+            188,
+            1,
             1
           ],
           [
-            9,
-            186,
-            1,
+            24,
+            2,
+            60,
             0
           ],
           [
-            35,
-            5,
-            46,
-            0
-          ],
-          [
-            1,
             0,
+            1,
             0,
             173
           ]
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "c26075de18f7c2a699bcf234a08429365186a37b",
+        "git_sha": "4b366974901b3cec1d1a3cc868df9db8cc86fe25",
         "git_dirty": true,
-        "evaluated_at": "2026-09-23T20:16:16+00:00"
+        "evaluated_at": "2026-09-23T20:31:46+00:00"
       },
       "app": {
         "n": 628,
-        "accuracy": 0.8726,
+        "accuracy": 0.8774,
         "per_class": {
           "NCLB": {
-            "precision": 0.7606,
-            "recall": 0.8314,
-            "f1": 0.7944,
+            "precision": 0.8125,
+            "recall": 0.7558,
+            "f1": 0.7831,
             "support": 172
           },
           "Rust": {
-            "precision": 0.9254,
-            "recall": 0.949,
-            "f1": 0.937,
+            "precision": 0.9353,
+            "recall": 0.9592,
+            "f1": 0.9471,
             "support": 196
           },
           "GLS": {
-            "precision": 0.7077,
-            "recall": 0.5349,
-            "f1": 0.6093,
+            "precision": 0.6593,
+            "recall": 0.6977,
+            "f1": 0.678,
             "support": 86
           },
           "Healthy": {
-            "precision": 0.9943,
+            "precision": 0.983,
             "recall": 0.9943,
-            "f1": 0.9943,
+            "f1": 0.9886,
             "support": 174
           }
         },
         "confusion_matrix": [
           [
-            143,
+            130,
             10,
-            18,
+            30,
+            2
+          ],
+          [
+            6,
+            188,
+            1,
             1
           ],
           [
-            9,
-            186,
-            1,
+            24,
+            2,
+            60,
             0
           ],
           [
-            35,
-            5,
-            46,
-            0
-          ],
-          [
-            1,
             0,
+            1,
             0,
             173
           ]
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "c26075de18f7c2a699bcf234a08429365186a37b",
+        "git_sha": "4b366974901b3cec1d1a3cc868df9db8cc86fe25",
         "git_dirty": true,
-        "evaluated_at": "2026-09-23T20:17:24+00:00"
+        "evaluated_at": "2026-09-23T20:33:06+00:00"
+      },
+      "export": {
+        "path": "models/exports/efficientnetb3_maize_int8.tflite",
+        "sha256": "31b5a71b83f0ee17ce4e495dd74b13aadfed61542e80812ac9ee7e98be43c090",
+        "precision": "int8",
+        "source_keras": {
+          "path": "models/checkpoints/phase1_stage2_best.keras",
+          "sha256": "e6cc64dc5d7d96c0ed90b89a9588849f0e2629b7a6a76dcd3b953b98ae3e2a35"
+        },
+        "exported_at": "2026-09-23T20:25:45+00:00",
+        "calibration": {
+          "csv": "data/annotations/labels.csv",
+          "split": "train",
+          "images": 200
+        }
       }
     },
     "efficientnetb3_maize_fp16.tflite": {

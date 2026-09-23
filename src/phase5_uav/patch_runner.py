@@ -25,8 +25,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import os
 import time
+import warnings
 from typing import List, Tuple, Optional
 
 import numpy as np
@@ -56,8 +58,10 @@ except ImportError:
 
 from PIL import Image
 
+from src.common.labels import SHORT_NAMES as CLASS_NAMES
+from src.common.postprocess import postprocess
+
 # ── Constants ──────────────────────────────────────────────────────────────────
-CLASS_NAMES   = ["NCLB", "Rust", "GLS", "Healthy"]
 PATCH_SIZE    = 300    # pixels — matches model input
 DEFAULT_STRIDE = 150   # 50% overlap between patches
 DEFAULT_MODEL  = "models/exports/efficientnetb3_maize_int8.tflite"
@@ -66,7 +70,14 @@ DEFAULT_MODEL  = "models/exports/efficientnetb3_maize_int8.tflite"
 # ── Geotransform ───────────────────────────────────────────────────────────────
 
 class GeoTransform:
-    """Maps pixel (row, col) → (lat, lon) for a georeferenced image."""
+    """Maps pixel (row, col) → (lat, lon) for a georeferenced image.
+
+    There is deliberately no default: an image with no georeference and no
+    stated origin produces no coordinates at all. The `dummy()` helper this
+    replaces defaulted to a point near Ibadan, so a demo run drew a map of a
+    field nobody had flown (T39).
+    """
+
     def __init__(self, origin_lon: float, origin_lat: float,
                  pixel_width: float, pixel_height: float):
         self.origin_lon   = origin_lon
@@ -75,16 +86,22 @@ class GeoTransform:
         self.pixel_height = pixel_height   # degrees per pixel, negative southward
 
     @classmethod
-    def dummy(cls, image_width_px: int, image_height_px: int,
-              centre_lat: float = 7.3775, centre_lon: float = 3.9470,
-              gsd_m: float = 0.05) -> "GeoTransform":
-        """Create a plausible geotransform for a demo image."""
-        deg_per_px = gsd_m / 111_320
+    def from_origin_and_gsd(cls, origin_lat: float, origin_lon: float, gsd_m: float,
+                            width_px: int = 0, height_px: int = 0) -> "GeoTransform":
+        """Builds a transform from a stated top-left corner and ground sample distance.
+
+        The operator supplies these with --origin-lat/--origin-lon/--gsd; they
+        are their numbers, not ours.
+        """
+        deg_per_px_lat = gsd_m / 111_320.0
+        # Longitude degrees shrink with latitude.
+        cos_lat = max(math.cos(math.radians(origin_lat)), 1e-6)
+        deg_per_px_lon = deg_per_px_lat / cos_lat
         return cls(
-            origin_lon   = centre_lon - (image_width_px  / 2) * deg_per_px,
-            origin_lat   = centre_lat + (image_height_px / 2) * deg_per_px,
-            pixel_width  =  deg_per_px,
-            pixel_height = -deg_per_px,
+            origin_lon=origin_lon,
+            origin_lat=origin_lat,
+            pixel_width=deg_per_px_lon,
+            pixel_height=-deg_per_px_lat,
         )
 
     def pixel_to_latlon(self, row: int, col: int) -> Tuple[float, float]:
@@ -93,12 +110,83 @@ class GeoTransform:
         return lat, lon
 
 
+def to_wgs84(crs, x: float, y: float) -> Tuple[float, float]:
+    """Transforms a projected coordinate to (lat, lon) in EPSG:4326.
+
+    Orthomosaics are usually in a UTM zone, and the old code read the affine
+    transform as if its units were already degrees (T39).
+    """
+    from rasterio.warp import transform as warp_transform
+
+    lons, lats = warp_transform(crs, "EPSG:4326", [x], [y])
+    return float(lats[0]), float(lons[0])
+
+
+def patch_coordinates(geo: Optional[GeoTransform], row: int, col: int):
+    """(lat, lon) for a patch centre, or (None, None) with no georeference."""
+    if geo is None:
+        return None, None
+    return geo.pixel_to_latlon(row, col)
+
+
+def result_row(patch_row: int, patch_col: int, lat, lon, class_id: int,
+               confidence: float, latency_ms: float, pixel_row: int = 0,
+               pixel_col: int = 0) -> dict:
+    """One CSV row. Coordinates are omitted entirely when unknown."""
+    row = {
+        "patch_row":  patch_row,
+        "patch_col":  patch_col,
+        "pixel_row":  pixel_row,
+        "pixel_col":  pixel_col,
+        "class_id":   class_id,
+        "class_name": CLASS_NAMES[class_id],
+        "confidence": round(confidence, 4),
+        "latency_ms": round(latency_ms, 1),
+    }
+    if lat is not None and lon is not None:
+        row["lat"] = round(lat, 7)
+        row["lon"] = round(lon, 7)
+    return row
+
+
+# ── Vegetation filter ─────────────────────────────────────────────────────────
+
+def excess_green(patch: np.ndarray) -> np.ndarray:
+    """Excess Green index (2g − r − b) on chromatic coordinates.
+
+    0 for any grey, positive for vegetation, negative for sky, soil and roads.
+    """
+    rgb = patch.astype(np.float32)
+    total = rgb.sum(axis=2, keepdims=True)
+    total[total == 0] = 1.0
+    chroma = rgb / total
+    return 2 * chroma[:, :, 1] - chroma[:, :, 0] - chroma[:, :, 2]
+
+
+def is_vegetation(patch: np.ndarray, min_fraction: float = 0.25,
+                  threshold: float = 0.05) -> bool:
+    """True when enough of the patch is plant tissue to be worth classifying.
+
+    The rule this replaces skipped any patch whose mean red beat 1.5× its mean
+    green — which is what a rust-covered canopy looks like, so the survey threw
+    away the disease it was flown to find (T39).
+    """
+    if patch.size == 0:
+        return False
+    return float((excess_green(patch) > threshold).mean()) >= min_fraction
+
+
 # ── Image loading ─────────────────────────────────────────────────────────────
 
-def load_image(path: str) -> Tuple[np.ndarray, GeoTransform]:
-    """
-    Load an orthomosaic and return (H, W, 3) uint8 array + GeoTransform.
-    Tries rasterio → OpenCV → PIL in order.
+def load_image(path: str, origin_lat: Optional[float] = None,
+               origin_lon: Optional[float] = None,
+               gsd_m: Optional[float] = None) -> Tuple[np.ndarray, Optional[GeoTransform], Optional[object]]:
+    """Loads an orthomosaic.
+
+    Returns the pixels, a GeoTransform when one can be known, and the file's
+    CRS when it has one. An image with no georeference and no stated origin
+    gets no transform at all — the runner then reports pixel positions only,
+    instead of coordinates nobody measured (T39).
     """
     if HAS_RASTERIO and path.endswith((".tif", ".tiff")):
         with rasterio.open(path) as src:
@@ -106,9 +194,7 @@ def load_image(path: str) -> Tuple[np.ndarray, GeoTransform]:
             arr = np.moveaxis(arr, 0, -1)      # → (H, W, 3)
             if arr.dtype != np.uint8:
                 arr = (arr / arr.max() * 255).astype(np.uint8)
-            t = src.transform
-            gt = GeoTransform(t.c, t.f, t.a, t.e)
-        return arr, gt
+            return arr, None, (src.transform, src.crs)
 
     if HAS_CV2:
         bgr = cv2.imread(path)
@@ -119,13 +205,22 @@ def load_image(path: str) -> Tuple[np.ndarray, GeoTransform]:
         arr = np.array(Image.open(path).convert("RGB"))
 
     h, w = arr.shape[:2]
-    gt = GeoTransform.dummy(w, h)
-    return arr, gt
+    if origin_lat is not None and origin_lon is not None and gsd_m:
+        return arr, GeoTransform.from_origin_and_gsd(origin_lat, origin_lon, gsd_m, w, h), None
+
+    warnings.warn(
+        f"{path} has no georeference and no --origin-lat/--origin-lon/--gsd was given; "
+        "patches will be reported in pixel coordinates only.",
+        stacklevel=2,
+    )
+    return arr, None, None
 
 
-def make_demo_image(width: int = 1500, height: int = 1000) -> Tuple[np.ndarray, GeoTransform]:
-    """
-    Synthetic 'aerial' image: green base with random disease patches for testing.
+def make_demo_image(width: int = 1500, height: int = 1000) -> Tuple[np.ndarray, None]:
+    """Synthetic 'aerial' image: green base with random disease patches.
+
+    It carries no georeference: a demo used to be placed near Ibadan, which
+    made an invented field look like a surveyed one (T39).
     """
     rng  = np.random.default_rng(42)
     base = np.zeros((height, width, 3), dtype=np.uint8)
@@ -149,8 +244,7 @@ def make_demo_image(width: int = 1500, height: int = 1000) -> Tuple[np.ndarray, 
         else:                    # GLS — grey
             base[r:r+ph, c:c+pw] = [130, 130, 120]
 
-    gt = GeoTransform.dummy(width, height)
-    return base, gt
+    return base, None
 
 
 # ── TFLite inference ──────────────────────────────────────────────────────────
@@ -180,29 +274,23 @@ def run_patch(interp: Interpreter, patch_rgb: np.ndarray) -> Tuple[int, float]:
     interp.invoke()
     raw = interp.get_tensor(out_detail["index"])[0]  # shape (4,)
 
-    # Dequantize uint8 output if quantized
-    if out_detail["dtype"] == np.uint8:
-        scale, zero_point = out_detail["quantization"]
-        raw = (raw.astype(np.float32) - zero_point) * scale
-
-    # Softmax if logits (values outside [0,1])
-    if raw.max() > 1.0 or raw.min() < 0.0:
-        e = np.exp(raw - raw.max())
-        raw = e / e.sum()
-
-    class_id = int(np.argmax(raw))
-    return class_id, float(raw[class_id])
+    # One shared rule for every phase and the app: dequantise with the
+    # tensor's own parameters, renormalise, never softmax (T33/T39).
+    probs = postprocess(raw, out_detail["quantization"])
+    class_id = int(np.argmax(probs))
+    return class_id, float(probs[class_id])
 
 
 # ── Main patch loop ───────────────────────────────────────────────────────────
 
 def run_orthomosaic(
     image: np.ndarray,
-    geo: GeoTransform,
+    geo: Optional[GeoTransform],
     interp: Interpreter,
     patch_size: int   = PATCH_SIZE,
     stride: int       = DEFAULT_STRIDE,
-    min_green_ratio: float = 0.05,  # skip patches with < 5% green (sky / road)
+    min_vegetation_fraction: float = 0.25,
+    georef=None,
 ) -> List[dict]:
     """
     Slide a window over the orthomosaic; return list of patch result dicts.
@@ -225,32 +313,30 @@ def run_orthomosaic(
             if patch.shape[:2] != (patch_size, patch_size):
                 continue
 
-            # Skip non-vegetation patches (very low green channel ratio)
-            green_mean = patch[:, :, 1].mean()
-            red_mean   = patch[:, :, 0].mean()
-            if green_mean < min_green_ratio * 255 or red_mean > green_mean * 1.5:
+            # Skip anything that is not plant tissue (road, sky, bare soil).
+            if not is_vegetation(patch, min_fraction=min_vegetation_fraction):
                 continue
 
             centre_row = r0 + patch_size // 2
             centre_col = c0 + patch_size // 2
-            lat, lon   = geo.pixel_to_latlon(centre_row, centre_col)
+            if georef is not None:
+                # A GeoTIFF is usually in a UTM zone: project the patch centre
+                # into WGS 84 rather than reading metres as degrees (T39).
+                affine, crs = georef
+                x, y = affine * (centre_col, centre_row)
+                lat, lon = to_wgs84(crs, x, y)
+            else:
+                lat, lon = patch_coordinates(geo, centre_row, centre_col)
 
             t0 = time.perf_counter()
             class_id, confidence = run_patch(interp, patch)
             latency_ms = (time.perf_counter() - t0) * 1000
 
-            results.append({
-                "patch_row":    ri,
-                "patch_col":    ci,
-                "pixel_row":    r0,
-                "pixel_col":    c0,
-                "lat":          round(lat, 7),
-                "lon":          round(lon, 7),
-                "class_id":     class_id,
-                "class_name":   CLASS_NAMES[class_id],
-                "confidence":   round(confidence, 4),
-                "latency_ms":   round(latency_ms, 1),
-            })
+            results.append(result_row(
+                patch_row=ri, patch_col=ci, lat=lat, lon=lon,
+                class_id=class_id, confidence=confidence,
+                latency_ms=latency_ms, pixel_row=r0, pixel_col=c0,
+            ))
             count += 1
             if count % 50 == 0:
                 pct = count / total * 100
@@ -297,18 +383,30 @@ def _parse_args():
     p.add_argument("--stride",     type=int, default=DEFAULT_STRIDE)
     p.add_argument("--demo",    action="store_true",
                    help="Run on a synthetic demo image (no real data needed)")
+    p.add_argument("--origin-lat", type=float, default=None,
+                   help="Latitude of the image's top-left corner (non-georeferenced images)")
+    p.add_argument("--origin-lon", type=float, default=None,
+                   help="Longitude of the image's top-left corner (non-georeferenced images)")
+    p.add_argument("--gsd", type=float, default=None,
+                   help="Ground sample distance in metres per pixel (non-georeferenced images)")
     return p.parse_args()
 
 
 def main():
     args = _parse_args()
 
+    georef = None
     if args.demo:
-        print("Generating synthetic orthomosaic demo (1500×1000 px)...")
+        print("Generating synthetic orthomosaic demo (1500×1000 px, no coordinates)...")
         image, geo = make_demo_image()
     elif args.image:
         print(f"Loading orthomosaic: {args.image}")
-        image, geo = load_image(args.image)
+        image, geo, georef = load_image(
+            args.image,
+            origin_lat=args.origin_lat,
+            origin_lon=args.origin_lon,
+            gsd_m=args.gsd,
+        )
     else:
         print("No image specified. Use --image <path> or --demo.")
         return
@@ -316,7 +414,8 @@ def main():
     print(f"Loading model: {args.model}")
     interp = load_interpreter(args.model)
 
-    results = run_orthomosaic(image, geo, interp, args.patch_size, args.stride)
+    results = run_orthomosaic(image, geo, interp, args.patch_size, args.stride,
+                              georef=georef)
     print_stats(results)
     write_csv(results, args.output)
 
