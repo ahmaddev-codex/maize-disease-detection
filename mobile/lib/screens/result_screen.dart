@@ -524,12 +524,15 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               children: [
                 MaizeGuardLogo(size: 20, isDark: true),
                 SizedBox(width: AppSpacing.xs + 2),
-                Text(
-                  'Diagnostic Result',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                Flexible(
+                  child: Text(
+                    'Diagnostic Result',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -787,11 +790,14 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                         children: [
                           const Icon(Icons.medication_outlined, size: 20, color: AppColors.emeraldBase),
                           const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            'RECOMMENDED TREATMENT PLAN',
-                            style: AppTypography.overline.copyWith(
-                              color: AppColors.emeraldBase,
-                              letterSpacing: 1.1,
+                          Expanded(
+                            child: Text(
+                              'RECOMMENDED TREATMENT PLAN',
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.overline.copyWith(
+                                color: AppColors.emeraldBase,
+                                letterSpacing: 1.1,
+                              ),
                             ),
                           ),
                         ],
@@ -1004,25 +1010,30 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            TextButton.icon(
-                              onPressed: () => _fetchGroqAdvice(
-                                result,
-                                cropVariety,
-                                groqKey,
-                                lang.label,
-                                scanId: currentScanId,
-                              ),
-                              icon: const Icon(Icons.refresh_rounded, size: 16),
-                              label: const Text('Regenerate Advice'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.emeraldBase,
+                            Flexible(
+                              child: TextButton.icon(
+                                onPressed: () => _fetchGroqAdvice(
+                                  result,
+                                  cropVariety,
+                                  groqKey,
+                                  lang.label,
+                                  scanId: currentScanId,
+                                ),
+                                icon: const Icon(Icons.refresh_rounded, size: 16),
+                                label: const Text(
+                                  'Regenerate Advice',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.emeraldBase,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ] else ...[
                         Text(
-                          'Generate verified agronomic guidance tailored specifically to Nigerian agro-ecological zones, current rain patterns, and local chemical availability.',
+                          'Ask for agronomic guidance written for Nigerian conditions. It needs an internet connection and an API key; without either, the built-in guidance is used.',
                           style: AppTypography.bodySmall.copyWith(
                             color: isDark ? AppColors.charcoal300 : AppColors.charcoal700,
                           ),
@@ -1123,7 +1134,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                   child: Column(
                     children: [
                       Text(
-                        'Agronomist Verification',
+                        'Was this diagnosis right?',
                         style: AppTypography.h3.copyWith(
                           color: isDark ? Colors.white : AppColors.charcoal900,
                         ),
@@ -1140,35 +1151,42 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _FeedbackOption(
-                            key: const Key('feedback-correct'),
-                            icon: Icons.check_circle_outline_rounded,
-                            label: 'Correct',
-                            selected: existingFeedback == 1,
-                            color: AppColors.healthy,
-                            onTap: currentScanId != null
-                                ? () => _recordFeedback(currentScanId, 1)
-                                : null,
+                          // Expanded so all three fit a 320px phone (T29).
+                          Expanded(
+                            child: _FeedbackOption(
+                              key: const Key('feedback-correct'),
+                              icon: Icons.check_circle_outline_rounded,
+                              label: 'Correct',
+                              selected: existingFeedback == 1,
+                              color: AppColors.healthy,
+                              onTap: currentScanId != null
+                                  ? () => _recordFeedback(currentScanId, 1)
+                                  : null,
+                            ),
                           ),
-                          _FeedbackOption(
-                            key: const Key('feedback-incorrect'),
-                            icon: Icons.highlight_off_rounded,
-                            label: 'Incorrect',
-                            selected: existingFeedback == 0,
-                            color: AppColors.danger,
-                            onTap: currentScanId != null
-                                ? () => _recordFeedback(currentScanId, 0)
-                                : null,
+                          Expanded(
+                            child: _FeedbackOption(
+                              key: const Key('feedback-incorrect'),
+                              icon: Icons.highlight_off_rounded,
+                              label: 'Incorrect',
+                              selected: existingFeedback == 0,
+                              color: AppColors.danger,
+                              onTap: currentScanId != null
+                                  ? () => _recordFeedback(currentScanId, 0)
+                                  : null,
+                            ),
                           ),
-                          _FeedbackOption(
-                            key: const Key('feedback-uncertain'),
-                            icon: Icons.help_outline_rounded,
-                            label: 'Uncertain',
-                            selected: existingFeedback == -1,
-                            color: AppColors.charcoal400,
-                            onTap: currentScanId != null
-                                ? () => _recordFeedback(currentScanId, -1)
-                                : null,
+                          Expanded(
+                            child: _FeedbackOption(
+                              key: const Key('feedback-uncertain'),
+                              icon: Icons.help_outline_rounded,
+                              label: 'Uncertain',
+                              selected: existingFeedback == -1,
+                              color: AppColors.charcoal400,
+                              onTap: currentScanId != null
+                                  ? () => _recordFeedback(currentScanId, -1)
+                                  : null,
+                            ),
                           ),
                         ],
                       ),
@@ -1184,7 +1202,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                       const MaizeGuardLogo(size: 16),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
-                        'Verified by MaizeGuard Edge Neural Engine',
+                        'Diagnosed on this phone by the MaizeGuard model',
                         style: AppTypography.caption.copyWith(
                           color: AppColors.charcoal400,
                           fontSize: 11,
@@ -1414,8 +1432,9 @@ class _FeedbackOption extends StatelessWidget {
       child: GestureDetector(
       onTap: onTap,
       child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2),
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
+          horizontal: AppSpacing.sm,
           vertical: AppSpacing.sm,
         ),
         decoration: BoxDecoration(
@@ -1431,11 +1450,16 @@ class _FeedbackOption extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: selected ? color : AppColors.charcoal400),
             const SizedBox(width: AppSpacing.xs),
-            Text(
-              label,
-              style: AppTypography.bodySmall.copyWith(
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? color : AppColors.charcoal400,
+            // Shrinks rather than overflowing on a 320px phone (T29).
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.bodySmall.copyWith(
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? color : AppColors.charcoal400,
+                ),
               ),
             ),
           ],

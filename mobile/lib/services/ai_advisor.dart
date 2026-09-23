@@ -275,7 +275,8 @@ $englishContent
     throw _GroqFailure(lastReason);
   }
 
-  /// Offline clinical fallback generated from verified agronomic knowledge in diseases.dart
+  /// Built-in fallback, generated from the agronomic table in diseases.dart
+  /// (see kActivesReview for where that table comes from and its review status).
   String _buildOfflineAdvice(
       int classId, double confidence, String? cropVariety, String language) {
     final disease = diseaseForClass(classId);

@@ -52,7 +52,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [x] T26 Groq client: deadline, stop on 401/offline, typed source, no `reasoning` [T24 · M] — model fixture transcribed from Groq's published list, not a live capture
 - [x] T27 Offline and non-English behaviour explicit; TTS fallbacks [T26 · M] — offline templates stay English-only (Q7 open), labelled "English (offline)"
 - [x] T28 API keys: no dev paths, Remove persists, no embedded key in release [T02 · S] — APK `strings | grep gsk_` check still to run at Checkpoint 4
-- [ ] T29 Honest UI copy (remove "verified" and "fully offline" claims) [T26, T27 · S]
+- [x] T29 Honest UI copy (remove "verified" and "fully offline" claims) [T26, T27 · S]
 - [ ] **Checkpoint 4:** online/offline × English/Hausa; Healthy scan gets no spray advice; agronomist review
 
 ## Phase 5: ML pipeline integrity (parallel with Phases 1–4)
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T29: claims the app cannot back are gone — "Offline Verified", "Verified by MaizeGuard Edge Neural Engine", "Agronomist Verification", "Works fully offline", "Field Validation" and the dark-mode sunlight claim; the feedback card now asks "Was this diagnosis right?" and Home says the diagnosis works offline while advice and local-language voice need a connection. A test greps `lib/` for those phrases and checks the result screen at 320px.
 - T27: offline advice is labelled "English (offline)" when another language was chosen and is cached under the language it is really in; a YarnGPT failure now falls back to a device voice in the closest installed locale (not English only), and failures are explained in plain words instead of showing an exception; the language picker names the engine that will actually speak.
 - T28: a key removed in Settings stays removed — a build-time key seeds the app once and never again; the app no longer reads `.env.json` from a developer's home directory, and key lengths are no longer logged at startup.
 - T26: advice requests have one 20 s budget for all attempts (was 5 models × 25 s), stop immediately on a rejected key or no connection, never show the model's private `reasoning`, and the card says whether the text came from a model (naming it) or from the built-in rules, with the reason.

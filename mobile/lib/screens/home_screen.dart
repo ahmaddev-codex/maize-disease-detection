@@ -190,7 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Instant edge inference for NCLB, Rust, and GLS. Works fully offline.',
+                              'On-device diagnosis for NCLB, Rust and GLS. The diagnosis works offline; AI advice and local-language voice need a connection.',
                               style: AppTypography.bodySmall.copyWith(color: AppColors.charcoal300),
                             ),
                             const SizedBox(height: AppSpacing.md),

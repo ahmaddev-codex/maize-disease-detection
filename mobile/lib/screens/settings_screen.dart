@@ -328,7 +328,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               contentPadding: EdgeInsets.zero,
               title: Text('High Contrast Dark Field Mode', style: AppTypography.h3),
               subtitle: Text(
-                'Optimized for direct sunlight outdoor farm readability',
+                'Lighter background with stronger contrast',
                 style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
               ),
               value: isDark,
@@ -393,7 +393,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 _SpecRow('Neural Architecture', 'EfficientNetB3 Quantized (INT8 / FP16)'),
                 Divider(height: AppSpacing.md),
-                _SpecRow('Training Corpus', 'PlantVillage & Field Validation (4,188 Samples)'),
+                _SpecRow('Training Corpus', 'PlantVillage, 4,188 samples'),
                 Divider(height: AppSpacing.md),
                 _SpecRow('Active Diagnostic Classes', 'NCLB, Rust, GLS, Healthy Foliage'),
                 Divider(height: AppSpacing.md),
