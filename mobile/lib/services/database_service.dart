@@ -106,6 +106,16 @@ class DatabaseService {
     await _database.delete('scan_records', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Attached after the scan is saved, so a slow fix never blocks the result (T18).
+  Future<void> updateLocation(int id, double latitude, double longitude) async {
+    await _database.update(
+      'scan_records',
+      {'latitude': latitude, 'longitude': longitude},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> updateNotes(int id, String notes) async {
     await _database.update(
       'scan_records',

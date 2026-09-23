@@ -68,7 +68,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ? EmptyStateView(
               illustration: const MaizeGuardLogo(size: 56),
               title: 'No Geospatial Data Yet',
-              message: 'Leaf scans taken with device GPS enabled will be georeferenced and mapped across your farmland.',
+              message: 'Scans are mapped once a location fix is available. If location access is off or was denied, scans are still saved — enable it in system settings to map them.',
               actionLabel: 'Scan Field',
               onAction: () => context.push('/camera'),
             )

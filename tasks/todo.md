@@ -37,7 +37,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [ ] **Checkpoint 2:** DD/MM/YYYY parses; dashboard bars correct; app-mode metrics ≈ python mode
 
 ## Phase 3: Scan flow and data lifecycle
-- [ ] T18 Result appears without waiting for GPS; location saved later [T03, T07 · M]
+- [x] T18 Result appears without waiting for GPS; location saved later [T03, T07 · M] — pre-permission explainer deferred to T20
 - [ ] T19 Crop to the on-screen box, behind a flag [T09 · M]
 - [ ] T20 Camera stream lifecycle and real luma brightness hint [— · M]
 - [ ] T21 Delete/Clear remove images, audio cache and stale state [T07 · M]
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T18: results appear immediately and the GPS fix is attached afterwards, so scan-to-result latency no longer includes a location wait.
 - T10: preprocessing and inference run off the UI thread; stored latency_ms is now model-only (papers must not quote it as capture-to-result).
 - T15: one confidence threshold set (low 0.60 / high 0.85); low-confidence scans ask for a retake in speech and urgency; 'critical' now reachable via the real trend.
 - T17: scan times and day buckets render in the device timezone (README/papers should stop implying UTC).

@@ -8,12 +8,9 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../design_system/design_system.dart';
 import '../navigation/open_scan.dart';
-import '../services/path_resolver.dart';
-import '../constants/diseases.dart';
-import '../models/scan_record.dart';
 import '../providers/app_provider.dart';
-import '../services/classifier_service.dart';
-import '../services/location_service.dart';
+import '../providers/service_providers.dart';
+import '../services/scan_flow.dart';
 import '../services/yarn_tts_service.dart';
 
 class CameraScreen extends ConsumerStatefulWidget {
@@ -158,31 +155,20 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     int? scanId;
 
     try {
-      final path     = await _persistImage(tempPath);
-      final result   = await ClassifierService.instance.classify(path);
-      final position = await LocationService.instance.getCurrentPosition();
-      final pending  = ref.read(pendingOcrProvider);
-      final disease  = diseaseForClass(result.classId);
+      final path   = await _persistImage(tempPath);
+      final result = await ref.read(classifierServiceProvider).classify(path);
 
-      final record = ScanRecord(
-        imagePath:    PathResolver.toRelative(path),
-        classId:      result.classId,
-        className:    disease.name,
-        shortName:    disease.shortName,
-        confidence:   result.confidence,
-        allScores:    result.allScores,
-        latencyMs:    result.latencyMs,
-        latitude:     position?.latitude,
-        longitude:    position?.longitude,
-        cropVariety:  pending?.cropVariety,
-        batchNumber:  pending?.batchNumber,
-        plantingDate: pending?.plantingDate,
-        scannedAt:    DateTime.now().toUtc(),
+      // Saved and shown straight away; the GPS fix follows in the background (T18).
+      final saved = await saveScan(
+        imagePath: path,
+        result: result,
+        pending: ref.read(pendingOcrProvider),
+        scans: ref.read(scanListProvider.notifier),
+        location: ref.read(locationServiceProvider),
+        db: ref.read(databaseServiceProvider),
       );
-
       ref.read(pendingOcrProvider.notifier).state = null;
-
-      scanId = await ref.read(scanListProvider.notifier).add(record);
+      scanId = saved.id;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
