@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,12 +85,24 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     super.dispose();
   }
 
-  /// Navigate back to home, stopping all audio first.
-  Future<void> _navigateHome() async {
-    await _stopAudio();
-    if (mounted) {
+  /// Returns to wherever this scan was opened from, stopping audio first;
+  /// falls back to Home when there is nothing to pop (T22).
+  void _goBack() {
+    // Stop audio without awaiting: the TTS engine must never hold up going back.
+    unawaited(_stopAudio());
+    // Navigator's own stack, not GoRouter.canPop(): with the result as the only
+    // page the latter still reports true and popping does nothing.
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
       context.go('/');
     }
+  }
+
+  void _retake() {
+    unawaited(_stopAudio());
+    context.pushReplacement('/camera');
   }
 
   Future<void> _stopAudio() async {
@@ -458,7 +471,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _navigateHome();
+        if (!didPop) _goBack();
       },
       child: Scaffold(
         body: CustomScrollView(
@@ -471,8 +484,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             foregroundColor: Colors.white,
             elevation: 0,
             leading: IconButton(
+              key: const Key('result-back'),
               icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              onPressed: _navigateHome,
+              onPressed: _goBack,
             ),
             title: const Row(
               mainAxisSize: MainAxisSize.min,
@@ -646,6 +660,14 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                                 style: AppTypography.bodySmall.copyWith(
                                   color: isDark ? AppColors.charcoal300 : AppColors.charcoal700,
                                 ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              AppButton(
+                                key: const Key('result-retake'),
+                                label: 'Retake photo',
+                                icon: Icons.camera_alt_rounded,
+                                variant: AppButtonVariant.secondary,
+                                onPressed: _retake,
                               ),
                             ],
                           ),
