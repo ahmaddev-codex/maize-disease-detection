@@ -14,7 +14,7 @@ Usage:
 Outputs:
     data/uav/disease_heatmap.html   — interactive Folium map (open in browser)
     data/uav/disease_heatmap.png    — static overview figure (for reports)
-    data/uav/heatmap_summary.json   — aggregate disease stats per class
+    data/uav/<output stem>_summary.json — aggregate disease stats per class
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ import json
 import os
 import random
 from collections import Counter, defaultdict
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 # ── Optional deps — graceful degradation ─────────────────────────────────────
 try:
@@ -41,7 +41,8 @@ except ImportError:
 
 try:
     import matplotlib
-    matplotlib.use("Agg")
+    # Deliberately not calling matplotlib.use() here: importing this module in
+    # a notebook used to switch that notebook to Agg (T38). main() sets it.
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
     from matplotlib.colors import to_rgba
@@ -87,7 +88,11 @@ def load_predictions(csv_path: str) -> List[Dict[str, Any]]:
 
 
 def make_demo_predictions(n: int = 200) -> List[Dict[str, Any]]:
-    """Generate synthetic predictions for demo/testing."""
+    """Invented predictions for a demo map.
+
+    Every row carries synthetic=True and no latency: these numbers have never
+    been measured and must never appear in a report as if they had (T38).
+    """
     rng = random.Random(42)
     base_lat, base_lon = 7.3775, 3.9470
     classes = ["NCLB", "Rust", "GLS", "Healthy"]
@@ -103,7 +108,7 @@ def make_demo_predictions(n: int = 200) -> List[Dict[str, Any]]:
             "class_id":   classes.index(cls),
             "class_name": cls,
             "confidence": rng.uniform(0.55, 0.99),
-            "latency_ms": rng.uniform(80, 250),
+            "synthetic":  True,
         })
     return rows
 
@@ -270,6 +275,13 @@ def build_static_map(predictions: List[Dict], output_png: str) -> None:
 
 # ── Summary JSON ──────────────────────────────────────────────────────────────
 
+def _mean_latency(predictions: List[Dict]) -> Optional[float]:
+    """Mean inference latency, or None when the predictions carry no timings."""
+    timings = [p["latency_ms"] for p in predictions if p.get("latency_ms") is not None]
+    if not timings:
+        return None
+    return round(sum(timings) / len(timings), 1)
+
 def build_summary(predictions: List[Dict], output_json: str) -> Dict:
     total = len(predictions)
     counts = Counter(p["class_name"] for p in predictions)
@@ -296,9 +308,8 @@ def build_summary(predictions: List[Dict], output_json: str) -> Dict:
             }
             for cls in ["NCLB", "Rust", "GLS", "Healthy"]
         },
-        "avg_latency_ms": round(
-            sum(p["latency_ms"] for p in predictions) / total, 1
-        ) if total else 0,
+        # None, not 0: a run without timings should not report a latency (T38).
+        "avg_latency_ms": _mean_latency(predictions),
         "recommendation": _recommend(disease_rate=disease_total / total if total else 0,
                                      counts=counts),
     }
@@ -310,10 +321,22 @@ def build_summary(predictions: List[Dict], output_json: str) -> Dict:
     return summary
 
 
+def summary_path_for(output_html: str) -> str:
+    """The summary that belongs to a given map file.
+
+    One place decides the name, so the docstring, the notebook and the CLI
+    cannot drift apart (T38).
+    """
+    return os.path.splitext(output_html)[0] + "_summary.json"
+
+
 def _recommend(disease_rate: float, counts: Counter) -> str:
     if disease_rate < 0.05:
         return "Field appears healthy. Continue routine scouting every 7-10 days."
-    dominant = counts.most_common(1)[0][0] if counts else "unknown"
+    # Healthy is not a disease: counting it made a mostly healthy field report
+    # "Dominant: Healthy" and refer the farmer to an agronomist (T38).
+    diseased = Counter({k: v for k, v in counts.items() if k != "Healthy" and v})
+    dominant = diseased.most_common(1)[0][0] if diseased else "unknown"
     recs = {
         "NCLB": "Apply foliar fungicide (mancozeb / azoxystrobin). Remove severely blighted leaves.",
         "Rust":  "Apply triazole fungicide (propiconazole) early. Rust spreads rapidly in cool humid conditions.",
@@ -350,10 +373,18 @@ def _parse_args():
 
 def main():
     args  = _parse_args()
+    # Plotting to files, so force a headless backend here rather than at import.
+    try:
+        import matplotlib as _mpl
+
+        _mpl.use("Agg")
+    except ImportError:
+        pass
+
     stem  = os.path.splitext(args.output)[0]
     out_html = args.output
     out_png  = stem + ".png"
-    out_json = stem + "_summary.json"
+    out_json = summary_path_for(args.output)
 
     if args.demo:
         print("Generating synthetic demo predictions (200 patches)...")
