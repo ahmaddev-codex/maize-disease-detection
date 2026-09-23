@@ -97,6 +97,32 @@ final activeScanRecordProvider = FutureProvider<ScanRecord?>((ref) async {
 // ── Pending OCR fields (from seed label scan, linked to next disease scan) ─────
 final pendingOcrProvider = StateProvider<OcrFields?>((ref) => null);
 
+// ── Crop to the on-screen box (experimental, T19) ─────────────────────────────
+// Off until field photos show it helps: a tight crop can cut off the lesion
+// that a reticle-shy farmer framed loosely.
+final cropToReticleProvider = StateNotifierProvider<CropToReticleNotifier, bool>(
+  (ref) => CropToReticleNotifier(),
+);
+
+class CropToReticleNotifier extends StateNotifier<bool> {
+  CropToReticleNotifier() : super(false) {
+    _load();
+  }
+
+  static const _key = 'crop_to_reticle';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool(_key) ?? false;
+  }
+
+  Future<void> toggle() async {
+    state = !state;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_key, state);
+  }
+}
+
 // ── Theme ──────────────────────────────────────────────────────────────────────
 final isDarkModeProvider = StateNotifierProvider<DarkModeNotifier, bool>(
   (ref) => DarkModeNotifier(),

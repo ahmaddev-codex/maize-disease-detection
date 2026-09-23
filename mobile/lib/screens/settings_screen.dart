@@ -337,6 +337,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('Diagnose Only the Aligned Box', style: AppTypography.h3),
+              subtitle: Text(
+                'Experimental: crops each photo to the on-screen box before diagnosis',
+                style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
+              ),
+              value: ref.watch(cropToReticleProvider),
+              activeThumbColor: AppColors.emeraldBase,
+              onChanged: (_) => ref.read(cropToReticleProvider.notifier).toggle(),
+            ),
+          ),
+
           const SizedBox(height: AppSpacing.lg),
 
           // ── Storage and Diagnostics ───────────────────────────────────────

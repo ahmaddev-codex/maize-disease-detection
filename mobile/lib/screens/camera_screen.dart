@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,9 +12,14 @@ import '../design_system/design_system.dart';
 import '../navigation/open_scan.dart';
 import '../providers/app_provider.dart';
 import '../providers/service_providers.dart';
+import '../services/crop_geometry.dart';
 import '../services/luma.dart';
 import '../services/scan_flow.dart';
 import '../services/yarn_tts_service.dart';
+
+/// Side of the on-screen alignment box, in logical pixels. The painter and the
+/// crop geometry must agree on it, so it lives in one place (T19).
+const double kReticleSide = 280;
 
 class CameraScreen extends ConsumerStatefulWidget {
   const CameraScreen({super.key});
@@ -164,7 +170,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         await _controller!.stopImageStream();
       }
       final file = await _controller!.takePicture();
-      await _classify(file.path);
+      await _classify(file.path, fromCamera: true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -197,8 +203,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     return dest.path;
   }
 
-  Future<void> _classify(String tempPath) async {
+  Future<void> _classify(String tempPath, {bool fromCamera = false}) async {
     if (!mounted) return;
+    // Read before any await: the crop needs the preview area off the screen.
+    final previewArea = MediaQuery.of(context).size;
     // Stop any audio from a previous scan result to prevent stale playback
     YarnTtsService.instance.stop();
     final overlay = _showProcessing();
@@ -208,6 +216,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     try {
       final path   = await _persistImage(tempPath);
       persistedPath = path;
+      if (fromCamera && ref.read(cropToReticleProvider)) {
+        await _cropToReticle(path, previewArea);
+      }
       final result = await ref.read(classifierServiceProvider).classify(path);
 
       // Saved and shown straight away; the GPS fix follows in the background (T18).
@@ -240,6 +251,27 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           if (mounted) _startBrightnessStream();
         }
       }
+    }
+  }
+
+  /// Keeps only what the box framed. A failure leaves the full capture in
+  /// place: a whole-frame diagnosis beats no diagnosis.
+  Future<void> _cropToReticle(String path, Size previewArea) async {
+    try {
+      final file = File(path);
+      final bytes = await file.readAsBytes();
+      final width = previewArea.width;
+      final height = previewArea.height;
+      final cropped = await Isolate.run(
+        () => cropJpegToReticle(
+          bytes,
+          previewArea: Size(width, height),
+          reticleSide: kReticleSide,
+        ),
+      );
+      if (cropped != null) await file.writeAsBytes(cropped, flush: true);
+    } catch (e) {
+      debugPrint('[Camera] reticle crop skipped: $e');
     }
   }
 
@@ -292,7 +324,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           if (isInit)
             Center(
               child: CustomPaint(
-                size: const Size(280, 280),
+                size: const Size.square(kReticleSide),
                 painter: _ReticlePainter(),
               ),
             ),
