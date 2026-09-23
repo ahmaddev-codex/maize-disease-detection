@@ -23,9 +23,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [~] **Checkpoint 1:** device run done 2026-09-23; app launches, but fonts crashed offline (T57) and the run had no API keys (needs `--dart-define-from-file=.env.json`)
 
 ## Phase 2: Diagnosis correctness
-- [ ] T09 Bilinear preprocessing with Dart↔Python parity test [T01 · M]
+- [x] T09 Bilinear preprocessing with Dart↔Python parity test [T01 · M]
 - [ ] T10 Inference off the UI thread; model vs total latency [T09 · M]
-- [ ] T11 Ship the primary model chosen in ADR-001 [T02, T05, T09 · S]
+- [x] T11 Ship the primary model chosen in ADR-001 [T02, T05, T09 · S]
 - [ ] T12 On-device latency benchmark → `device_benchmark.json` [T10, T11, device · S]
 - [x] T13 OCR parser fixes (dates, varieties, batch numbers) with shared fixtures [— · M]
 - [x] T14 Python extractor parity, `--image` CLI, Tesseract check [T13 · S]
@@ -97,4 +97,5 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T09/T11: the app resizes bilinearly and loads FP16 first (INT8 fallback); setup.sh only ships models listed in metrics.json.
 - T57: fonts are bundled; the app no longer downloads DM Sans at runtime (affects any 'works offline' claim in README/papers).

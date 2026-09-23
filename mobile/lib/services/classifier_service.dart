@@ -1,17 +1,29 @@
 import 'dart:io';
-import 'dart:typed_data';
-import 'package:image/image.dart' as img;
+import 'package:flutter/foundation.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
+import 'classifier_preprocess.dart';
 import '../models/scan_record.dart';
 import '../constants/diseases.dart';
 
+/// Loads a TFLite interpreter for a bundled model asset.
+typedef InterpreterLoader = Future<Interpreter> Function(String asset);
+
 class ClassifierService {
   static final ClassifierService instance = ClassifierService._();
-  ClassifierService._();
+
+  ClassifierService._([InterpreterLoader? loader])
+      : _loadInterpreter = loader ?? _loadWithDelegate;
+
+  /// Lets tests observe which model assets are tried, and in what order.
+  @visibleForTesting
+  factory ClassifierService.forTesting(InterpreterLoader loader) =>
+      ClassifierService._(loader);
+
+  final InterpreterLoader _loadInterpreter;
 
   Interpreter? _interpreter;
   bool _isLoaded  = false;
-  bool _isInt8    = true; // false -> FP16 fallback was loaded
+  bool _isInt8    = false; // true -> INT8 fallback was loaded (ADR-001)
 
   static const String _int8Model = 'assets/models/efficientnetb3_maize_int8.tflite';
   static const String _fp16Model = 'assets/models/efficientnetb3_maize_fp16.tflite';
@@ -36,15 +48,16 @@ class ClassifierService {
   }
 
   Future<void> _load() async {
+    // ADR-001: FP16 is the primary model (91.10% vs INT8 88.08% on the test
+    // split, and INT8 measured slower on CPU). INT8 is the fallback.
     try {
-      _interpreter = await _loadWithDelegate(_int8Model);
-      _isInt8  = true;
+      _interpreter = await _loadInterpreter(_fp16Model);
+      _isInt8  = false;
       _isLoaded = true;
     } catch (_) {
-      // GPU delegate failed or INT8 not supported — try FP16 on CPU
       try {
-        _interpreter = await _loadWithDelegate(_fp16Model);
-        _isInt8  = false;
+        _interpreter = await _loadInterpreter(_int8Model);
+        _isInt8  = true;
         _isLoaded = true;
       } catch (e) {
         throw Exception('Failed to load TFLite model: $e');
@@ -52,7 +65,7 @@ class ClassifierService {
     }
   }
 
-  Future<Interpreter> _loadWithDelegate(String asset) async {
+  static Future<Interpreter> _loadWithDelegate(String asset) async {
     try {
       final options = InterpreterOptions()..addDelegate(GpuDelegateV2());
       return await Interpreter.fromAsset(asset, options: options);
@@ -67,11 +80,10 @@ class ClassifierService {
     final stopwatch = Stopwatch()..start();
 
     // ── Preprocess image ──────────────────────────────────────────────────────
-    final bytes   = await File(imagePath).readAsBytes();
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) throw Exception('Failed to decode image: $imagePath');
-
-    final resized = img.copyResize(decoded, width: _inputSize, height: _inputSize);
+    final rgb = preprocessForModel(
+      await File(imagePath).readAsBytes(),
+      size: _inputSize,
+    );
 
     // Inspect actual input tensor type to prevent buffer length mismatch crashes
     final inputTensorInfo = _interpreter!.getInputTensor(0);
@@ -80,31 +92,15 @@ class ClassifierService {
     dynamic inputTensor;
 
     if (isFloatInput) {
-      // FP16 / Float32 model: expects [1, 300, 300, 3] float32
-      final floatBuffer = Float32List(_inputSize * _inputSize * 3);
-      int idx = 0;
-      for (int y = 0; y < _inputSize; y++) {
-        for (int x = 0; x < _inputSize; x++) {
-          final pixel = resized.getPixel(x, y);
-          floatBuffer[idx++] = pixel.r.toDouble();
-          floatBuffer[idx++] = pixel.g.toDouble();
-          floatBuffer[idx++] = pixel.b.toDouble();
-        }
+      // FP16 / Float32 model: expects [1, 300, 300, 3] float32 in [0, 255]
+      final floatBuffer = Float32List(rgb.length);
+      for (var i = 0; i < rgb.length; i++) {
+        floatBuffer[i] = rgb[i].toDouble();
       }
       inputTensor = floatBuffer.reshape([1, _inputSize, _inputSize, 3]);
     } else {
       // INT8 / Uint8 model: expects [1, 300, 300, 3] uint8
-      final uintBuffer = Uint8List(_inputSize * _inputSize * 3);
-      int idx = 0;
-      for (int y = 0; y < _inputSize; y++) {
-        for (int x = 0; x < _inputSize; x++) {
-          final pixel = resized.getPixel(x, y);
-          uintBuffer[idx++] = pixel.r.toInt();
-          uintBuffer[idx++] = pixel.g.toInt();
-          uintBuffer[idx++] = pixel.b.toInt();
-        }
-      }
-      inputTensor = uintBuffer.reshape([1, _inputSize, _inputSize, 3]);
+      inputTensor = rgb.reshape([1, _inputSize, _inputSize, 3]);
     }
 
     // ── Output buffer — dynamically match output tensor type ──────────────────

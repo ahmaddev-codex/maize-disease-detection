@@ -74,70 +74,70 @@
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "c95678f8607f751361b3fb73ecbd26ed1a07ac4e",
+        "git_sha": "02889c200dfadd1a53073808a709d6756f7abe6b",
         "git_dirty": true,
-        "evaluated_at": "2026-09-10T12:20:06+00:00"
+        "evaluated_at": "2026-09-23T06:46:10+00:00"
       },
       "app": {
         "n": 629,
-        "accuracy": 0.8633,
+        "accuracy": 0.8808,
         "per_class": {
           "NCLB": {
-            "precision": 0.7917,
-            "recall": 0.7733,
-            "f1": 0.7824,
+            "precision": 0.7802,
+            "recall": 0.8256,
+            "f1": 0.8023,
             "support": 172
           },
           "Rust": {
-            "precision": 0.8762,
-            "recall": 0.9388,
-            "f1": 0.9064,
+            "precision": 0.925,
+            "recall": 0.9439,
+            "f1": 0.9343,
             "support": 196
           },
           "GLS": {
-            "precision": 0.6835,
-            "recall": 0.6279,
-            "f1": 0.6545,
+            "precision": 0.7222,
+            "recall": 0.6047,
+            "f1": 0.6582,
             "support": 86
           },
           "Healthy": {
             "precision": 1.0,
-            "recall": 0.9829,
-            "f1": 0.9914,
+            "recall": 1.0,
+            "f1": 1.0,
             "support": 175
           }
         },
         "confusion_matrix": [
           [
-            133,
-            17,
-            22,
+            142,
+            11,
+            19,
             0
           ],
           [
             10,
-            184,
-            2,
+            185,
+            1,
             0
           ],
           [
-            25,
-            7,
-            54,
+            30,
+            4,
+            52,
             0
           ],
           [
             0,
-            2,
-            1,
-            172
+            0,
+            0,
+            175
           ]
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "c95678f8607f751361b3fb73ecbd26ed1a07ac4e",
+        "git_sha": "02889c200dfadd1a53073808a709d6756f7abe6b",
         "git_dirty": true,
-        "evaluated_at": "2026-09-10T12:22:01+00:00"
+        "evaluated_at": "2026-09-23T06:48:05+00:00"
       }
     },
     "efficientnetb3_maize_fp16.tflite": {
@@ -214,30 +214,30 @@
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "c95678f8607f751361b3fb73ecbd26ed1a07ac4e",
+        "git_sha": "02889c200dfadd1a53073808a709d6756f7abe6b",
         "git_dirty": true,
-        "evaluated_at": "2026-09-10T12:22:32+00:00"
+        "evaluated_at": "2026-09-23T06:48:35+00:00"
       },
       "app": {
         "n": 629,
-        "accuracy": 0.9094,
+        "accuracy": 0.911,
         "per_class": {
           "NCLB": {
-            "precision": 0.8589,
-            "recall": 0.814,
-            "f1": 0.8358,
+            "precision": 0.8571,
+            "recall": 0.8372,
+            "f1": 0.8471,
             "support": 172
           },
           "Rust": {
-            "precision": 0.974,
-            "recall": 0.9541,
-            "f1": 0.9639,
+            "precision": 0.9694,
+            "recall": 0.9694,
+            "f1": 0.9694,
             "support": 196
           },
           "GLS": {
-            "precision": 0.7071,
-            "recall": 0.814,
-            "f1": 0.7568,
+            "precision": 0.7111,
+            "recall": 0.7442,
+            "f1": 0.7273,
             "support": 86
           },
           "Healthy": {
@@ -249,21 +249,21 @@
         },
         "confusion_matrix": [
           [
-            140,
-            4,
-            28,
+            144,
+            3,
+            25,
             0
           ],
           [
-            8,
-            187,
+            5,
+            190,
             1,
             0
           ],
           [
-            15,
-            1,
-            70,
+            19,
+            3,
+            64,
             0
           ],
           [
@@ -275,9 +275,9 @@
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "c95678f8607f751361b3fb73ecbd26ed1a07ac4e",
+        "git_sha": "02889c200dfadd1a53073808a709d6756f7abe6b",
         "git_dirty": true,
-        "evaluated_at": "2026-09-10T12:23:05+00:00"
+        "evaluated_at": "2026-09-23T06:49:09+00:00"
       }
     }
   },

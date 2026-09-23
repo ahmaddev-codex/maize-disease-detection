@@ -11,8 +11,8 @@ Run:
 
 Preprocessing modes:
     python — bilinear resize, matching tf.image.resize used during training
-    app    — nearest-neighbour resize, mirroring mobile/lib/services/classifier_service.dart
-             (img.copyResize default interpolation)
+    app    — mirrors mobile/lib/services/classifier_preprocess.dart (also bilinear
+             since T09; it used nearest-neighbour before, costing ~1.8 points)
 
 Both modes dequantize integer outputs with the tensor's quantization params and
 renormalize scores by their sum — the same normalization the mobile app applies.
@@ -66,7 +66,7 @@ DEFAULT_MODES  = ["python", "app"]
 
 RESAMPLING = {
     "python": Image.Resampling.BILINEAR,
-    "app":    Image.Resampling.NEAREST,
+    "app":    Image.Resampling.BILINEAR,
 }
 
 

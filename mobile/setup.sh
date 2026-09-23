@@ -69,12 +69,21 @@ fi
 info "Copying TFLite models into assets/models/…"
 mkdir -p assets/models
 
-for MODEL in efficientnetb3_maize_int8.tflite efficientnetb3_maize_fp16.tflite; do
+METRICS="$ROOT_DIR/models/exports/metrics.json"
+
+for MODEL in efficientnetb3_maize_fp16.tflite efficientnetb3_maize_int8.tflite; do
   SRC="$ROOT_DIR/models/exports/$MODEL"
   DST="assets/models/$MODEL"
   if [[ -f "$SRC" ]]; then
+    # Only ship models whose accuracy has been measured (ADR-006: metrics.json
+    # is the single source of truth for model numbers).
+    [[ -f "$METRICS" ]] || die "models/exports/metrics.json not found. Run:
+    python -m src.phase4_edge.evaluate_tflite --model models/exports/$MODEL"
+    SHA=$(shasum -a 256 "$SRC" | cut -d' ' -f1)
+    grep -q "$SHA" "$METRICS" || die "$MODEL is not in metrics.json (sha256 ${SHA:0:12}…). Run:
+    python -m src.phase4_edge.evaluate_tflite --model models/exports/$MODEL"
     cp "$SRC" "$DST"
-    success "Copied $MODEL"
+    success "Copied $MODEL (measured, sha256 ${SHA:0:12}…)"
   else
     warn "$MODEL not found at models/exports/ — run 'bash run_all.sh' first"
   fi
