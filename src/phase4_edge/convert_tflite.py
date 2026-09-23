@@ -14,12 +14,18 @@ INT8 requires a representative dataset (100–500 images) so the converter can
 compute per-layer activation ranges.  We sample from labels.csv for this.
 """
 
-import os
 import argparse
+import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+from typing import Dict, List
+
 import numpy as np
 import tensorflow as tf
 
-from src.phase1_cnn.data_pipeline import load_labels_csv, IMG_SIZE
+from src.phase1_cnn.data_pipeline import IMG_SIZE, load_labels_csv, split_dataframe
 
 KERAS_MODEL  = "models/exports/efficientnetb3_maize.keras"
 EXPORT_DIR   = "models/exports"
@@ -30,16 +36,89 @@ CALIB_IMAGES = 200   # number of images used for INT8 calibration
 
 # ── Representative dataset ────────────────────────────────────────────────────
 
+def calibration_sample(csv_path: str, n: int = CALIB_IMAGES, seed: int = 42) -> List[str]:
+    """Image paths for INT8 calibration, drawn from the training split only.
+
+    Sampling the whole of labels.csv fitted the quantisation ranges on the very
+    images the model is then scored against, quietly flattering the INT8
+    numbers (T32).
+    """
+    train_df, _, _ = split_dataframe(load_labels_csv(csv_path))
+    if n >= len(train_df):
+        return list(train_df["image_path"])
+    return list(train_df.sample(n, random_state=seed)["image_path"])
+
+
+def sha256_of(path) -> str:
+    """Content hash of a file, used to tie an export to its source."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def export_record(
+    exported,
+    source_keras,
+    precision: str,
+    calibration_csv=None,
+    calibration_images: int = 0,
+) -> Dict:
+    """What this export is and where it came from.
+
+    Shipped TFLite files used to carry no link to the checkpoint that produced
+    them, so nobody could tell which training run the app was running (T32).
+    """
+    source_path = Path(source_keras)
+    source = {
+        "path": str(source_path),
+        "sha256": sha256_of(source_path) if source_path.exists() else None,
+    }
+    if not source_path.exists():
+        source["missing"] = True
+
+    record = {
+        "path": str(exported),
+        "sha256": sha256_of(exported),
+        "precision": precision,
+        "source_keras": source,
+        "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+    }
+    if calibration_csv is not None and calibration_images:
+        record["calibration"] = {
+            "csv": str(calibration_csv),
+            "split": "train",
+            "images": calibration_images,
+        }
+    return record
+
+
+def record_export(record: Dict, metrics_path: str = os.path.join(EXPORT_DIR, "metrics.json")) -> None:
+    """Merges an export record into metrics.json beside that model's scores."""
+    metrics = {}
+    if os.path.exists(metrics_path):
+        with open(metrics_path) as handle:
+            metrics = json.load(handle)
+    models = metrics.setdefault("models", {})
+    entry = models.setdefault(os.path.basename(record["path"]), {})
+    entry["export"] = record
+    os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
+    with open(metrics_path, "w") as handle:
+        json.dump(metrics, handle, indent=2)
+        handle.write("\n")
+    print(f"Export provenance written → {metrics_path}")
+
+
 def make_representative_dataset(csv_path: str, n: int = CALIB_IMAGES):
     """
     Generator that yields calibration batches (1 image each) as float32
     in the [0, 255] range that EfficientNetB3 expects.
     """
-    df = load_labels_csv(csv_path)
-    sample = df.sample(min(n, len(df)), random_state=42)
+    sample_paths = calibration_sample(csv_path, n)
 
     def _gen():
-        for path in sample["image_path"].values:
+        for path in sample_paths:
             raw   = tf.io.read_file(path)
             image = tf.image.decode_image(raw, channels=3, expand_animations=False)
             image = tf.image.resize(image, IMG_SIZE)
@@ -82,6 +161,7 @@ def convert_fp16(model_path: str, out_path: str):
 
         size_mb = os.path.getsize(out_path) / 1e6
         print(f"FP16 model saved → {out_path}  ({size_mb:.1f} MB)")
+        record_export(export_record(out_path, source_keras=model_path, precision="fp16"))
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -116,6 +196,13 @@ def convert_int8(model_path: str, csv_path: str, out_path: str):
 
         size_mb = os.path.getsize(out_path) / 1e6
         print(f"INT8 model saved → {out_path}  ({size_mb:.1f} MB)")
+        record_export(export_record(
+            out_path,
+            source_keras=model_path,
+            precision="int8",
+            calibration_csv=csv_path,
+            calibration_images=len(calibration_sample(csv_path)),
+        ))
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 

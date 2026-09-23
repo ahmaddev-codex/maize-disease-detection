@@ -143,56 +143,14 @@ if [ ! -d "$PLANTVILLAGE_DIR" ]; then
 fi
 
 echo ">>> Step 0: Building labels.csv + labels_with_metadata.csv ..."
-$VENV - << 'PYEOF'
-import os, csv, random
-from collections import Counter
-
-MAPPING = {
-    "Blight":         (0, "NCLB"),
-    "Common_Rust":    (1, "Rust"),
-    "Gray_Leaf_Spot": (2, "GLS"),
-    "Healthy":        (3, "Healthy"),
-}
-ROOT = "data/raw/plantvillage/data"
-rows = []
-for folder, (label, class_name) in MAPPING.items():
-    path = os.path.join(ROOT, folder)
-    for fname in sorted(os.listdir(path)):
-        if fname.lower().endswith((".jpg", ".jpeg", ".png")):
-            rows.append({"image_path": os.path.join(path, fname),
-                         "label": label, "class_name": class_name, "source": "plantvillage"})
-
-os.makedirs("data/annotations", exist_ok=True)
-with open("data/annotations/labels.csv", "w", newline="") as f:
-    w = csv.DictWriter(f, fieldnames=["image_path","label","class_name","source"])
-    w.writeheader(); w.writerows(rows)
-
-varieties = ["SAMMAZ 15","SAMMAZ 17","SAMMAZ 29","SAMMAZ 34","SAMMAZ 50",
-             "OBA SUPER 2","EVDT 99","POOL 16 DT","TZEE-W","ABA WHITE",
-             "ACROSS 97","SUWAN 1","EARLY THRIVING", None]
-batches   = ["BN-2024-042", "BN-2023-011", "LOT-2024-007", None]
-dates     = ["2024-03-15", "2023-11-01", "2024-05-20", None]
-rng = random.Random(0)
-with open("data/annotations/labels_with_metadata.csv", "w", newline="") as f:
-    fn = ["image_path","label","class_name","source","crop_variety","batch_number","planting_date"]
-    w = csv.DictWriter(f, fieldnames=fn)
-    w.writeheader()
-    for row in rows:
-        w.writerow({**row, "crop_variety": rng.choice(varieties),
-                    "batch_number": rng.choice(batches),
-                    "planting_date": rng.choice(dates)})
-
-counts = Counter(r["class_name"] for r in rows)
-total  = sum(counts.values())
-print(f"\n  labels.csv written: {total} images")
-print(f"  {'Class':<24} {'Count':>6}  {'Pct':>6}")
-print(f"  {'─'*40}")
-for cls in ["NCLB","Rust","GLS","Healthy"]:
-    n = counts.get(cls, 0)
-    print(f"  {cls:<24} {n:>6}  {n/total*100:>5.1f}%")
-print(f"  {'─'*40}")
-print(f"  {'TOTAL':<24} {total:>6}  100.0%")
-PYEOF
+# Built by a tested module (tests/test_build_labels.py), not an inline heredoc.
+# Images listed in data/annotations/exclusions.csv are dropped: two duplicate
+# pairs carried conflicting labels (T34).
+$VENV -m src.phase1_cnn.build_labels \
+  --root "$PLANTVILLAGE_DIR" \
+  --labels "$LABELS_CSV" \
+  --metadata "$META_CSV" \
+  --check-duplicates
 echo ""
 
 # ── Step 1: Phase 1 CNN training ───────────────────────────────────────────────

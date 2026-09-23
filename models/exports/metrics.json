@@ -18,126 +18,126 @@
         ]
       },
       "python": {
-        "n": 629,
-        "accuracy": 0.8808,
+        "n": 628,
+        "accuracy": 0.8726,
         "per_class": {
           "NCLB": {
-            "precision": 0.7802,
-            "recall": 0.8256,
-            "f1": 0.8023,
+            "precision": 0.7606,
+            "recall": 0.8314,
+            "f1": 0.7944,
             "support": 172
           },
           "Rust": {
-            "precision": 0.925,
-            "recall": 0.9439,
-            "f1": 0.9343,
+            "precision": 0.9254,
+            "recall": 0.949,
+            "f1": 0.937,
             "support": 196
           },
           "GLS": {
-            "precision": 0.7222,
-            "recall": 0.6047,
-            "f1": 0.6582,
+            "precision": 0.7077,
+            "recall": 0.5349,
+            "f1": 0.6093,
             "support": 86
           },
           "Healthy": {
-            "precision": 1.0,
-            "recall": 1.0,
-            "f1": 1.0,
-            "support": 175
+            "precision": 0.9943,
+            "recall": 0.9943,
+            "f1": 0.9943,
+            "support": 174
           }
         },
         "confusion_matrix": [
           [
-            142,
-            11,
-            19,
-            0
+            143,
+            10,
+            18,
+            1
           ],
           [
-            10,
-            185,
+            9,
+            186,
             1,
             0
           ],
           [
-            30,
-            4,
-            52,
+            35,
+            5,
+            46,
             0
           ],
           [
+            1,
             0,
             0,
-            0,
-            175
+            173
           ]
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "02889c200dfadd1a53073808a709d6756f7abe6b",
+        "git_sha": "c26075de18f7c2a699bcf234a08429365186a37b",
         "git_dirty": true,
-        "evaluated_at": "2026-09-23T06:46:10+00:00"
+        "evaluated_at": "2026-09-23T20:16:16+00:00"
       },
       "app": {
-        "n": 629,
-        "accuracy": 0.8808,
+        "n": 628,
+        "accuracy": 0.8726,
         "per_class": {
           "NCLB": {
-            "precision": 0.7802,
-            "recall": 0.8256,
-            "f1": 0.8023,
+            "precision": 0.7606,
+            "recall": 0.8314,
+            "f1": 0.7944,
             "support": 172
           },
           "Rust": {
-            "precision": 0.925,
-            "recall": 0.9439,
-            "f1": 0.9343,
+            "precision": 0.9254,
+            "recall": 0.949,
+            "f1": 0.937,
             "support": 196
           },
           "GLS": {
-            "precision": 0.7222,
-            "recall": 0.6047,
-            "f1": 0.6582,
+            "precision": 0.7077,
+            "recall": 0.5349,
+            "f1": 0.6093,
             "support": 86
           },
           "Healthy": {
-            "precision": 1.0,
-            "recall": 1.0,
-            "f1": 1.0,
-            "support": 175
+            "precision": 0.9943,
+            "recall": 0.9943,
+            "f1": 0.9943,
+            "support": 174
           }
         },
         "confusion_matrix": [
           [
-            142,
-            11,
-            19,
-            0
+            143,
+            10,
+            18,
+            1
           ],
           [
-            10,
-            185,
+            9,
+            186,
             1,
             0
           ],
           [
-            30,
-            4,
-            52,
+            35,
+            5,
+            46,
             0
           ],
           [
+            1,
             0,
             0,
-            0,
-            175
+            173
           ]
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "02889c200dfadd1a53073808a709d6756f7abe6b",
+        "git_sha": "c26075de18f7c2a699bcf234a08429365186a37b",
         "git_dirty": true,
-        "evaluated_at": "2026-09-23T06:48:05+00:00"
+        "evaluated_at": "2026-09-23T20:17:24+00:00"
       }
     },
     "efficientnetb3_maize_fp16.tflite": {
@@ -158,151 +158,152 @@
         ]
       },
       "python": {
-        "n": 629,
-        "accuracy": 0.911,
+        "n": 628,
+        "accuracy": 0.9315,
         "per_class": {
           "NCLB": {
-            "precision": 0.8571,
-            "recall": 0.8372,
-            "f1": 0.8471,
+            "precision": 0.8674,
+            "recall": 0.9128,
+            "f1": 0.8895,
             "support": 172
           },
           "Rust": {
-            "precision": 0.9694,
-            "recall": 0.9694,
-            "f1": 0.9694,
+            "precision": 0.9843,
+            "recall": 0.9592,
+            "f1": 0.9716,
             "support": 196
           },
           "GLS": {
-            "precision": 0.7111,
-            "recall": 0.7442,
-            "f1": 0.7273,
+            "precision": 0.8049,
+            "recall": 0.7674,
+            "f1": 0.7857,
             "support": 86
           },
           "Healthy": {
             "precision": 1.0,
             "recall": 1.0,
             "f1": 1.0,
-            "support": 175
+            "support": 174
           }
         },
         "confusion_matrix": [
           [
-            144,
-            3,
-            25,
+            157,
+            0,
+            15,
             0
           ],
           [
-            5,
-            190,
+            7,
+            188,
             1,
             0
           ],
           [
-            19,
+            17,
             3,
-            64,
+            66,
             0
           ],
           [
             0,
             0,
             0,
-            175
+            174
           ]
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "02889c200dfadd1a53073808a709d6756f7abe6b",
+        "git_sha": "c26075de18f7c2a699bcf234a08429365186a37b",
         "git_dirty": true,
-        "evaluated_at": "2026-09-23T06:48:35+00:00"
+        "evaluated_at": "2026-09-23T20:17:57+00:00"
       },
       "app": {
-        "n": 629,
-        "accuracy": 0.911,
+        "n": 628,
+        "accuracy": 0.9315,
         "per_class": {
           "NCLB": {
-            "precision": 0.8571,
-            "recall": 0.8372,
-            "f1": 0.8471,
+            "precision": 0.8674,
+            "recall": 0.9128,
+            "f1": 0.8895,
             "support": 172
           },
           "Rust": {
-            "precision": 0.9694,
-            "recall": 0.9694,
-            "f1": 0.9694,
+            "precision": 0.9843,
+            "recall": 0.9592,
+            "f1": 0.9716,
             "support": 196
           },
           "GLS": {
-            "precision": 0.7111,
-            "recall": 0.7442,
-            "f1": 0.7273,
+            "precision": 0.8049,
+            "recall": 0.7674,
+            "f1": 0.7857,
             "support": 86
           },
           "Healthy": {
             "precision": 1.0,
             "recall": 1.0,
             "f1": 1.0,
-            "support": 175
+            "support": 174
           }
         },
         "confusion_matrix": [
           [
-            144,
-            3,
-            25,
+            157,
+            0,
+            15,
             0
           ],
           [
-            5,
-            190,
+            7,
+            188,
             1,
             0
           ],
           [
-            19,
+            17,
             3,
-            64,
+            66,
             0
           ],
           [
             0,
             0,
             0,
-            175
+            174
           ]
         ],
         "csv": "data/annotations/labels.csv",
         "split": "test",
-        "git_sha": "02889c200dfadd1a53073808a709d6756f7abe6b",
+        "git_sha": "c26075de18f7c2a699bcf234a08429365186a37b",
         "git_dirty": true,
-        "evaluated_at": "2026-09-23T06:49:09+00:00"
+        "evaluated_at": "2026-09-23T20:18:27+00:00"
+      },
+      "export": {
+        "path": "models/exports/efficientnetb3_maize_fp16.tflite",
+        "sha256": "54081d8bc48206305a1121d62c4ce45727adb91bcef65c67fd538b59c0e9320d",
+        "precision": "fp16",
+        "source_keras": {
+          "path": "models/checkpoints/phase1_stage2_best.keras",
+          "sha256": "e6cc64dc5d7d96c0ed90b89a9588849f0e2629b7a6a76dcd3b953b98ae3e2a35"
+        },
+        "exported_at": "2026-09-23T20:19:49+00:00"
       }
     }
   },
   "dataset": {
     "csv": "data/annotations/labels.csv",
     "split_sizes": {
-      "train": 2931,
+      "train": 2930,
       "val": 628,
-      "test": 629
+      "test": 628
     },
     "duplicates": {
-      "duplicate_files": 4,
-      "duplicate_groups": 2,
-      "conflicting_label_groups": 2,
+      "duplicate_files": 0,
+      "duplicate_groups": 0,
+      "conflicting_label_groups": 0,
       "groups_spanning_train_and_test": 0,
-      "conflicting_groups": [
-        [
-          "data/raw/plantvillage/data/Blight/Corn_Blight (1104).jpg",
-          "data/raw/plantvillage/data/Gray_Leaf_Spot/Corn_Gray_Spot (564).jpg"
-        ],
-        [
-          "data/raw/plantvillage/data/Blight/Corn_Blight (77).jpg",
-          "data/raw/plantvillage/data/Gray_Leaf_Spot/Corn_Gray_Spot (19).jpg"
-        ]
-      ]
+      "conflicting_groups": []
     }
   }
 }

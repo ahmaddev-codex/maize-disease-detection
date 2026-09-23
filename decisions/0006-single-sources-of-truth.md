@@ -24,6 +24,8 @@ The audit found the same concept defined several times, with different values:
 | Class ids and labels, Python post-processing | `src/common/labels.py`, `src/common/postprocess.py` |
 | Mobile confidence thresholds | `mobile/lib/constants/thresholds.dart` |
 | OCR parsing test cases (Dart and Python) | `tests/fixtures/ocr_cases.json` |
+| Model output post-processing cases (Dart and Python) | `tests/fixtures/postprocess_cases.json` |
+| Images excluded from training and evaluation | `data/annotations/exclusions.csv` (applied by `src/phase1_cnn/build_labels.py`) |
 | Maize varieties and cited traits | `data/reference/maize_varieties.csv` (Dart and Python lists generated from it) |
 | Model and OCR evaluation results | `models/exports/metrics.json`, written only by evaluation scripts |
 
@@ -38,4 +40,10 @@ Docs and papers quote numbers from `metrics.json` and cite it.
 
 ## Consequences
 - New tasks must read from these sources instead of adding literals (T13–T16, T33, T53).
+- As of T33 the app shares the post-processing rule through
+  `mobile/lib/services/classifier_postprocess.dart`, which runs the same
+  fixture cases as `src/common/postprocess.py`.
+- As of T34 `labels.csv` is generated, never hand-edited: `run_all.sh` calls
+  `build_labels.py --check-duplicates`, which refuses to write a set in which a
+  byte-identical image carries two labels.
 - CI can check that docs contain no model numbers absent from `metrics.json` (T49).
