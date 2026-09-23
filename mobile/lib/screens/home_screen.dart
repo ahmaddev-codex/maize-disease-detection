@@ -90,10 +90,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final isDark  = Theme.of(context).brightness == Brightness.dark;
     final recent  = scans.take(5).toList();
 
-    final total      = scans.length;
-    final healthy    = scans.where((s) => s.classId == 3).length;
-    final healthPct  = total == 0 ? 100 : (healthy / total * 100).round();
-    final diseased   = total - healthy;
+    // Same source and window as the dashboard, so the two always agree (T16).
+    final stats      = ref.watch(farmStatsProvider(30)).valueOrNull;
+    final total      = stats?.total ?? 0;
+    final diseased   = stats?.diseased ?? 0;
+    final healthRate = stats?.healthRate;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
@@ -314,7 +315,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('$total', style: AppTypography.h2),
-                            Text('Total Scans', style: AppTypography.caption.copyWith(color: AppColors.charcoal500)),
+                            Text('Scans (30 days)', style: AppTypography.caption.copyWith(color: AppColors.charcoal500)),
                           ],
                         ),
                       ),
@@ -326,7 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '$healthPct%',
+                              healthRate == null ? '—' : '${(healthRate * 100).round()}%',
                               style: AppTypography.h2.copyWith(color: AppColors.healthy),
                             ),
                             Text('Healthy Rate', style: AppTypography.caption.copyWith(color: AppColors.charcoal500)),

@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import '../models/farm_stats.dart';
 import '../models/scan_record.dart';
 
 class DatabaseService {
@@ -8,10 +10,14 @@ class DatabaseService {
 
   Database? _db;
 
-  Future<void> init() async {
-    final dbPath = await getDatabasesPath();
+  /// Lets tests run against an in-memory database.
+  @visibleForTesting
+  factory DatabaseService.forTesting() => DatabaseService._();
+
+  Future<void> init({String? path}) async {
+    final dbPath = path ?? join(await getDatabasesPath(), 'maizeguard.db');
     _db = await openDatabase(
-      join(dbPath, 'maizeguard.db'),
+      dbPath,
       version: 2,
       onCreate: (db, _) async {
         await db.execute('''
@@ -43,6 +49,13 @@ class DatabaseService {
         }
       },
     );
+  }
+
+  /// Closes the database so each test starts from a clean in-memory instance.
+  @visibleForTesting
+  Future<void> close() async {
+    await _db?.close();
+    _db = null;
   }
 
   Database get _database {
@@ -111,32 +124,47 @@ class DatabaseService {
     );
   }
 
-  Future<Map<String, int>> getClassCounts({int days = 30}) async {
+  /// Scan counts per class over the last [days]. Grouped by class_id: grouping
+  /// by class_name made the dashboard read 0 for every disease (T16).
+  Future<FarmStats> farmStats({int days = 30}) async {
     final since = DateTime.now().toUtc().subtract(Duration(days: days)).toIso8601String();
     final rows = await _database.rawQuery('''
-      SELECT class_name, COUNT(*) as cnt
+      SELECT class_id, COUNT(*) as cnt
       FROM scan_records
       WHERE scanned_at >= ?
-      GROUP BY class_name
+      GROUP BY class_id
     ''', [since]);
-    return {for (final r in rows) r['class_name'] as String: r['cnt'] as int};
+    return FarmStats(
+      days: days,
+      countsByClass: {for (final r in rows) r['class_id'] as int: r['cnt'] as int},
+    );
   }
 
   Future<void> clearAll() async {
     await _database.delete('scan_records');
   }
 
-  // Returns scan count per day for the last [days] days (for the bar chart)
+  // Scan count per *local* day for the last [days] days (for the bar chart).
+  // Timestamps are stored in UTC, so a 00:30 scan in Lagos belongs to that day
+  // locally, not the day before (T16/T17).
   Future<Map<String, int>> getDailyScans({int days = 7}) async {
     final since = DateTime.now().toUtc().subtract(Duration(days: days)).toIso8601String();
-    final rows = await _database.rawQuery('''
-      SELECT substr(scanned_at, 1, 10) as day, COUNT(*) as cnt
-      FROM scan_records
-      WHERE scanned_at >= ?
-      GROUP BY day
-      ORDER BY day ASC
-    ''', [since]);
-    return {for (final r in rows) r['day'] as String: r['cnt'] as int};
+    final rows = await _database.query(
+      'scan_records',
+      columns: ['scanned_at'],
+      where: 'scanned_at >= ?',
+      whereArgs: [since],
+    );
+
+    final counts = <String, int>{};
+    for (final row in rows) {
+      final local = DateTime.parse(row['scanned_at'] as String).toLocal();
+      final key = '${local.year.toString().padLeft(4, '0')}-'
+          '${local.month.toString().padLeft(2, '0')}-'
+          '${local.day.toString().padLeft(2, '0')}';
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
   }
 
   // Returns health rate change: positive = improving, negative = worsening.

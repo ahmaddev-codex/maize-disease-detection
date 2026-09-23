@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_env.dart';
+import '../models/farm_stats.dart';
 import '../models/scan_record.dart';
 import '../services/database_service.dart';
 import 'service_providers.dart';
@@ -255,6 +256,12 @@ class DisplayLanguageNotifier extends StateNotifier<DisplayLanguage> {
     await prefs.setInt(_key, lang.index);
   }
 }
+
+// ── Farm statistics (Home and the dashboard share one source) ─────────────────
+final farmStatsProvider = FutureProvider.family<FarmStats, int>((ref, days) async {
+  ref.watch(scanListProvider); // recompute after a scan, delete or clear
+  return ref.watch(databaseServiceProvider).farmStats(days: days);
+});
 
 // ── Health trend (delta health rate: >0.1 improving, <-0.1 worsening) ─────────
 final healthTrendProvider = FutureProvider<double>((ref) async {

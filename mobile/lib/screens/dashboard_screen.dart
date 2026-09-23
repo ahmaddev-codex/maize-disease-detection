@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../design_system/design_system.dart';
+import '../models/farm_stats.dart';
 import '../providers/app_provider.dart';
-import '../services/database_service.dart';
+import '../providers/service_providers.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -13,7 +14,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  Map<String, int> _classCounts = {};
+  FarmStats _stats = const FarmStats(days: 30, countsByClass: {});
   Map<String, int> _dailyCounts = {};
   bool _loading = true;
 
@@ -25,22 +26,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
-    final results = await Future.wait([
-      DatabaseService.instance.getClassCounts(days: 30),
-      DatabaseService.instance.getDailyScans(days: 7),
-    ]);
+    final db = ref.read(databaseServiceProvider);
+    final stats = await db.farmStats(days: 30);
+    final daily = await db.getDailyScans(days: 7);
     if (mounted) {
       setState(() {
-        _classCounts = results[0];
-        _dailyCounts = results[1];
+        _stats = stats;
+        _dailyCounts = daily;
         _loading = false;
       });
     }
   }
-
-  int get _total => _classCounts.values.fold(0, (a, b) => a + b);
-  int get _healthy => _classCounts['Healthy'] ?? 0;
-  double get _healthScore => _total == 0 ? 100 : (_healthy / _total * 100);
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +76,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     children: [
                       Expanded(
                         flex: 3,
-                        child: _HealthScoreCard(score: _healthScore, total: _total),
+                        child: _HealthScoreCard(rate: _stats.healthRate, total: _stats.total),
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
@@ -119,7 +115,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '$_total',
+                                '${_stats.total}',
                                 style: AppTypography.h2.copyWith(color: AppColors.emeraldBase),
                               ),
                               const SizedBox(height: 2),
@@ -138,7 +134,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${_total - _healthy}',
+                                '${_stats.diseased}',
                                 style: AppTypography.h2.copyWith(color: AppColors.rust),
                               ),
                               const SizedBox(height: 2),
@@ -169,13 +165,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                         const SizedBox(height: AppSpacing.md),
                         ...[
-                          ('Northern Leaf Blight (NCLB)', 'NCLB', AppColors.nclb),
-                          ('Common Rust', 'Rust', AppColors.rust),
-                          ('Gray Leaf Spot (GLS)', 'GLS', AppColors.gls),
-                          ('Healthy Foliage', 'Healthy', AppColors.healthy),
+                          ('Northern Leaf Blight (NCLB)', 0, AppColors.nclb),
+                          ('Common Rust', 1, AppColors.rust),
+                          ('Gray Leaf Spot (GLS)', 2, AppColors.gls),
+                          ('Healthy Foliage', kHealthyClassId, AppColors.healthy),
                         ].map((item) {
-                          final count = _classCounts[item.$2] ?? 0;
-                          final pct = _total > 0 ? count / _total : 0.0;
+                          final count = _stats.countFor(item.$2);
+                          final pct = _stats.shareOf(item.$2);
                           final color = item.$3;
 
                           return Padding(
@@ -341,12 +337,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 }
 
 class _HealthScoreCard extends StatelessWidget {
-  final double score;
+  /// Null when nothing has been scanned yet — showing 100% would be a lie.
+  final double? rate;
   final int total;
-  const _HealthScoreCard({required this.score, required this.total});
+  const _HealthScoreCard({required this.rate, required this.total});
 
   @override
   Widget build(BuildContext context) {
+    if (rate == null) {
+      return AppCard(
+        child: SizedBox(
+          height: 120,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.grass_outlined, size: 28, color: AppColors.charcoal400),
+              const SizedBox(height: AppSpacing.xs),
+              Text('No scans yet', style: AppTypography.h3.copyWith(fontSize: 13)),
+              Text(
+                'Scan a leaf to see farm health',
+                textAlign: TextAlign.center,
+                style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final score = rate! * 100;
     final color = score >= 70
         ? AppColors.healthy
         : (score >= 40 ? AppColors.warning : AppColors.danger);
