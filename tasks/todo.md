@@ -48,7 +48,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Phase 4: AI advice and voice
 - [x] T24 Advice saved per scan (DB v3, additive migration) [T06, T16 · M] — brought forward part of T26: getAdvice now reports its source
-- [ ] T25 Safe, diagnosis-aware prompts and per-disease voice scripts [T15 · M]
+- [x] T25 Safe, diagnosis-aware prompts and per-disease voice scripts [T15 · M] — actives table marked `pending-agronomist-review`; Q5 sign-off still open
 - [ ] T26 Groq client: deadline, stop on 401/offline, typed source, no `reasoning` [T24 · M]
 - [ ] T27 Offline and non-English behaviour explicit; TTS fallbacks [T26 · M]
 - [ ] T28 API keys: no dev paths, Remove persists, no embedded key in release [T02 · S]
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T25: advice is now diagnosis-aware — a healthy leaf gets monitoring only and is told no fungicide is needed, a low-confidence scan is asked for a better photo with no chemical named, and a confident diagnosis names active ingredients from one reviewed-pending table (no brands, no invented dosages; rate and pre-harvest interval come from the product label). Ridomil Gold and Funguran are gone from every prompt, offline text, voice script and the chemical tab.
 - T24: advice is generated once per (scan, language) and stored with the scan, so reopening a result makes no request and replays the cached voice; schema is v3 (additive) and the advisor now reports whether the text came from Groq or the offline rules.
 - T19: a settings toggle ("Diagnose Only the Aligned Box", default off) crops camera captures to the on-screen box before diagnosis; gallery photos are untouched and the stored image is the cropped one.
 - T20: the brightness hint is computed from real luma (yuv420 on Android, bgra8888 on iOS) instead of raw stream bytes, the preview stream stops while a result is on screen and while the app is backgrounded, and flipping the camera keeps the stream running.

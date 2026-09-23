@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/app_env.dart';
 import '../constants/diseases.dart';
+import 'advice_prompt.dart';
 
 /// Advice plus where it came from. The screen stores the provenance with the
 /// scan, so "offline mode" text is never replayed as if Groq had answered (T24).
@@ -54,42 +55,19 @@ class AiAdvisor {
     return cleaned.trim();
   }
 
-  String _prompt(int classId, double confidence, String? cropVariety, String language) {
-    final disease = diseaseForClass(classId);
-    final variety = cropVariety != null ? 'Crop variety: $cropVariety.' : '';
-    final langInstruction = language == 'English'
-        ? ''
-        : '\nRespond entirely in $language. Keep all fungicide brand names in '
-          'their original form (e.g. Mancozeb, Ridomil Gold, Funguran, Dithane M-45).';
-
-    return '''
-You are an expert agronomist advising a Nigerian smallholder maize farmer.
-
-Diagnosis: ${disease.name} (confidence ${(confidence * 100).toStringAsFixed(1)}%).
-$variety
-
-CRITICAL FORMATTING RULES:
-- Never use hashtags (#, ##, ###) for headers.
-- Never use asterisks (** or *) for bold or italic text.
-- Never use markdown tables or pipes (|).
-- Use plain capital letters for headings (e.g. 1. DISEASE SUMMARY, 2. IMMEDIATE TREATMENT, 3. PREVENTION, 4. RE-INSPECTION).
-- Use simple bullet points (•) for list items.
-- Write in clean, conversational language that can be read aloud directly by voice text-to-speech without sounding robotic or reading syntax symbols.
-- Keep the advisory concise (around 150-180 words total).$langInstruction
-
-Structure your advisory as:
-1. DISEASE SUMMARY: (2 sentences in plain language)
-2. IMMEDIATE TREATMENT: (Three actionable steps with Nigerian fungicides like Mancozeb, Ridomil Gold, Funguran, including dosage and safety)
-3. PREVENTION: (Two practical field practices like resistant varieties, crop rotation, debris sanitation)
-4. RE-INSPECTION: (Clear timeline to re-check the field)
-''';
-  }
+  String _prompt(int classId, double confidence, String? cropVariety, String language) =>
+      buildAdvicePrompt(
+        classId: classId,
+        confidence: confidence,
+        cropVariety: cropVariety,
+        language: language,
+      );
 
   String _translatePrompt(String language, String englishContent) => '''
 Translate the following agricultural advisory into $language for a Nigerian smallholder farmer.
 CRITICAL FORMATTING RULES:
 - Never use hashtags (#, ##, ###) or asterisks (** or *).
-- Keep all fungicide brand names (e.g. Mancozeb, Dithane M-45, Ridomil Gold, Funguran) unchanged.
+- Keep active ingredient names (e.g. mancozeb, azoxystrobin, propiconazole, tebuconazole) in English so they can be matched on a product label.
 - Keep the same structure with plain capitalized headings and simple bullet points (•).
 - Keep language direct, natural, and conversational for voice text-to-speech.
 
@@ -220,7 +198,24 @@ $englishContent
   String _buildOfflineAdvice(
       int classId, double confidence, String? cropVariety, String language) {
     final disease = diseaseForClass(classId);
+    final mode = adviceModeFor(classId: classId, confidence: confidence);
     final buf = StringBuffer();
+
+    if (mode == AdviceMode.uncertain) {
+      // Too unsure to name a disease, so name nothing to spray.
+      buf.writeln('OFFLINE ADVICE');
+      buf.writeln('This photo was not clear enough to diagnose '
+          '(confidence ${(confidence * 100).toStringAsFixed(1)}%).');
+      buf.writeln();
+      buf.writeln('1. BETTER PHOTO:');
+      buf.writeln('• Fill the frame with one leaf, in even daylight');
+      buf.writeln('• Avoid shadow, glare and a moving hand');
+      buf.writeln();
+      buf.writeln('2. MEANWHILE:');
+      buf.writeln('• Do not apply any chemical until the disease is confirmed');
+      buf.writeln('• Ask an extension officer if the symptoms spread');
+      return buf.toString();
+    }
 
     buf.writeln('CLINICAL AGRONOMIC ADVICE (OFFLINE MODE)');
     buf.writeln('Disease: ${disease.name} (${disease.shortName})');
@@ -232,9 +227,16 @@ $englishContent
     buf.writeln(disease.description);
     buf.writeln();
 
-    buf.writeln('2. IMMEDIATE TREATMENT:');
-    for (final t in disease.treatments) {
-      buf.writeln('• $t');
+    if (mode == AdviceMode.healthy) {
+      buf.writeln('2. TREATMENT:');
+      buf.writeln('• No fungicide is needed for a healthy plant');
+    } else {
+      buf.writeln('2. IMMEDIATE TREATMENT:');
+      for (final t in disease.treatments) {
+        buf.writeln('• $t');
+      }
+      buf.writeln('• Dose, pre-harvest interval and protective equipment are on '
+          'the product label; an extension officer can confirm the choice locally');
     }
     buf.writeln();
 

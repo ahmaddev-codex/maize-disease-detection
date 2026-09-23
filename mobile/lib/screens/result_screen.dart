@@ -8,6 +8,7 @@ import '../config/app_env.dart';
 import '../constants/diseases.dart';
 import '../constants/thresholds.dart';
 import '../design_system/design_system.dart';
+import '../l10n/voice_scripts.dart';
 import '../models/scan_record.dart';
 import '../providers/app_provider.dart';
 import '../providers/service_providers.dart';
@@ -261,36 +262,10 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     ClassificationResult result,
     Recommendation recs,
     DisplayLanguage lang,
-  ) {
-    final isHealthy = result.classId == 3;
-
-    switch (lang) {
-      case DisplayLanguage.yoruba:
-        if (isHealthy) {
-          return 'Eto itoju: Ko nilo ogun olu kankan fun agbado yi. E rii daju pe e fa koriko kuro ki e si se ayewo oko lorekore.';
-        }
-        return 'Eto itoju fun arun ${disease.name}. Ni akoko, e fe ogun bii Mancozeb tabi Ridomil Gold ni owuro kutukutu lori awon ewe. Ni ekeji, e ja awon ewe ti arun ti ba je ki e si sun won. Ni eketa, e yago fun bibomirin oko ni ale lati da itankale arun duro.';
-
-      case DisplayLanguage.hausa:
-        if (isHealthy) {
-          return 'Shirin kulawa: Ba a bukatar kowane irin maganin feshi a yanzu. A tabbatar da cire ciyawa da duba lafiyar amfanin gona.';
-        }
-        return 'Shirin maganin cutar ${disease.name}. Da farko, a fesa magani kamar Mancozeb ko Ridomil Gold da sassafe kafin rana ta yi zafi. Na biyu, a cire ganyayen da suka lalace a kona su. Na uku, a kula da tazara tsakanin shuke-shuke da guji zuba ruwa da yamma.';
-
-      case DisplayLanguage.igbo:
-        if (isHealthy) {
-          return 'Atumatu ogwugwo: O dighi ogwu di mkpa maka oka di mma. Wepu ahihia ma na-elekota ubi gi mgbe niile.';
-        }
-        return 'Atumatu ogwugwo maka oria ${disease.name}. Nke mbu, jiri ogwu dika Mancozeb ma o bu Ridomil Gold fesaa n\'isi ututu. Nke abuo, wepu akwukwo ndi oria biara na ha ma kpoo ha oku. Nke ato, zere igba mmiri n\'uhuruchi iji gbochie oria a igbasa.';
-
-      case DisplayLanguage.english:
-        if (isHealthy) {
-          return 'Treatment plan: No synthetic fungicide is required for healthy crops. Maintain weed-free borders and standard plant spacing.';
-        }
-        final fungicide = disease.classId == 1 ? 'triazole or tebuconazole' : 'mancozeb or ridomil gold';
-        return 'Recommended treatment plan for ${disease.name}. First, apply recommended fungicide such as $fungicide during early morning hours. Second, remove and safely destroy severely infected leaves. Third, ensure adequate plant spacing and avoid evening sprinkler irrigation. Review full cultural controls and fungicide guidance below.';
-    }
-  }
+  ) =>
+      // One actives table drives every language, so Rust names a triazole in
+      // Hausa exactly as it does in English (T25).
+      treatmentScript(lang, disease, isLowConfidence: recs.needsRetake);
 
   String _cleanMarkdownForSpeech(String markdown) {
     var text = markdown;
@@ -1184,15 +1159,26 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               .toList(),
         );
       case 2:
-        final chemicalItems = disease.treatments
-            .where((t) => t.toLowerCase().contains('fungicide') || t.toLowerCase().contains('spray') || t.toLowerCase().contains('mancozeb') || t.toLowerCase().contains('azoxystrobin'))
-            .toList();
-        if (chemicalItems.isEmpty) {
-          return const _BulletItem(text: 'No synthetic chemicals necessary for this diagnosis. Continue monitoring field.');
+        // Straight from the actives table, so the tab, the prompt and the voice
+        // script name the same chemistry (T25).
+        if (recs.needsRetake) {
+          return const _BulletItem(
+            text: 'Confirm the diagnosis before applying anything — this photo was not clear enough to be sure.',
+          );
+        }
+        if (disease.actives.isEmpty) {
+          return const _BulletItem(
+            text: 'No fungicide is needed for this diagnosis. Keep scouting the field.',
+          );
         }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: chemicalItems.map((c) => _BulletItem(text: c)).toList(),
+          children: [
+            ...disease.actives.map((a) => _BulletItem(text: a)),
+            const _BulletItem(
+              text: 'Rate, pre-harvest interval and protective equipment are on the product label. Confirm the product with your extension officer.',
+            ),
+          ],
         );
       case 3:
       default:
