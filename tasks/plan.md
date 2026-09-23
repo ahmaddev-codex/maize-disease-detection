@@ -625,6 +625,21 @@ Changes:
 **Files likely touched:** `mobile/lib/screens/camera_screen.dart`, `mobile/lib/screens/result_screen.dart`, `mobile/test/seed_metadata_visibility_test.dart`
 **Estimated scope:** Small
 
+### Task T58: Cut the release APK below the size requirement (found in T04)
+
+**Description:** The release APK is 148 MB against NFR-23's 80 MB, because it bundles every CPU architecture plus both models (FP16 ~23 MB and INT8 ~13 MB) and the ML Kit text recogniser. Options: build per-ABI APKs (`--split-per-abi`) or an app bundle, and decide whether both models need to ship now that FP16 is primary (ADR-001).
+
+**Acceptance criteria:**
+- [ ] A per-ABI release APK (arm64-v8a) is under the agreed limit, or REQUIREMENTS is updated with a measured, justified number.
+- [ ] The size is recorded next to the model metrics so the papers can quote it.
+
+**Verification:**
+- [ ] `flutter build apk --release --split-per-abi` and record each output size.
+
+**Dependencies:** T04, T11
+**Files likely touched:** `mobile/android/app/build.gradle.kts`, `mobile/setup.sh`, `REQUIREMENTS.md`
+**Estimated scope:** Small
+
 ### Checkpoint 3: Scan journey
 - [ ] On a real device: OCR → attach chip → capture → result shows instantly → GPS pin appears later → delete removes the file → back goes to the origin screen.
 - [ ] `flutter test` green; human review.

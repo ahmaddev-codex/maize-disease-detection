@@ -43,6 +43,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [ ] T21 Delete/Clear remove images, audio cache and stale state [T07 · M]
 - [ ] T22 Back returns to origin; Retake button [T07 · S]
 - [ ] T23 Seed metadata chip on camera and fields on Result [T06 · S]
+- [ ] T58 Release APK size: 148 MB vs the 80 MB requirement (found in T04) [T04, T11 · S]
 - [ ] **Checkpoint 3:** full scan journey verified on a device
 
 ## Phase 4: AI advice and voice
