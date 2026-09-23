@@ -14,9 +14,14 @@ class AdviceResponse {
   const AdviceResponse({
     required this.text,
     required this.source,
+    required this.language,
     this.model,
     this.offlineReason,
   });
+
+  /// The language the text is actually in. The built-in rules are English only,
+  /// so this is not always the language that was asked for (T27).
+  final String language;
 
   /// 'groq' when a model answered, 'offline' for the built-in rules.
   final String source;
@@ -142,6 +147,7 @@ $englishContent
           return AdviceResponse(
             text: sanitizeAiText(response.text),
             source: 'groq',
+            language: language,
             model: response.model,
           );
         }
@@ -156,6 +162,7 @@ $englishContent
     return AdviceResponse(
       text: sanitizeAiText(_buildOfflineAdvice(classId, confidence, cropVariety, language)),
       source: 'offline',
+      language: 'English', // the built-in rules are written in English only (Q7)
       offlineReason: reason,
     );
   }

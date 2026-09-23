@@ -8,6 +8,7 @@ import '../config/app_env.dart';
 import '../constants/diseases.dart';
 import '../constants/thresholds.dart';
 import '../design_system/design_system.dart';
+import '../l10n/offline_advice.dart';
 import '../l10n/voice_scripts.dart';
 import '../models/scan_record.dart';
 import '../providers/app_provider.dart';
@@ -16,6 +17,7 @@ import '../services/ai_advisor.dart';
 import '../services/path_resolver.dart';
 import '../services/yarn_tts_service.dart';
 import '../services/recommendation_engine.dart';
+import '../services/voice_fallback.dart';
 
 class ResultScreen extends ConsumerStatefulWidget {
   const ResultScreen({super.key});
@@ -39,6 +41,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   String? _aiSource;
   String? _aiModel;
   String? _aiOfflineReason;
+  String? _aiLanguageNote;
   bool _loadingAi = false;
   String? _aiError;
 
@@ -49,6 +52,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
   final _tts = FlutterTts();
   bool _ttsAvailable = true;
+  Object? _lastVoiceError;
 
   // Active Treatment Tab: 0 = Immediate, 1 = Cultural, 2 = Chemical, 3 = Prevention
   int _activeTreatmentTab = 0;
@@ -166,50 +170,61 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         return;
       } catch (e) {
         debugPrint('[Audio] YarnGPT playback error: $e');
-        if (!lang.isEnglish) {
-          if (mounted) {
-            setState(() {
-              _activeLoadingSection = null;
-              _activePlayingSection = null;
-            });
-          }
-          _showSnack('YarnGPT error: $e');
-          return;
-        }
+        _lastVoiceError = e;
       }
     }
 
-    // 2. Fallback to device TTS for English if YarnGPT is unconfigured or unavailable
-    if (lang.isEnglish) {
-      if (!_ttsAvailable) {
+    // 2. The device's own voice, in the closest locale it has installed (T27).
+    if (!_ttsAvailable) {
+      if (mounted) setState(() => _activeLoadingSection = null);
+      _showSnack('This phone has no voice installed, so nothing can be read aloud.');
+      return;
+    }
+
+    try {
+      final installed = await _installedTtsLocales();
+      final locale = pickTtsLocale(lang, installed);
+      if (locale == null) {
         if (mounted) setState(() => _activeLoadingSection = null);
-        _showSnack('Device text-to-speech is unavailable.');
+        _showSnack(
+          key.isEmpty
+              ? 'Add a YarnGPT key in Settings to hear this in ${lang.label}, or switch to English.'
+              : 'This phone has no ${lang.label} voice installed. The written advice above is complete.',
+        );
         return;
       }
-      try {
-        await _tts.setLanguage('en-US');
-        await _tts.setSpeechRate(0.46);
-        if (mounted) {
-          setState(() {
-            _activeLoadingSection = null;
-            _activePlayingSection = section;
-          });
-        }
-        await _tts.speak(cleanText);
-      } catch (e) {
-        if (mounted) {
-          setState(() {
-            _activePlayingSection = null;
-            _activeLoadingSection = null;
-            _ttsAvailable = false;
-          });
-        }
-        _showSnack('Audio playback error: $e');
+
+      await _tts.setLanguage(locale);
+      await _tts.setSpeechRate(0.46);
+      if (mounted) {
+        setState(() {
+          _activeLoadingSection = null;
+          _activePlayingSection = section;
+        });
       }
-    } else {
-      if (mounted) setState(() => _activeLoadingSection = null);
-      _showSnack('YarnGPT API key required for local languages. Configure in Settings or .env.json.');
+      await _tts.speak(cleanText);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _activePlayingSection = null;
+          _activeLoadingSection = null;
+          _ttsAvailable = false;
+        });
+      }
+      _showSnack(friendlyVoiceError(_lastVoiceError ?? e));
     }
+  }
+
+  /// Locales the device's own engine can speak, lowercase, empty when it cannot
+  /// be asked.
+  Future<List<String>> _installedTtsLocales() async {
+    try {
+      final languages = await _tts.getLanguages;
+      if (languages is List) return languages.map((l) => '$l').toList();
+    } catch (e) {
+      debugPrint('[Audio] could not list device voices: $e');
+    }
+    return const ['en-US'];
   }
 
   String _getResultSpokenSummary(
@@ -343,10 +358,12 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       // Kept with the scan: reopening it should cost neither a request nor a
       // fresh speech file (T24).
       if (scanId != null) {
+        // Stored under the language the text is actually in, so an English
+        // offline answer is not replayed as if it were Hausa (T27).
         await ref.read(databaseServiceProvider).saveAdvice(
               scanId,
               advice: text,
-              language: language,
+              language: advice.language,
               source: advice.source,
               model: advice.model,
             );
@@ -357,6 +374,11 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           _aiSource = advice.source;
           _aiModel = advice.model;
           _aiOfflineReason = advice.offlineReason;
+          _aiLanguageNote = adviceLanguageNote(
+            requested: language,
+            actual: advice.language,
+            isOffline: advice.isOffline,
+          );
           _loadingAi = false;
         });
       }
@@ -423,6 +445,13 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       _aiSource = _aiAdvice == null ? null : record.aiSource;
       _aiModel = _aiAdvice == null ? null : record.aiModel;
       _aiOfflineReason = null;
+      _aiLanguageNote = _aiAdvice == null
+          ? null
+          : adviceLanguageNote(
+              requested: lang.label,
+              actual: record.aiLanguage ?? lang.label,
+              isOffline: record.aiSource == 'offline',
+            );
       _aiError = null;
       _loadingAi = false;
       if (scanChanged) _hasAutoPlayed = false;
@@ -866,7 +895,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                                 // rules must never read as a model's reply (T26).
                                 Text(
                                   switch (_aiSource) {
-                                    'offline' => 'Offline guidance · built-in agronomic rules',
+                                    'offline' => _aiLanguageNote == null
+                                        ? 'Offline guidance · built-in agronomic rules'
+                                        : 'Offline guidance · $_aiLanguageNote',
                                     'groq' => 'Answered online by ${_aiModel ?? 'a Groq model'}',
                                     _ => 'Online when a key is set, built-in rules otherwise',
                                   },
@@ -1234,6 +1265,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       ),
       builder: (ctx) {
         final current = ref.watch(displayLanguageProvider);
+        final yarnKey = ref.watch(yarnGptKeyProvider) ?? AppEnv.yarnGptApiKey;
         return Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
@@ -1243,7 +1275,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               Text('Select Advisory Language', style: AppTypography.h3.copyWith(color: Colors.white)),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Changes speech synthesis voice and agronomic advisory language across all sections',
+                'Voice and AI advice language',
                 style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -1251,9 +1283,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                 (l) => ListTile(
                   title: Text(l.label, style: const TextStyle(color: Colors.white)),
                   subtitle: Text(
-                    l.isEnglish
-                        ? 'Device Speech Engine · Standard Accent'
-                        : 'YarnGPT Native Audio · Voice: ${l.yarnVoice}',
+                    voiceEngineLabel(l, hasYarnKey: yarnKey.isNotEmpty),
                     style: const TextStyle(color: AppColors.charcoal400, fontSize: 12),
                   ),
                   trailing: current == l ? const Icon(Icons.check_rounded, color: AppColors.emeraldBase) : null,

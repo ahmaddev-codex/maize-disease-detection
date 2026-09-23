@@ -73,6 +73,7 @@ class FakeAiAdvisor implements AiAdvisor {
     return AdviceResponse(
       text: 'Advice for class $classId',
       source: 'groq',
+      language: language,
       model: 'fake-model',
     );
   }

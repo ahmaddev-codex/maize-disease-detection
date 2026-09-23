@@ -50,7 +50,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [x] T24 Advice saved per scan (DB v3, additive migration) [T06, T16 · M] — brought forward part of T26: getAdvice now reports its source
 - [x] T25 Safe, diagnosis-aware prompts and per-disease voice scripts [T15 · M] — actives table marked `pending-agronomist-review`; Q5 sign-off still open
 - [x] T26 Groq client: deadline, stop on 401/offline, typed source, no `reasoning` [T24 · M] — model fixture transcribed from Groq's published list, not a live capture
-- [ ] T27 Offline and non-English behaviour explicit; TTS fallbacks [T26 · M]
+- [x] T27 Offline and non-English behaviour explicit; TTS fallbacks [T26 · M] — offline templates stay English-only (Q7 open), labelled "English (offline)"
 - [x] T28 API keys: no dev paths, Remove persists, no embedded key in release [T02 · S] — APK `strings | grep gsk_` check still to run at Checkpoint 4
 - [ ] T29 Honest UI copy (remove "verified" and "fully offline" claims) [T26, T27 · S]
 - [ ] **Checkpoint 4:** online/offline × English/Hausa; Healthy scan gets no spray advice; agronomist review
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T27: offline advice is labelled "English (offline)" when another language was chosen and is cached under the language it is really in; a YarnGPT failure now falls back to a device voice in the closest installed locale (not English only), and failures are explained in plain words instead of showing an exception; the language picker names the engine that will actually speak.
 - T28: a key removed in Settings stays removed — a build-time key seeds the app once and never again; the app no longer reads `.env.json` from a developer's home directory, and key lengths are no longer logged at startup.
 - T26: advice requests have one 20 s budget for all attempts (was 5 models × 25 s), stop immediately on a rejected key or no connection, never show the model's private `reasoning`, and the card says whether the text came from a model (naming it) or from the built-in rules, with the reason.
 - T25: advice is now diagnosis-aware — a healthy leaf gets monitoring only and is told no fungicide is needed, a low-confidence scan is asked for a better photo with no chemical named, and a confident diagnosis names active ingredients from one reviewed-pending table (no brands, no invented dosages; rate and pre-harvest interval come from the product label). Ridomil Gold and Funguran are gone from every prompt, offline text, voice script and the chemical tab.
