@@ -24,7 +24,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Phase 2: Diagnosis correctness
 - [x] T09 Bilinear preprocessing with Dart↔Python parity test [T01 · M]
-- [ ] T10 Inference off the UI thread; model vs total latency [T09 · M]
+- [~] T10 Inference off the UI thread; latency is model-only [T09 · M] — code done; on-device jank check pending (Checkpoint 2)
 - [x] T11 Ship the primary model chosen in ADR-001 [T02, T05, T09 · S]
 - [ ] T12 On-device latency benchmark → `device_benchmark.json` [T10, T11, device · S]
 - [x] T13 OCR parser fixes (dates, varieties, batch numbers) with shared fixtures [— · M]
@@ -97,6 +97,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T10: preprocessing and inference run off the UI thread; stored latency_ms is now model-only (papers must not quote it as capture-to-result).
 - T15: one confidence threshold set (low 0.60 / high 0.85); low-confidence scans ask for a retake in speech and urgency; 'critical' now reachable via the real trend.
 - T17: scan times and day buckets render in the device timezone (README/papers should stop implying UTC).
 - T16: dashboard and Home share one 30-day stats source counted by class id; empty farms show an empty state instead of 100%.

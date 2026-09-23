@@ -96,7 +96,7 @@ class FakeClassifierService implements ClassifierService {
   }
 
   @override
-  void dispose() {}
+  Future<void> dispose() async {}
 }
 
 /// Test double for [LocationService] with an optional artificial delay.

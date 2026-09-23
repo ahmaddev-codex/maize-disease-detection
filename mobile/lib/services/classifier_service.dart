@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'classifier_preprocess.dart';
@@ -22,6 +23,7 @@ class ClassifierService {
   final InterpreterLoader _loadInterpreter;
 
   Interpreter? _interpreter;
+  IsolateInterpreter? _isolateInterpreter;
   bool _isLoaded  = false;
   bool _isInt8    = false; // true -> INT8 fallback was loaded (ADR-001)
 
@@ -63,6 +65,13 @@ class ClassifierService {
         throw Exception('Failed to load TFLite model: $e');
       }
     }
+
+    // Inference runs on its own isolate so a scan never janks the UI (T10).
+    try {
+      _isolateInterpreter = await IsolateInterpreter.create(address: _interpreter!.address);
+    } catch (e) {
+      debugPrint('[Classifier] isolate interpreter unavailable, running inline: $e');
+    }
   }
 
   static Future<Interpreter> _loadWithDelegate(String asset) async {
@@ -77,13 +86,13 @@ class ClassifierService {
   Future<ClassificationResult> classify(String imagePath) async {
     if (!_isLoaded || _interpreter == null) await loadModel();
 
-    final stopwatch = Stopwatch()..start();
+    final totalWatch = Stopwatch()..start();
 
     // ── Preprocess image ──────────────────────────────────────────────────────
-    final rgb = preprocessForModel(
-      await File(imagePath).readAsBytes(),
-      size: _inputSize,
-    );
+    // Decoding and resizing a 12 MP photo on the UI thread froze the
+    // "Analyzing Leaf Sample…" overlay, so it runs on a background isolate (T10).
+    final bytes = await File(imagePath).readAsBytes();
+    final rgb = await Isolate.run(() => preprocessForModel(bytes, size: _inputSize));
 
     // Inspect actual input tensor type to prevent buffer length mismatch crashes
     final inputTensorInfo = _interpreter!.getInputTensor(0);
@@ -111,8 +120,17 @@ class ClassifierService {
         ? List.filled(_numClasses, 0.0).reshape([1, _numClasses])
         : List.filled(_numClasses, 0).reshape([1, _numClasses]);
 
-    _interpreter!.run(inputTensor, outputTensor);
-    stopwatch.stop();
+    final modelWatch = Stopwatch()..start();
+    final isolateInterpreter = _isolateInterpreter;
+    if (isolateInterpreter != null) {
+      await isolateInterpreter.run(inputTensor, outputTensor);
+    } else {
+      _interpreter!.run(inputTensor, outputTensor);
+    }
+    modelWatch.stop();
+    totalWatch.stop();
+    debugPrint('[Classifier] model ${modelWatch.elapsedMilliseconds} ms · '
+        'capture-to-result ${totalWatch.elapsedMilliseconds} ms');
 
     // ── Dequantise / normalise ────────────────────────────────────────────────
     List<double> scores;
@@ -140,11 +158,13 @@ class ClassifierService {
       shortName:  disease.shortName,
       confidence: confidence,
       allScores:  normalised,
-      latencyMs:  stopwatch.elapsedMilliseconds.toDouble(),
+      latencyMs:  modelWatch.elapsedMilliseconds.toDouble(),
     );
   }
 
-  void dispose() {
+  Future<void> dispose() async {
+    await _isolateInterpreter?.close();
+    _isolateInterpreter = null;
     _interpreter?.close();
     _interpreter = null;
     _isLoaded    = false;
