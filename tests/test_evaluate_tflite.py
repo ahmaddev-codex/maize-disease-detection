@@ -39,8 +39,9 @@ def test_preprocess_returns_uint8_batch_in_both_modes(tmp_path):
     assert python_tensor.shape == (1, 300, 300, 3)
     assert python_tensor.dtype == np.uint8
     assert app_tensor.shape == (1, 300, 300, 3)
-    # Bilinear and nearest-neighbour resizing of a checkerboard must differ
-    assert not np.array_equal(python_tensor, app_tensor)
+    # Since T09 the app resizes bilinearly too, so both modes must agree; this
+    # guards the parity that closed a 1.75-point accuracy gap.
+    assert np.array_equal(python_tensor, app_tensor)
 
 
 def test_preprocess_rejects_unknown_mode(tmp_path):

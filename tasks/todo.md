@@ -60,7 +60,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [ ] T32 Model provenance and train-only INT8 calibration [T01 · M]
 - [ ] T33 Shared Python labels and post-processing [T01 · M]
 - [ ] T34 Dataset hygiene: conflicting-label duplicates excluded [T01 · M]
-- [ ] T35 Python 3.11 env, requirements, truthful `run_all` banner [— · S]
+- [x] T35 Python 3.11 env, requirements, truthful `run_all` banner [— · S]
 - [ ] T36 (stretch) GLS/NCLB F1 ≥ 0.88 — split before starting [T32, T34 · L]
 - [ ] **Checkpoint 5:** `pytest` green; `run_all.sh` quick completes; metrics reproduce
 
@@ -97,5 +97,6 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T35: run_all.sh banner, setup_env.sh and requirements now match the code (Python 3.11, AdamW, 17-d metadata, FP16 primary); NFR-22 needs revisiting in REQUIREMENTS.
 - T09/T11: the app resizes bilinearly and loads FP16 first (INT8 fallback); setup.sh only ships models listed in metrics.json.
 - T57: fonts are bundled; the app no longer downloads DM Sans at runtime (affects any 'works offline' claim in README/papers).

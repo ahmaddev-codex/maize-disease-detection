@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# setup_env.sh — create and activate a Python 3.12 virtual environment
-# TF 2.16 requires Python 3.12 on Apple Silicon; Python 3.14 is not yet supported.
+# setup_env.sh — create and activate a Python 3.11 virtual environment
+# TF 2.16 supports Python 3.9–3.12; this project pins 3.11 (what .venv and the
+# notebook kernel use).
 set -e
 
-PYTHON=${PYTHON:-python3.12}
+PYTHON=${PYTHON:-python3.11}
 ENV_DIR=".venv"
 
 echo "==> Creating virtual environment with $PYTHON ..."
