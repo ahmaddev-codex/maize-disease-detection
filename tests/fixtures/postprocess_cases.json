@@ -1,0 +1,74 @@
+{
+  "_description": "Shared post-processing cases for the TFLite output tensor (ADR-006, T33). Python (src/common/postprocess.py) and Dart (mobile/lib/services/classifier_postprocess.dart) must agree digit for digit: the app and the reported metrics have to describe the same model.",
+  "_rules": [
+    "Integer output is dequantised with the tensor's own (scale, zero_point).",
+    "Scores are renormalised by their sum. Softmax is never applied to values that are already probabilities.",
+    "A degenerate output (all zero, or a non-positive sum) is reported as an even split, not as a confident class."
+  ],
+  "tolerance": 1e-6,
+  "cases": [
+    {
+      "name": "int8 output, quantised probabilities",
+      "raw": [255, 0, 0, 1],
+      "integer_output": true,
+      "scale": 0.00390625,
+      "zero_point": 0,
+      "expected": [0.99609375, 0.0, 0.0, 0.00390625],
+      "expected_class_id": 0
+    },
+    {
+      "name": "int8 output with a non-zero zero point",
+      "raw": [10, 138, 10, 10],
+      "integer_output": true,
+      "scale": 0.0078125,
+      "zero_point": 10,
+      "expected": [0.0, 1.0, 0.0, 0.0],
+      "expected_class_id": 1
+    },
+    {
+      "name": "int8 scores that do not already sum to one",
+      "raw": [100, 50, 25, 25],
+      "integer_output": true,
+      "scale": 0.00390625,
+      "zero_point": 0,
+      "expected": [0.5, 0.25, 0.125, 0.125],
+      "expected_class_id": 0
+    },
+    {
+      "name": "float output that already sums to one is left alone",
+      "raw": [0.05, 0.05, 0.8, 0.1],
+      "integer_output": false,
+      "scale": 0.0,
+      "zero_point": 0,
+      "expected": [0.05, 0.05, 0.8, 0.1],
+      "expected_class_id": 2
+    },
+    {
+      "name": "float logits-shaped output is renormalised, never softmaxed",
+      "raw": [0.2, 0.2, 0.4, 0.2],
+      "integer_output": false,
+      "scale": 0.0,
+      "zero_point": 0,
+      "expected": [0.2, 0.2, 0.4, 0.2],
+      "expected_class_id": 2
+    },
+    {
+      "name": "float output summing above one",
+      "raw": [1.0, 1.0, 1.0, 1.0],
+      "integer_output": false,
+      "scale": 0.0,
+      "zero_point": 0,
+      "expected": [0.25, 0.25, 0.25, 0.25],
+      "expected_class_id": 0
+    },
+    {
+      "name": "a degenerate all-zero output is an even split, not a confident call",
+      "raw": [0, 0, 0, 0],
+      "integer_output": true,
+      "scale": 0.00390625,
+      "zero_point": 0,
+      "expected": [0.25, 0.25, 0.25, 0.25],
+      "expected_class_id": 0
+    }
+  ]
+}

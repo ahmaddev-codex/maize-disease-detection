@@ -59,7 +59,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [x] T30 Fusion training crash fixed (Prove-It) [— · S]
 - [ ] T31 Fusion metadata policy and ablation (ADR-002) [T30, T01 · M]
 - [ ] T32 Model provenance and train-only INT8 calibration [T01 · M]
-- [ ] T33 Shared Python labels and post-processing [T01 · M]
+- [x] T33 Shared Python labels and post-processing [T01 · M] — UAV modules still hold their own names (T39/T40)
 - [ ] T34 Dataset hygiene: conflicting-label duplicates excluded [T01 · M]
 - [x] T35 Python 3.11 env, requirements, truthful `run_all` banner [— · S]
 - [ ] T36 (stretch) GLS/NCLB F1 ≥ 0.88 — split before starting [T32, T34 · L]
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T33: one label set (`src/common/labels.py`, display names matching diseases.dart) and one post-processing rule (dequantise → renormalise, never softmax) shared by Python and the app through `tests/fixtures/postprocess_cases.json`; `inference.py` no longer double-softmaxes (its printed confidence used to disagree with the metrics) and its `--csv` flag now really evaluates instead of silently benchmarking.
 - T29: claims the app cannot back are gone — "Offline Verified", "Verified by MaizeGuard Edge Neural Engine", "Agronomist Verification", "Works fully offline", "Field Validation" and the dark-mode sunlight claim; the feedback card now asks "Was this diagnosis right?" and Home says the diagnosis works offline while advice and local-language voice need a connection. A test greps `lib/` for those phrases and checks the result screen at 320px.
 - T27: offline advice is labelled "English (offline)" when another language was chosen and is cached under the language it is really in; a YarnGPT failure now falls back to a device voice in the closest installed locale (not English only), and failures are explained in plain words instead of showing an exception; the language picker names the engine that will actually speak.
 - T28: a key removed in Settings stays removed — a build-time key seeds the app once and never again; the app no longer reads `.env.json` from a developer's home directory, and key lengths are no longer logged at startup.

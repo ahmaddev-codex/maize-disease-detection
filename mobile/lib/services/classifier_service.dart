@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
+import 'classifier_postprocess.dart';
 import 'classifier_preprocess.dart';
 import '../models/scan_record.dart';
 import '../constants/diseases.dart';
@@ -133,22 +134,15 @@ class ClassifierService {
         'capture-to-result ${totalWatch.elapsedMilliseconds} ms');
 
     // ── Dequantise / normalise ────────────────────────────────────────────────
-    List<double> scores;
-    if (!isFloatOutput) {
-      final raw = (outputTensor[0] as List).cast<int>();
-      scores = raw.map((v) => (v - _zeroPoint) * _scale).toList();
-    } else {
-      // FP16/FP32 model already outputs float probabilities
-      scores = (outputTensor[0] as List).cast<double>();
-    }
+    // One shared rule, checked against the Python pipeline's fixtures (T33).
+    final normalised = probabilitiesFrom(
+      (outputTensor[0] as List).cast<num>(),
+      integerOutput: !isFloatOutput,
+      scale: _scale,
+      zeroPoint: _zeroPoint,
+    );
 
-    // Normalise so scores sum to 1 (softmax if needed)
-    final sum = scores.fold<double>(0, (a, b) => a + b);
-    final normalised = (sum > 0 && (sum - 1.0).abs() > 0.01)
-        ? scores.map((s) => s / sum).toList()
-        : scores;
-
-    final classId    = normalised.indexOf(normalised.reduce((a, b) => a > b ? a : b));
+    final classId    = argmax(normalised);
     final confidence = normalised[classId];
     final disease    = diseaseForClass(classId);
 

@@ -38,13 +38,10 @@ except ImportError:
             "tflite-runtime (pip install tflite-runtime)."
         )
 
-# Canonical class labels
-CLASS_NAMES = [
-    "Northern Leaf Blight",
-    "Common Rust",
-    "Gray Leaf Spot",
-    "Healthy",
-]
+# Canonical class labels and post-processing, shared with every other phase
+# and with the app (src/common, ADR-006).
+from src.common.labels import CLASS_NAMES  # noqa: E402
+from src.common.postprocess import postprocess  # noqa: E402
 
 DEFAULT_INT8_PATH = "models/exports/efficientnetb3_maize_int8.tflite"
 DEFAULT_FP16_PATH = "models/exports/efficientnetb3_maize_fp16.tflite"
@@ -120,25 +117,9 @@ class EdgeClassifier:
 
         output_data = self.interpreter.get_tensor(self.output_details[0]["index"])[0]
 
-        # Dequantise if output is integer
-        if output_data.dtype in (np.uint8, np.int8):
-            scale, zero_point = self.output_quant
-            if scale > 0:
-                scores = (output_data.astype(np.float32) - zero_point) * scale
-            else:
-                scores = output_data.astype(np.float32) / 255.0
-        else:
-            scores = output_data.astype(np.float32)
-
-        # Softmax normalisation if needed
-        total = np.sum(scores)
-        if total > 0 and abs(total - 1.0) > 0.01:
-            exp_scores = np.exp(scores - np.max(scores))
-            probs = exp_scores / np.sum(exp_scores)
-        else:
-            probs = scores
-
-        probs = [float(p) for p in probs]
+        # The model's last layer is a softmax, so its output is already a
+        # probability vector: dequantise and renormalise, never softmax (T33).
+        probs = [float(p) for p in postprocess(output_data, self.output_quant)]
         top_idx = int(np.argmax(probs))
         confidence = probs[top_idx]
 
@@ -212,7 +193,12 @@ def main():
     parser.add_argument("--benchmark", action="store_true", help="Run speed benchmark")
     parser.add_argument("--runs", type=int, default=50, help="Number of benchmark iterations")
     parser.add_argument("--threads", type=int, default=4, help="Number of CPU threads")
-    parser.add_argument("--csv", type=str, default=None, help="Evaluate on a CSV dataset")
+    parser.add_argument(
+        "--csv",
+        type=str,
+        default=None,
+        help="Evaluate on a CSV dataset (delegates to src.phase4_edge.evaluate_tflite)",
+    )
 
     args = parser.parse_args()
 
@@ -239,6 +225,24 @@ def main():
         print(f"P50 Latency  : {results['p50_latency_ms']} ms")
         print(f"P95 Latency  : {results['p95_latency_ms']} ms")
         print(f"Throughput   : {results['fps']} FPS")
+        return
+
+    if args.csv:
+        # One evaluation path only: this flag used to be accepted and ignored,
+        # so `--csv` printed a benchmark instead of an evaluation (T33).
+        from src.phase1_cnn.data_pipeline import load_labels_csv, split_dataframe
+        from src.phase4_edge.evaluate_tflite import evaluate_model
+
+        if not os.path.exists(args.csv):
+            print(f"[!] Labels CSV not found: {args.csv}", file=sys.stderr)
+            sys.exit(1)
+
+        _, _, test_df = split_dataframe(load_labels_csv(args.csv))
+        print(f"[*] Evaluating {model_path} on the test split of {args.csv} "
+              f"({len(test_df)} images) ...")
+        report = evaluate_model(model_path, test_df, mode="app", num_threads=args.threads)
+        print(json.dumps(report, indent=2))
+        print("[i] For a recorded run, use: python -m src.phase4_edge.evaluate_tflite")
         return
 
     if args.image:

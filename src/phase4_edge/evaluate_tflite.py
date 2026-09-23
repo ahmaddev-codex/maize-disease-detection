@@ -58,7 +58,9 @@ import pandas as pd
 from PIL import Image
 from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 
-from src.phase1_cnn.data_pipeline import CLASS_NAMES, load_labels_csv, split_dataframe
+from src.common.labels import SHORT_NAMES as CLASS_NAMES
+from src.common.postprocess import postprocess
+from src.phase1_cnn.data_pipeline import load_labels_csv, split_dataframe
 
 DEFAULT_CSV    = "data/annotations/labels.csv"
 DEFAULT_OUTPUT = "models/exports/metrics.json"
@@ -81,13 +83,12 @@ def preprocess(image_path: str, size: Tuple[int, int], mode: str) -> np.ndarray:
 
 
 def dequantize_and_normalize(raw: np.ndarray, quantization: Tuple[float, int]) -> np.ndarray:
-    """Dequantize integer model output, then renormalize so scores sum to 1."""
-    scores = raw.astype(np.float32)
-    scale, zero_point = quantization
-    if np.issubdtype(raw.dtype, np.integer) and scale > 0:
-        scores = (scores - zero_point) * scale
-    total = float(scores.sum())
-    return scores / total if total > 0 else scores
+    """Dequantize integer model output, then renormalize so scores sum to 1.
+
+    Kept as a name the rest of this module already uses; the rule itself lives
+    in src/common/postprocess.py, shared with inference and the app (T33).
+    """
+    return postprocess(raw, quantization)
 
 
 def _to_input_tensor(batch: np.ndarray, input_detail: dict) -> np.ndarray:
