@@ -37,7 +37,7 @@ ScanRecord _record({
     );
 
 class _FixedScanList extends ScanListNotifier {
-  _FixedScanList(List<ScanRecord> scans) {
+  _FixedScanList(List<ScanRecord> scans) : super(null) {
     state = scans;
   }
 

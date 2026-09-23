@@ -162,9 +162,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     YarnTtsService.instance.stop();
     final overlay = _showProcessing();
     int? scanId;
+    String? persistedPath;
 
     try {
       final path   = await _persistImage(tempPath);
+      persistedPath = path;
       final result = await ref.read(classifierServiceProvider).classify(path);
 
       // Saved and shown straight away; the GPS fix follows in the background (T18).
@@ -179,6 +181,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       ref.read(pendingOcrProvider.notifier).state = null;
       scanId = saved.id;
     } catch (e) {
+      // No record was saved, so the copied photo would be an orphan (T21).
+      if (persistedPath != null) {
+        await ref.read(scanStorageProvider).deleteImage(persistedPath);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Diagnosis failed: $e')),

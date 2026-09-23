@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../design_system/design_system.dart';
 import '../providers/app_provider.dart';
-import '../services/database_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -422,7 +421,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Purge All Diagnostic Data?'),
         content: const Text(
-          'All diagnostic records, geolocation coordinates, and captured leaf pictures will be permanently removed from this device.',
+          'All diagnostic records, geolocation coordinates, captured leaf pictures and saved voice advice will be permanently removed from this device.',
         ),
         actions: [
           TextButton(
@@ -441,11 +440,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _clearing = true);
     try {
-      await DatabaseService.instance.clearAll();
-      await ref.read(scanListProvider.notifier).load();
-      ref.read(activeScanIdProvider.notifier).state = null;
+      // Records, captured images and cached speech all go (T21).
+      await ref.read(scanListProvider.notifier).clear();
       messenger.showSnackBar(
-        const SnackBar(content: Text('All local diagnostic records purged')),
+        const SnackBar(content: Text('Records, photos and saved audio purged')),
       );
     } finally {
       if (mounted) setState(() => _clearing = false);

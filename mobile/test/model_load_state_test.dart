@@ -9,6 +9,8 @@ import 'package:maizeguard/screens/home_screen.dart';
 import 'fakes/fake_services.dart';
 
 class _EmptyScanList extends ScanListNotifier {
+  _EmptyScanList() : super(null);
+
   @override
   Future<void> load({int? classFilter}) async {}
 }

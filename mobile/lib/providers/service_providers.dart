@@ -4,6 +4,7 @@ import '../services/classifier_service.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
 import '../services/ocr_service.dart';
+import '../services/scan_storage.dart';
 import '../services/yarn_tts_service.dart';
 
 // Services are read through these providers so tests can override them with
@@ -14,3 +15,4 @@ final locationServiceProvider   = Provider<LocationService>((ref) => LocationSer
 final aiAdvisorProvider         = Provider<AiAdvisor>((ref) => AiAdvisor.instance);
 final yarnTtsServiceProvider    = Provider<YarnTtsService>((ref) => YarnTtsService.instance);
 final databaseServiceProvider   = Provider<DatabaseService>((ref) => DatabaseService.instance);
+final scanStorageProvider       = Provider<ScanStorage>((ref) => ScanStorage.instance);

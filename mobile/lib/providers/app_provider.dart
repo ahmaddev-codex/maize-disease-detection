@@ -7,19 +7,38 @@ import '../config/app_env.dart';
 import '../models/farm_stats.dart';
 import '../models/scan_record.dart';
 import '../services/database_service.dart';
+import '../services/scan_storage.dart';
 import 'service_providers.dart';
 
 // ── Scan history ──────────────────────────────────────────────────────────────
 final scanListProvider = StateNotifierProvider<ScanListNotifier, List<ScanRecord>>(
-  (ref) => ScanListNotifier(ref.watch(databaseServiceProvider)),
+  (ref) => ScanListNotifier(
+    ref.watch(databaseServiceProvider),
+    storage: ref.watch(scanStorageProvider),
+    ref: ref,
+  ),
 );
 
 class ScanListNotifier extends StateNotifier<List<ScanRecord>> {
-  ScanListNotifier([DatabaseService? db])
+  ScanListNotifier(DatabaseService? db, {ScanStorage? storage, Ref? ref})
       : _db = db ?? DatabaseService.instance,
+        _storage = storage ?? ScanStorage.instance,
+        _ref = ref,
         super([]);
 
   final DatabaseService _db;
+  final ScanStorage _storage;
+
+  /// Present when built from [scanListProvider]; lets a delete or purge reset
+  /// the scan the Result screen is pointing at (T21).
+  final Ref? _ref;
+
+  void _forgetActiveScan([int? onlyIfId]) {
+    final ref = _ref;
+    if (ref == null) return;
+    if (onlyIfId != null && ref.read(activeScanIdProvider) != onlyIfId) return;
+    ref.read(activeScanIdProvider.notifier).state = null;
+  }
 
   Future<void> load({int? classFilter}) async {
     state = await _db.getScans(classIdFilter: classFilter);
@@ -49,8 +68,20 @@ class ScanListNotifier extends StateNotifier<List<ScanRecord>> {
   }
 
   Future<void> delete(int id) async {
+    // Read the path before the row goes, or the image can never be found.
+    final record = await _db.getScanById(id);
     await _db.deleteScan(id);
+    if (record != null) await _storage.deleteImage(record.imagePath);
     state = state.where((r) => r.id != id).toList();
+    _forgetActiveScan(id);
+  }
+
+  /// Purges every record plus the files behind them: captures and cached speech.
+  Future<void> clear() async {
+    await _db.clearAll();
+    await _storage.clearAll();
+    state = [];
+    _forgetActiveScan();
   }
 }
 
