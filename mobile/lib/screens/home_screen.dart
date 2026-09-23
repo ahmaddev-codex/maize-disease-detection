@@ -2,12 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../design_system/design_system.dart';
 import '../navigation/open_scan.dart';
 import '../providers/app_provider.dart';
 import '../providers/classifier_state.dart';
 import '../services/path_resolver.dart';
+import '../utils/time_format.dart';
 
 class _ModelStatusPill extends StatelessWidget {
   const _ModelStatusPill({
@@ -435,7 +435,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               subtitle: Text(
-                                DateFormat('d MMM · HH:mm').format(scan.scannedAt),
+                                formatScanTime(scan.scannedAt),
                                 style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
                               ),
                               trailing: Container(

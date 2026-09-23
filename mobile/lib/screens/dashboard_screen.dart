@@ -1,11 +1,11 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../design_system/design_system.dart';
 import '../models/farm_stats.dart';
 import '../providers/app_provider.dart';
 import '../providers/service_providers.dart';
+import '../utils/time_format.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -327,12 +327,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  // Local days, matching how getDailyScans buckets scans (T16/T17).
   List<String> _dayLabels() {
-    final today = DateTime.now().toUtc();
-    return List.generate(7, (i) {
-      final d = today.subtract(Duration(days: 6 - i));
-      return DateFormat('yyyy-MM-dd').format(d);
-    });
+    final today = DateTime.now();
+    return List.generate(7, (i) => localDayKey(today.subtract(Duration(days: 6 - i))));
   }
 }
 

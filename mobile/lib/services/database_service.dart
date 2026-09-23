@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/farm_stats.dart';
 import '../models/scan_record.dart';
+import '../utils/time_format.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
@@ -158,10 +159,7 @@ class DatabaseService {
 
     final counts = <String, int>{};
     for (final row in rows) {
-      final local = DateTime.parse(row['scanned_at'] as String).toLocal();
-      final key = '${local.year.toString().padLeft(4, '0')}-'
-          '${local.month.toString().padLeft(2, '0')}-'
-          '${local.day.toString().padLeft(2, '0')}';
+      final key = localDayKey(DateTime.parse(row['scanned_at'] as String));
       counts[key] = (counts[key] ?? 0) + 1;
     }
     return counts;

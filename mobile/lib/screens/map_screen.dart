@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../design_system/design_system.dart';
 import '../models/scan_record.dart';
 import '../navigation/open_scan.dart';
 import '../providers/app_provider.dart';
 import '../services/path_resolver.dart';
+import '../utils/time_format.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -221,7 +221,7 @@ class _ScanDetailCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${DateFormat('d MMM yyyy · HH:mm').format(scan.scannedAt)} · ${(scan.confidence * 100).toStringAsFixed(0)}% Confidence',
+                      '${formatScanDateTime(scan.scannedAt)} · ${(scan.confidence * 100).toStringAsFixed(0)}% Confidence',
                       style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
                     ),
                   ],

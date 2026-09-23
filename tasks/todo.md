@@ -33,7 +33,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [x] T57 Bundle DM Sans so fonts never fetch at runtime (found on device) [— · S]
 - [ ] T15 One threshold set; urgency uses confidence and trend [T06 · M]
 - [x] T16 Farm stats by `class_id`; Home = Dashboard; empty state; local-day buckets [T03 · M]
-- [ ] T17 Local time display helper [T16 · M]
+- [x] T17 Local time display helper [T16 · M]
 - [ ] **Checkpoint 2:** DD/MM/YYYY parses; dashboard bars correct; app-mode metrics ≈ python mode
 
 ## Phase 3: Scan flow and data lifecycle
@@ -97,6 +97,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T17: scan times and day buckets render in the device timezone (README/papers should stop implying UTC).
 - T16: dashboard and Home share one 30-day stats source counted by class id; empty farms show an empty state instead of 100%.
 - T35: run_all.sh banner, setup_env.sh and requirements now match the code (Python 3.11, AdamW, 17-d metadata, FP16 primary); NFR-22 needs revisiting in REQUIREMENTS.
 - T09/T11: the app resizes bilinearly and loads FP16 first (INT8 fallback); setup.sh only ships models listed in metrics.json.

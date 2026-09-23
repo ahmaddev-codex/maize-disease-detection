@@ -2,13 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../design_system/design_system.dart';
 import '../models/scan_record.dart';
 import '../navigation/open_scan.dart';
 import '../providers/app_provider.dart';
 import '../services/database_service.dart';
 import '../services/path_resolver.dart';
+import '../utils/time_format.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -180,7 +180,7 @@ class _ScanCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        DateFormat('d MMM yyyy · HH:mm').format(scan.scannedAt),
+                        formatScanDateTime(scan.scannedAt),
                         style: AppTypography.caption.copyWith(
                           color: AppColors.charcoal400,
                         ),
