@@ -36,6 +36,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
   // AI Agronomic Advice (Groq Frontier Model)
   String? _aiAdvice;
+  String? _aiSource;
+  String? _aiModel;
+  String? _aiOfflineReason;
   bool _loadingAi = false;
   String? _aiError;
 
@@ -351,6 +354,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       if (mounted) {
         setState(() {
           _aiAdvice = text;
+          _aiSource = advice.source;
+          _aiModel = advice.model;
+          _aiOfflineReason = advice.offlineReason;
           _loadingAi = false;
         });
       }
@@ -414,6 +420,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       _renderedScanId = record.id;
       _renderedLanguage = lang.label;
       _aiAdvice = record.adviceFor(lang.label);
+      _aiSource = _aiAdvice == null ? null : record.aiSource;
+      _aiModel = _aiAdvice == null ? null : record.aiModel;
+      _aiOfflineReason = null;
       _aiError = null;
       _loadingAi = false;
       if (scanChanged) _hasAutoPlayed = false;
@@ -848,13 +857,20 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Groq Agronomic Assistant',
+                                  'Agronomic Assistant',
                                   style: AppTypography.h3.copyWith(
                                     color: isDark ? Colors.white : AppColors.charcoal900,
                                   ),
                                 ),
+                                // Says where this text came from: built-in
+                                // rules must never read as a model's reply (T26).
                                 Text(
-                                  'Powered by GPT OSS 120B · Offline Verified',
+                                  switch (_aiSource) {
+                                    'offline' => 'Offline guidance · built-in agronomic rules',
+                                    'groq' => 'Answered online by ${_aiModel ?? 'a Groq model'}',
+                                    _ => 'Online when a key is set, built-in rules otherwise',
+                                  },
+                                  key: const Key('result-advice-source'),
                                   style: AppTypography.caption.copyWith(
                                     color: AppColors.charcoal400,
                                   ),
@@ -865,6 +881,20 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                         ],
                       ),
                       const SizedBox(height: AppSpacing.md),
+                      if (_aiSource == 'offline' && _aiOfflineReason != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.charcoal400.withValues(alpha: 0.12),
+                            borderRadius: AppRadii.sm,
+                          ),
+                          child: Text(
+                            _aiOfflineReason!,
+                            style: AppTypography.caption.copyWith(color: AppColors.charcoal400),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
                       if (_aiError != null) ...[
                         Container(
                           padding: const EdgeInsets.all(AppSpacing.sm),
@@ -893,7 +923,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                                 ),
                                 const SizedBox(height: AppSpacing.sm),
                                 Text(
-                                  'Consulting Groq Frontier Reasoning Model…',
+                                  'Asking the agronomic assistant…',
                                   style: AppTypography.bodySmall,
                                 ),
                               ],

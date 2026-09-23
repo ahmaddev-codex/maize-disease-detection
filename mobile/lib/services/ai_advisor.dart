@@ -1,4 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/app_env.dart';
 import '../constants/diseases.dart';
@@ -7,19 +11,58 @@ import 'advice_prompt.dart';
 /// Advice plus where it came from. The screen stores the provenance with the
 /// scan, so "offline mode" text is never replayed as if Groq had answered (T24).
 class AdviceResponse {
-  const AdviceResponse({required this.text, required this.source, this.model});
+  const AdviceResponse({
+    required this.text,
+    required this.source,
+    this.model,
+    this.offlineReason,
+  });
 
   /// 'groq' when a model answered, 'offline' for the built-in rules.
   final String source;
   final String text;
   final String? model;
 
+  /// Why the built-in rules answered instead of a model — shown to the farmer
+  /// so "offline guidance" is never mistaken for a model's reply (T26).
+  final String? offlineReason;
+
   bool get isOffline => source == 'offline';
 }
 
+/// Why a request stopped, in words a farmer can act on.
+class _GroqFailure implements Exception {
+  const _GroqFailure(this.reason, {this.fatal = false});
+
+  final String reason;
+
+  /// Retrying another model cannot help: a rejected key, no connection, or the
+  /// deadline has passed.
+  final bool fatal;
+
+  @override
+  String toString() => reason;
+}
+
 class AiAdvisor {
+  AiAdvisor._({http.Client? client, Duration? deadline})
+      : _client = client,
+        _deadline = deadline ?? const Duration(seconds: 20);
+
   static final AiAdvisor instance = AiAdvisor._();
-  AiAdvisor._();
+
+  /// Lets tests drive the client without a network or a key.
+  @visibleForTesting
+  factory AiAdvisor.withClient(http.Client client, {Duration? deadline}) =>
+      AiAdvisor._(client: client, deadline: deadline);
+
+  final http.Client? _client;
+
+  /// Budget for the whole advice request, not per model: five models at 25 s
+  /// each used to leave a farmer watching a spinner for two minutes.
+  final Duration _deadline;
+
+  http.Client get _http => _client ?? http.Client();
 
   static const _groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -91,6 +134,7 @@ $englishContent
 
     final prompt = _prompt(classId, confidence, cropVariety, language);
 
+    String reason = 'No API key is set, so the built-in guidance was used.';
     if (key.isNotEmpty) {
       try {
         final response = await _callGroq(prompt, key);
@@ -101,14 +145,18 @@ $englishContent
             model: response.model,
           );
         }
-      } catch (_) {
-        // Fall back to offline rule-based recommendation
+        reason = 'The model returned nothing usable, so the built-in guidance was used.';
+      } on _GroqFailure catch (e) {
+        reason = e.reason;
+      } catch (e) {
+        reason = 'The advice service could not be reached, so the built-in guidance was used.';
       }
     }
 
     return AdviceResponse(
       text: sanitizeAiText(_buildOfflineAdvice(classId, confidence, cropVariety, language)),
       source: 'offline',
+      offlineReason: reason,
     );
   }
 
@@ -140,58 +188,84 @@ $englishContent
   }
 
   Future<({String text, String model})> _callGroq(String prompt, String apiKey) async {
-    final candidateModels = <String>[
-      AppEnv.groqModel,
-      if (AppEnv.groqModel != 'openai/gpt-oss-120b') 'openai/gpt-oss-120b',
-      'openai/gpt-oss-20b',
-      'qwen/qwen3.6-27b',
-      'qwen/qwen3.8-27b',
-    ];
+    final expiry = DateTime.now().add(_deadline);
+    final client = _http;
+    String lastReason = 'The advice service did not answer, so the built-in guidance was used.';
 
-    String? lastError;
+    for (final model in AppEnv.groqModels) {
+      final remaining = expiry.difference(DateTime.now());
+      if (remaining <= Duration.zero) {
+        throw const _GroqFailure(
+          'The advice service did not answer in time, so the built-in guidance was used.',
+          fatal: true,
+        );
+      }
 
-    for (final model in candidateModels) {
       try {
-        final response = await http.post(
-          Uri.parse(_groqEndpoint),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $apiKey',
-          },
-          body: jsonEncode({
-            'model': model,
-            'messages': [
-              {
-                'role': 'system',
-                'content':
-                    'You are an expert agronomist advising Nigerian smallholder maize farmers. Provide practical, field-tested guidance. Do not use markdown headers (#) or bold asterisks (**). Use clean plain text with simple bullet points (•).',
+        final response = await client
+            .post(
+              Uri.parse(_groqEndpoint),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $apiKey',
               },
-              {'role': 'user', 'content': prompt},
-            ],
-            'temperature': 0.2,
-            'max_tokens': 800,
-          }),
-        ).timeout(const Duration(seconds: 25));
+              body: jsonEncode({
+                'model': model,
+                'messages': [
+                  {
+                    'role': 'system',
+                    'content':
+                        'You are an expert agronomist advising Nigerian smallholder maize farmers. Provide practical, field-tested guidance. Do not use markdown headers (#) or bold asterisks (**). Use clean plain text with simple bullet points (•).',
+                  },
+                  {'role': 'user', 'content': prompt},
+                ],
+                'temperature': 0.2,
+                'max_tokens': 800,
+              }),
+            )
+            .timeout(remaining);
+
+        // A rejected key fails the same way on every model, so stop asking.
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          throw const _GroqFailure(
+            'That API key was rejected, so the built-in guidance was used. Check it in Settings.',
+            fatal: true,
+          );
+        }
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          final choice = data['choices']?[0];
-          String? text = choice?['message']?['content'] as String?;
-          if (text == null || text.trim().isEmpty) {
-            text = choice?['message']?['reasoning'] as String?;
-          }
+          // Only 'content' is advice. 'reasoning' is the model thinking aloud
+          // and must never be shown as guidance (T26).
+          final text = data['choices']?[0]?['message']?['content'] as String?;
           if (text != null && text.trim().isNotEmpty) {
             return (text: sanitizeAiText(text), model: model);
           }
+          lastReason = 'The model returned nothing usable, so the built-in guidance was used.';
+          continue;
         }
 
-        lastError = 'Groq API (${response.statusCode}): ${response.body}';
+        lastReason = 'The advice service answered with an error (${response.statusCode}), '
+            'so the built-in guidance was used.';
+      } on _GroqFailure {
+        rethrow;
+      } on SocketException {
+        throw const _GroqFailure(
+          'No internet connection, so the built-in guidance was used.',
+          fatal: true,
+        );
+      } on TimeoutException {
+        throw const _GroqFailure(
+          'The advice service did not answer in time, so the built-in guidance was used.',
+          fatal: true,
+        );
       } catch (e) {
-        lastError = e.toString();
+        debugPrint('[AiAdvisor] $model failed: $e');
+        lastReason = 'The advice service could not be reached, so the built-in guidance was used.';
       }
     }
 
-    throw Exception(lastError ?? 'Failed to get response from Groq API');
+    throw _GroqFailure(lastReason);
   }
 
   /// Offline clinical fallback generated from verified agronomic knowledge in diseases.dart

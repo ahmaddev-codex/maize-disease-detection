@@ -30,7 +30,7 @@ void main() {
     }
   }
 
-  ScanRecord rustScan({String? advice, String? language}) => ScanRecord(
+  ScanRecord rustScan({String? advice, String? language, String source = 'groq'}) => ScanRecord(
         id: scanId,
         imagePath: '${tmp.path}/rust.jpg',
         classId: 1,
@@ -43,7 +43,7 @@ void main() {
         scannedAt: DateTime.utc(2026, 9, 10, 9),
         aiAdvice: advice,
         aiLanguage: language,
-        aiSource: advice == null ? null : 'groq',
+        aiSource: advice == null ? null : source,
       );
 
   setUp(() async {
@@ -108,6 +108,25 @@ void main() {
         scrollable: find.byType(Scrollable).first, maxScrolls: 40);
     await settle(tester);
     expect(advice, findsWidgets);
+  });
+
+  testWidgets('built-in guidance is labelled as such, not as a model reply', (tester) async {
+    db.records[scanId] = rustScan(
+      advice: 'Built-in guidance for rust.',
+      language: 'English',
+      source: 'offline',
+    );
+
+    container.read(activeScanIdProvider.notifier).state = scanId;
+    await pumpResult(tester);
+
+    final label = find.byKey(const Key('result-advice-source'));
+    await tester.scrollUntilVisible(label, 400,
+        scrollable: find.byType(Scrollable).first, maxScrolls: 40);
+    await settle(tester);
+
+    expect(tester.widget<Text>(label).data, contains('Offline guidance'));
+    expect(find.textContaining('GPT OSS'), findsNothing);
   });
 
   testWidgets('advice saved in another language is not shown as this one', (tester) async {
