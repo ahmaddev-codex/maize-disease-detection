@@ -39,7 +39,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 ## Phase 3: Scan flow and data lifecycle
 - [x] T18 Result appears without waiting for GPS; location saved later [T03, T07 · M] — pre-permission explainer deferred to T20
 - [ ] T19 Crop to the on-screen box, behind a flag [T09 · M]
-- [ ] T20 Camera stream lifecycle and real luma brightness hint [— · M]
+- [x] T20 Camera stream lifecycle and real luma brightness hint [— · M] — device check of both hints still pending
 - [x] T21 Delete/Clear remove images, audio cache and stale state [T07 · M]
 - [x] T22 Back returns to origin; Retake button [T07 · S]
 - [x] T23 Seed metadata chip on camera and fields on Result [T06 · S]
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T20: the brightness hint is computed from real luma (yuv420 on Android, bgra8888 on iOS) instead of raw stream bytes, the preview stream stops while a result is on screen and while the app is backgrounded, and flipping the camera keeps the stream running.
 - T21: deleting a scan now deletes its photo, Purge All also removes `scans/` and the cached speech (dialog and snackbar reworded to match), deleting the open scan clears the active-scan state, and a capture whose diagnosis fails is removed instead of orphaned.
 - T23: a scanned seed label is shown on the camera before capture (with a clear action) and on the result of the scan it was attached to; the camera screen now degrades to a message instead of a blank spinner when no camera is available.
 - T22: back returns to the screen a scan was opened from, low-confidence results offer a retake, and navigation no longer waits on the audio engine.

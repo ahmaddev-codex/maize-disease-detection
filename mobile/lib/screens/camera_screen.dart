@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import '../design_system/design_system.dart';
 import '../navigation/open_scan.dart';
 import '../providers/app_provider.dart';
 import '../providers/service_providers.dart';
+import '../services/luma.dart';
 import '../services/scan_flow.dart';
 import '../services/yarn_tts_service.dart';
 
@@ -27,6 +29,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   bool _isFlashOn = false;
   String? _brightnessHint;
   String? _cameraError;
+  bool _initializing = false;
 
   @override
   void initState() {
@@ -35,27 +38,52 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     _initCamera();
   }
 
+  /// takePicture always writes a JPEG file; the format group only decides what
+  /// the preview stream delivers, and luma needs a real one (T20).
+  CameraController _newController(CameraDescription description) => CameraController(
+        description,
+        ResolutionPreset.high,
+        enableAudio: false,
+        imageFormatGroup:
+            Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
+      );
+
+  /// Stops the stream, then hands the camera back to the OS.
+  Future<void> _releaseController(CameraController controller) async {
+    try {
+      if (controller.value.isStreamingImages) await controller.stopImageStream();
+    } catch (e) {
+      debugPrint('[Camera] stream stop failed: $e');
+    }
+    await controller.dispose();
+  }
+
   Future<void> _initCamera() async {
+    if (_initializing) return;
+    _initializing = true;
     try {
       _cameras = await availableCameras();
       if (_cameras.isEmpty) {
         if (mounted) setState(() => _cameraError = 'No camera found on this device.');
         return;
       }
-      _controller = CameraController(
-        _cameras.first,
-        ResolutionPreset.high,
-        enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
-      );
-      await _controller!.initialize();
-      if (!mounted) return;
-      setState(() => _cameraError = null);
+      final controller = _newController(_cameras.first);
+      await controller.initialize();
+      if (!mounted) {
+        await _releaseController(controller);
+        return;
+      }
+      setState(() {
+        _controller = controller;
+        _cameraError = null;
+      });
 
       _startBrightnessStream();
     } catch (e) {
       debugPrint('[Camera] unavailable: $e');
       if (mounted) setState(() => _cameraError = 'Camera unavailable. Use Gallery to pick a photo.');
+    } finally {
+      _initializing = false;
     }
   }
 
@@ -65,42 +93,55 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
     // Live brightness feedback — sampled to avoid UI lag
     _controller!.startImageStream((image) {
-      final luma = _estimateLuma(image);
-      String? hint;
-      if (luma < 55) {
-        hint = 'Low light: move closer to daylight';
-      } else if (luma > 215) {
-        hint = 'Direct glare: shade leaf for accurate diagnosis';
-      }
+      final hint = lightingHint(lightingFrom(_lumaOf(image)));
       if (hint != _brightnessHint && mounted) {
         setState(() => _brightnessHint = hint);
       }
     });
   }
 
-  double _estimateLuma(CameraImage image) {
-    if (image.planes.isEmpty) return 128;
-    final plane = image.planes[0];
-    final bytes = plane.bytes;
-    double sum = 0;
-    int count = 0;
-    for (int i = 0; i < bytes.length; i += 12) {
-      sum += bytes[i];
-      count++;
+  Future<void> _stopBrightnessStream() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (!controller.value.isStreamingImages) return;
+    try {
+      await controller.stopImageStream();
+    } catch (e) {
+      debugPrint('[Camera] stream stop failed: $e');
     }
-    return count > 0 ? sum / count : 128;
+  }
+
+  /// 128 (mid-grey) for a layout we cannot read, so no false hint is shown.
+  double _lumaOf(CameraImage image) {
+    if (image.planes.isEmpty) return 128;
+    final plane = image.planes.first;
+    return switch (image.format.group) {
+      ImageFormatGroup.yuv420 => lumaFromYPlane(
+          plane.bytes,
+          width: image.width,
+          height: image.height,
+          bytesPerRow: plane.bytesPerRow,
+        ),
+      ImageFormatGroup.bgra8888 => lumaFromBgra(
+          plane.bytes,
+          width: image.width,
+          height: image.height,
+          bytesPerRow: plane.bytesPerRow,
+        ),
+      _ => 128,
+    };
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null || !_controller!.value.isInitialized) return;
-    if (state == AppLifecycleState.inactive) {
-      if (_controller!.value.isStreamingImages) {
-        _controller!.stopImageStream();
-      }
-      _controller!.dispose();
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      final controller = _controller;
+      if (controller == null) return;
+      // Cleared first: the build must never touch a controller being disposed.
+      setState(() => _controller = null);
+      unawaited(_releaseController(controller));
     } else if (state == AppLifecycleState.resumed) {
-      _initCamera();
+      if (_controller == null) _initCamera();
     }
   }
 
@@ -193,7 +234,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     } finally {
       overlay.remove();
       if (mounted && scanId != null) {
-        openScan(context, ref, scanId);
+        await _stopBrightnessStream();
+        if (mounted) {
+          await openScan(context, ref, scanId);
+          if (mounted) _startBrightnessStream();
+        }
       }
     }
   }
@@ -207,10 +252,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (_controller?.value.isStreamingImages == true) {
-      _controller!.stopImageStream();
-    }
-    _controller?.dispose();
+    final controller = _controller;
+    _controller = null;
+    if (controller != null) unawaited(_releaseController(controller));
     super.dispose();
   }
 
@@ -454,19 +498,22 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                   label: 'Flip',
                   onTap: _cameras.length > 1
                       ? () async {
-                          final current = _controller!.description;
+                          final previous = _controller;
+                          if (previous == null) return;
                           final next = _cameras.firstWhere(
-                            (c) => c.lensDirection != current.lensDirection,
+                            (c) => c.lensDirection != previous.description.lensDirection,
                             orElse: () => _cameras.first,
                           );
-                          await _controller!.dispose();
-                          _controller = CameraController(
-                            next,
-                            ResolutionPreset.high,
-                            enableAudio: false,
-                          );
-                          await _controller!.initialize();
-                          if (mounted) setState(() {});
+                          setState(() => _controller = null);
+                          await _releaseController(previous);
+                          final replacement = _newController(next);
+                          await replacement.initialize();
+                          if (!mounted) {
+                            await _releaseController(replacement);
+                            return;
+                          }
+                          setState(() => _controller = replacement);
+                          _startBrightnessStream();
                         }
                       : null,
                 ),
