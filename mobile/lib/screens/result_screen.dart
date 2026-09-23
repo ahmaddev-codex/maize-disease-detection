@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../config/app_env.dart';
 import '../constants/diseases.dart';
+import '../constants/thresholds.dart';
 import '../design_system/design_system.dart';
 import '../models/scan_record.dart';
 import '../providers/app_provider.dart';
@@ -200,7 +201,19 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     DisplayLanguage lang,
   ) {
     final confPercent = (result.confidence * 100).toStringAsFixed(0);
-    final isHealthy = result.classId == 3;
+    final isHealthy = result.classId == kHealthyClassId;
+
+    // Too unsure to act on: ask for a better photo instead of urging treatment.
+    // TODO(T27): have these three translations reviewed by native speakers.
+    if (recs.needsRetake) {
+      return switch (lang) {
+        DisplayLanguage.yoruba => 'Aworan naa ko ye wa daradara. E tun ya aworan ewe naa ninu imole to peye ki a to pinnu arun ti o ni.',
+        DisplayLanguage.hausa  => 'Hoton bai fito sosai ba. A sake daukar hoton ganyen cikin haske mai kyau kafin a tabbatar da cutar.',
+        DisplayLanguage.igbo   => "Foto a edoghi anya nke oma. Biko sere foto akwukwo ahu ozo n'ihe nchacha tupu anyi ekwuo oria ya.",
+        DisplayLanguage.english =>
+          'This scan is not clear enough to be certain. Please retake the photo in good daylight, with the leaf flat inside the frame, before treating.',
+      };
+    }
 
     switch (lang) {
       case DisplayLanguage.yoruba:
@@ -409,8 +422,10 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     final int? existingFeedback = record.feedback;
 
     final disease = diseaseForClass(result.classId);
-    final recs = RecommendationEngine.generate(result);
-    final isLowConf = result.confidence < 0.60;
+    // Urgency now reflects the real farm trend, so 'critical' is reachable (T15).
+    final trendDelta = ref.watch(healthTrendProvider).valueOrNull ?? 0.0;
+    final recs = RecommendationEngine.generate(result, trend: trendFromDelta(trendDelta));
+    final isLowConf = recs.needsRetake;
 
     // Distinct audio texts for Result, Treatment Plan, and AI Advisor
     final String resultAudioText = _getResultSpokenSummary(disease, result, recs, lang);
@@ -619,7 +634,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Low Confidence (<60%) — Recommended Retake',
+                                'Low confidence (below ${(ConfidenceThresholds.low * 100).round()}%) — retake recommended',
                                 style: AppTypography.bodyMedium.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.warning,

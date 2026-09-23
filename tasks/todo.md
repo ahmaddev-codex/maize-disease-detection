@@ -31,7 +31,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [x] T14 Python extractor parity, `--image` CLI, Tesseract check [T13 · S]
 - [x] T56 OCR deskew no longer rotates labels 90° (found in T14) [T14 · S]
 - [x] T57 Bundle DM Sans so fonts never fetch at runtime (found on device) [— · S]
-- [ ] T15 One threshold set; urgency uses confidence and trend [T06 · M]
+- [x] T15 One threshold set; urgency uses confidence and trend [T06 · M]
 - [x] T16 Farm stats by `class_id`; Home = Dashboard; empty state; local-day buckets [T03 · M]
 - [x] T17 Local time display helper [T16 · M]
 - [ ] **Checkpoint 2:** DD/MM/YYYY parses; dashboard bars correct; app-mode metrics ≈ python mode
@@ -97,6 +97,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T15: one confidence threshold set (low 0.60 / high 0.85); low-confidence scans ask for a retake in speech and urgency; 'critical' now reachable via the real trend.
 - T17: scan times and day buckets render in the device timezone (README/papers should stop implying UTC).
 - T16: dashboard and Home share one 30-day stats source counted by class id; empty farms show an empty state instead of 100%.
 - T35: run_all.sh banner, setup_env.sh and requirements now match the code (Python 3.11, AdamW, 17-d metadata, FP16 primary); NFR-22 needs revisiting in REQUIREMENTS.

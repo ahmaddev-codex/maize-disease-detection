@@ -1,5 +1,4 @@
-/// Class id of the Healthy class (see constants/diseases.dart).
-const int kHealthyClassId = 3;
+import '../constants/diseases.dart';
 
 /// Scan counts per disease class over a window, shared by Home and the dashboard
 /// so both always report the same numbers for the same period.

@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../design_system/design_system.dart';
+import '../constants/diseases.dart';
 import '../models/farm_stats.dart';
 import '../providers/app_provider.dart';
 import '../providers/service_providers.dart';

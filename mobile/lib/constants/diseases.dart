@@ -1,3 +1,6 @@
+/// Class id of the Healthy class.
+const int kHealthyClassId = 3;
+
 class DiseaseInfo {
   final int classId;
   final String name;

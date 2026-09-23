@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../constants/thresholds.dart';
 import '../tokens/app_colors.dart';
 import '../tokens/app_radii.dart';
 import '../tokens/app_spacing.dart';
@@ -23,8 +24,8 @@ class ConfidenceMeter extends StatelessWidget {
   int get _resolvedClassId => classId ?? diseaseIndex ?? 0;
 
   String get _confidenceText {
-    if (confidence >= 0.85) return 'High Confidence';
-    if (confidence >= 0.65) return 'Moderate Confidence';
+    if (ConfidenceThresholds.isHigh(confidence)) return 'High Confidence';
+    if (!ConfidenceThresholds.isLow(confidence)) return 'Moderate Confidence';
     return 'Low Confidence (Verify)';
   }
 
