@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -145,37 +143,23 @@ class DarkModeNotifier extends StateNotifier<bool> {
   }
 }
 
-Future<String?> _tryReadEnvKey(String envKey) async {
-  try {
-    for (final p in [
-      '.env.json',
-      'mobile/.env.json',
-      '/Users/mac/projects/maize-disease-detection/mobile/.env.json',
-    ]) {
-      final f = File(p);
-      if (f.existsSync()) {
-        final data = jsonDecode(await f.readAsString());
-        if (data is Map && data[envKey] is String && (data[envKey] as String).isNotEmpty) {
-          return (data[envKey] as String).trim();
-        }
-      }
-    }
-  } catch (_) {}
-  return null;
-}
-
 // ── Groq API key (Primary & exclusive AI provider) ──────────────────────────────
 final groqKeyProvider = StateNotifierProvider<GroqKeyNotifier, String?>(
   (ref) => GroqKeyNotifier(),
 );
 
 class GroqKeyNotifier extends StateNotifier<String?> {
-  GroqKeyNotifier() : super(null) {
+  GroqKeyNotifier({String? envKey}) : _envKey = envKey ?? AppEnv.groqApiKey, super(null) {
     _load();
   }
 
+  /// The build-time key, if the app was built with one. Injectable so the
+  /// seed-once behaviour can be tested (T28).
+  final String _envKey;
+
   static const _storage = FlutterSecureStorage();
   static const _key     = 'groq_api_key';
+  static const _seededFlag = 'groq_api_key_seeded';
 
   Future<void> _load() async {
     final saved = await _storage.read(key: _key);
@@ -183,16 +167,15 @@ class GroqKeyNotifier extends StateNotifier<String?> {
       state = saved.trim();
       return;
     }
-    if (AppEnv.groqApiKey.isNotEmpty) {
-      state = AppEnv.groqApiKey;
-      await _storage.write(key: _key, value: state!);
-      return;
-    }
-    final fileKey = await _tryReadEnvKey('GROQ_API_KEY');
-    if (fileKey != null && fileKey.isNotEmpty) {
-      state = fileKey;
-      await _storage.write(key: _key, value: fileKey);
-    }
+    if (_envKey.isEmpty) return;
+
+    // Seeded once only: a farmer who removes the key must not find it back
+    // after the next launch (T28).
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_seededFlag) ?? false) return;
+    await prefs.setBool(_seededFlag, true);
+    state = _envKey;
+    await _storage.write(key: _key, value: _envKey);
   }
 
   Future<void> save(String key) async {
@@ -212,12 +195,17 @@ final yarnGptKeyProvider = StateNotifierProvider<YarnGptKeyNotifier, String?>(
 );
 
 class YarnGptKeyNotifier extends StateNotifier<String?> {
-  YarnGptKeyNotifier() : super(null) {
+  YarnGptKeyNotifier({String? envKey}) : _envKey = envKey ?? AppEnv.yarnGptApiKey, super(null) {
     _load();
   }
 
+  /// The build-time key, if the app was built with one. Injectable so the
+  /// seed-once behaviour can be tested (T28).
+  final String _envKey;
+
   static const _storage = FlutterSecureStorage();
   static const _key     = 'yarngpt_api_key';
+  static const _seededFlag = 'yarngpt_api_key_seeded';
 
   Future<void> _load() async {
     final saved = await _storage.read(key: _key);
@@ -225,16 +213,15 @@ class YarnGptKeyNotifier extends StateNotifier<String?> {
       state = saved.trim();
       return;
     }
-    if (AppEnv.yarnGptApiKey.isNotEmpty) {
-      state = AppEnv.yarnGptApiKey;
-      await _storage.write(key: _key, value: state!);
-      return;
-    }
-    final fileKey = await _tryReadEnvKey('YARNGPT_API_KEY');
-    if (fileKey != null && fileKey.isNotEmpty) {
-      state = fileKey;
-      await _storage.write(key: _key, value: fileKey);
-    }
+    if (_envKey.isEmpty) return;
+
+    // Seeded once only: a farmer who removes the key must not find it back
+    // after the next launch (T28).
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_seededFlag) ?? false) return;
+    await prefs.setBool(_seededFlag, true);
+    state = _envKey;
+    await _storage.write(key: _key, value: _envKey);
   }
 
   Future<void> save(String key) async {

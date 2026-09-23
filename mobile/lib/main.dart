@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
-import 'config/app_env.dart';
 import 'design_system/tokens/app_typography.dart';
 import 'services/database_service.dart';
 import 'services/path_resolver.dart';
@@ -42,8 +41,6 @@ void main() async {
   await PathResolver.init();
   await DatabaseService.instance.init();
 
-  debugPrint('[ENV] GROQ key length  : ${AppEnv.groqApiKey.length}');
-  debugPrint('[ENV] YARNGPT key length: ${AppEnv.yarnGptApiKey.length}');
 
   runApp(const ProviderScope(child: MaizeGuardApp()));
 }
