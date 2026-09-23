@@ -1,9 +1,24 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 abstract class AppTypography {
   static const String fontFamily = 'DM Sans';
+
+  /// Uses the DM Sans files bundled in google_fonts/ and never downloads a font.
+  /// Without this the app threw an unhandled exception per weight whenever
+  /// fonts.gstatic.com was unreachable (T57).
+  static void configureBundledFonts() {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    LicenseRegistry.addLicense(() async* {
+      yield LicenseEntryWithLineBreaks(
+        const ['google_fonts'],
+        await rootBundle.loadString('google_fonts/OFL.txt'),
+      );
+    });
+  }
 
   static TextTheme textTheme({required bool isDark}) {
     final primary = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;

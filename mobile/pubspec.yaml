@@ -71,3 +71,5 @@ flutter:
   assets:
     - assets/models/
     - assets/images/
+    # Bundled DM Sans weights: google_fonts uses these instead of fetching over HTTP.
+    - google_fonts/

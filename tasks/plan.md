@@ -479,6 +479,30 @@ Fix: estimate skew from text pixels only (inverted binary), normalise the minAre
 **Files likely touched:** `src/phase2_ocr/preprocessor.py`, `tests/test_ocr_preprocessor.py`
 **Estimated scope:** Small
 
+### Task T57: Bundle fonts so the app never fetches them at runtime (found on device)
+
+**Description:** `AppTypography` builds every style with `GoogleFonts.dmSans(...)`, and no font files are bundled. On a phone without internet, google_fonts tries to download each weight from `fonts.gstatic.com` and throws an unhandled exception per weight:
+
+```
+Unhandled Exception: Exception: Failed to load font with url https://fonts.gstatic.com/...ttf:
+ClientException with SocketException: Failed host lookup: 'fonts.gstatic.com'
+```
+
+This contradicts the offline claim and spams errors at startup. Fix: bundle the five DM Sans weights the design system uses (400, 500, 600, 700, 800) plus the OFL licence under `mobile/google_fonts/`, declare the folder in `assets`, disable runtime fetching, and register the licence.
+
+**Acceptance criteria:**
+- [ ] The five weight files and `OFL.txt` are bundled and listed in `pubspec.yaml` assets.
+- [ ] `GoogleFonts.config.allowRuntimeFetching` is false once the app configures fonts.
+- [ ] Rendering app text in a test throws no exception; the font licence is registered with `LicenseRegistry`.
+
+**Verification:**
+- [ ] `flutter test test/bundled_fonts_test.dart`: RED before bundling, then GREEN.
+- [ ] Manual: run on a device in airplane mode; no `google_fonts` exceptions in the log.
+
+**Dependencies:** None
+**Files likely touched:** `mobile/google_fonts/*`, `mobile/pubspec.yaml`, `mobile/lib/design_system/tokens/app_typography.dart`, `mobile/lib/main.dart`, `mobile/test/bundled_fonts_test.dart`
+**Estimated scope:** Small
+
 ### Checkpoint 2: Diagnosis correctness
 - [ ] `flutter test` and `pytest` green; `metrics.json` app mode ≈ python mode.
 - [ ] Manual: a seed label with `15/03/2024` parses; dashboard bars match actual scans; times are local; the model status shows the ADR-001 variant.

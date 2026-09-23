@@ -136,6 +136,8 @@ void main() {
   testWidgets('tapping a History record opens that scan', (tester) async {
     await pumpRoutes(tester, const HistoryScreen());
 
+    await tester.ensureVisible(find.text('Gray Leaf Spot'));
+    await _settle(tester);
     await tester.tap(find.text('Gray Leaf Spot'));
     await _settle(tester);
 
@@ -146,9 +148,12 @@ void main() {
   testWidgets('tapping a recent scan on Home opens that scan', (tester) async {
     await pumpRoutes(tester, const HomeScreen());
 
-    // Recent scans sit below the fold in the test viewport.
+    // Recent scans sit below the fold in the test viewport; scroll until the row
+    // exists, then bring it fully on screen so the tap lands on it.
     await tester.scrollUntilVisible(find.text('Common Rust'), 200,
         scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.text('Common Rust'));
+    await _settle(tester);
     await tester.tap(find.text('Common Rust'));
     await _settle(tester);
 

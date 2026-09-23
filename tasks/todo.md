@@ -5,14 +5,14 @@ The full details for each task (acceptance criteria, verification, files) are in
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title list its dependencies, then its scope (S/M/L).
 
 ## Pre-flight (user)
-- [ ] Commit or stash WIP on `dev` (`camera_screen.dart`, `result_screen.dart`, `heatmap.py`), and decide whether to commit `notebooks/` and `research-papers/`
-- [ ] Answer the Open Questions in plan.md (Q1–Q12)
+- [x] Commit or stash WIP on `dev` (`camera_screen.dart`, `result_screen.dart`, `heatmap.py`), and decide whether to commit `notebooks/` and `research-papers/`
+- [x] Answer the Open Questions in plan.md (Q1–Q3 answered; devices, agronomist and native speakers available; Q4–Q15 still open)
 
 ## Phase 0: Baseline and decisions
 - [x] T01 Reproducible TFLite evaluation → `metrics.json` [— · S]
 - [x] T02 ADR-001…006 recorded, and `pubspec.lock` committed [T01 · S]
 - [x] T03 Service providers and test fakes [— · S]
-- [ ] **Checkpoint 0:** ADRs approved; baseline metrics committed; tests green
+- [x] **Checkpoint 0:** ADRs approved; baseline metrics committed; tests green
 
 ## Phase 1: Mobile release blockers
 - [x] T04 Android release has network, GPS, app ID, signing and OSM attribution [T02 · M]
@@ -20,7 +20,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [x] T06 Result screen renders exactly one resolved scan [T03 · M]
 - [x] T07 Home, History and Map use `openScan`; legacy providers removed [T06 · M]
 - [x] T08 Feedback highlight updates; History no-feedback label [T06 · S]
-- [ ] **Checkpoint 1:** release APK on a real phone — GPS pin, Groq advice, correct scan from History/Map
+- [~] **Checkpoint 1:** device run done 2026-09-23; app launches, but fonts crashed offline (T57) and the run had no API keys (needs `--dart-define-from-file=.env.json`)
 
 ## Phase 2: Diagnosis correctness
 - [ ] T09 Bilinear preprocessing with Dart↔Python parity test [T01 · M]
@@ -30,6 +30,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [x] T13 OCR parser fixes (dates, varieties, batch numbers) with shared fixtures [— · M]
 - [x] T14 Python extractor parity, `--image` CLI, Tesseract check [T13 · S]
 - [x] T56 OCR deskew no longer rotates labels 90° (found in T14) [T14 · S]
+- [x] T57 Bundle DM Sans so fonts never fetch at runtime (found on device) [— · S]
 - [ ] T15 One threshold set; urgency uses confidence and trend [T06 · M]
 - [ ] T16 Farm stats by `class_id`; Home = Dashboard; empty state; local-day buckets [T03 · M]
 - [ ] T17 Local time display helper [T16 · M]
@@ -96,4 +97,4 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
--
+- T57: fonts are bundled; the app no longer downloads DM Sans at runtime (affects any 'works offline' claim in README/papers).

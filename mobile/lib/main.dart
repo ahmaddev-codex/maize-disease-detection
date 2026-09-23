@@ -4,11 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'config/app_env.dart';
+import 'design_system/tokens/app_typography.dart';
 import 'services/database_service.dart';
 import 'services/path_resolver.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Fonts ship with the app; never fetch them over the network.
+  AppTypography.configureBundledFonts();
 
   // Configure the iOS AVAudioSession to playback + mixWithOthers so that
   // audioplayers and flutter_tts can coexist. audioplayers_darwin registers
