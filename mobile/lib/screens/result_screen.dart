@@ -31,6 +31,7 @@ enum AudioSection {
 class _ResultScreenState extends ConsumerState<ResultScreen> {
   // Scan whose advice and audio state this screen currently holds
   int? _renderedScanId;
+  String? _renderedLanguage;
 
   // AI Agronomic Advice (Groq Frontier Model)
   String? _aiAdvice;
@@ -344,8 +345,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     ClassificationResult result,
     String? variety,
     String? groqKey,
-    String language,
-  ) async {
+    String language, {
+    int? scanId,
+  }) async {
     setState(() {
       _loadingAi = true;
       _aiError = null;
@@ -359,9 +361,21 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         apiKey: groqKey,
         language: language,
       );
+      final text = AiAdvisor.sanitizeAiText(advice.text);
+      // Kept with the scan: reopening it should cost neither a request nor a
+      // fresh speech file (T24).
+      if (scanId != null) {
+        await ref.read(databaseServiceProvider).saveAdvice(
+              scanId,
+              advice: text,
+              language: language,
+              source: advice.source,
+              model: advice.model,
+            );
+      }
       if (mounted) {
         setState(() {
-          _aiAdvice = AiAdvisor.sanitizeAiText(advice);
+          _aiAdvice = text;
           _loadingAi = false;
         });
       }
@@ -418,13 +432,16 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       );
     }
 
-    // Advice and audio state belong to one scan; start fresh when it changes.
-    if (record.id != _renderedScanId) {
+    // Advice and audio state belong to one scan in one language; start fresh
+    // when either changes, and reuse advice already saved for that pair (T24).
+    if (record.id != _renderedScanId || lang.label != _renderedLanguage) {
+      final scanChanged = record.id != _renderedScanId;
       _renderedScanId = record.id;
-      _aiAdvice = null;
+      _renderedLanguage = lang.label;
+      _aiAdvice = record.adviceFor(lang.label);
       _aiError = null;
       _loadingAi = false;
-      _hasAutoPlayed = false;
+      if (scanChanged) _hasAutoPlayed = false;
     }
 
     final ClassificationResult result = record.toResult();
@@ -461,7 +478,8 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     if (_aiAdvice == null && !_loadingAi && _aiError == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _aiAdvice == null && !_loadingAi && _aiError == null) {
-          _fetchGroqAdvice(result, cropVariety, groqKey, lang.label);
+          _fetchGroqAdvice(result, cropVariety, groqKey, lang.label,
+              scanId: currentScanId);
         }
       });
     }
@@ -956,6 +974,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                                 cropVariety,
                                 groqKey,
                                 lang.label,
+                                scanId: currentScanId,
                               ),
                               icon: const Icon(Icons.refresh_rounded, size: 16),
                               label: const Text('Regenerate Advice'),

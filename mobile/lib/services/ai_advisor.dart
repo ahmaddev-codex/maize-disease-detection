@@ -3,6 +3,19 @@ import 'package:http/http.dart' as http;
 import '../config/app_env.dart';
 import '../constants/diseases.dart';
 
+/// Advice plus where it came from. The screen stores the provenance with the
+/// scan, so "offline mode" text is never replayed as if Groq had answered (T24).
+class AdviceResponse {
+  const AdviceResponse({required this.text, required this.source, this.model});
+
+  /// 'groq' when a model answered, 'offline' for the built-in rules.
+  final String source;
+  final String text;
+  final String? model;
+
+  bool get isOffline => source == 'offline';
+}
+
 class AiAdvisor {
   static final AiAdvisor instance = AiAdvisor._();
   AiAdvisor._();
@@ -87,7 +100,7 @@ $englishContent
 
   /// Generates agronomic advice using Groq (openai/gpt-oss-120b).
   /// Falls back seamlessly to built-in offline clinical rules if network or key fails.
-  Future<String> getAdvice({
+  Future<AdviceResponse> getAdvice({
     required int classId,
     required double confidence,
     required String? cropVariety,
@@ -103,15 +116,22 @@ $englishContent
     if (key.isNotEmpty) {
       try {
         final response = await _callGroq(prompt, key);
-        if (response.trim().isNotEmpty) {
-          return sanitizeAiText(response);
+        if (response.text.trim().isNotEmpty) {
+          return AdviceResponse(
+            text: sanitizeAiText(response.text),
+            source: 'groq',
+            model: response.model,
+          );
         }
       } catch (_) {
         // Fall back to offline rule-based recommendation
       }
     }
 
-    return sanitizeAiText(_buildOfflineAdvice(classId, confidence, cropVariety, language));
+    return AdviceResponse(
+      text: sanitizeAiText(_buildOfflineAdvice(classId, confidence, cropVariety, language)),
+      source: 'offline',
+    );
   }
 
   /// Translates result text into [language] via Groq.
@@ -130,8 +150,8 @@ $englishContent
       try {
         final prompt = _translatePrompt(language, englishContent);
         final response = await _callGroq(prompt, key);
-        if (response.trim().isNotEmpty) {
-          return sanitizeAiText(response);
+        if (response.text.trim().isNotEmpty) {
+          return sanitizeAiText(response.text);
         }
       } catch (_) {
         // Return original if translation service fails
@@ -141,7 +161,7 @@ $englishContent
     return sanitizeAiText(englishContent);
   }
 
-  Future<String> _callGroq(String prompt, String apiKey) async {
+  Future<({String text, String model})> _callGroq(String prompt, String apiKey) async {
     final candidateModels = <String>[
       AppEnv.groqModel,
       if (AppEnv.groqModel != 'openai/gpt-oss-120b') 'openai/gpt-oss-120b',
@@ -183,7 +203,7 @@ $englishContent
             text = choice?['message']?['reasoning'] as String?;
           }
           if (text != null && text.trim().isNotEmpty) {
-            return sanitizeAiText(text);
+            return (text: sanitizeAiText(text), model: model);
           }
         }
 

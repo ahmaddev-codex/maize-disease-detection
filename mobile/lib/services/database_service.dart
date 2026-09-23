@@ -19,7 +19,7 @@ class DatabaseService {
     final dbPath = path ?? join(await getDatabasesPath(), 'maizeguard.db');
     _db = await openDatabase(
       dbPath,
-      version: 2,
+      version: 3,
       onCreate: (db, _) async {
         await db.execute('''
           CREATE TABLE scan_records (
@@ -38,15 +38,32 @@ class DatabaseService {
             planting_date TEXT,
             scanned_at    TEXT NOT NULL,
             notes         TEXT,
-            feedback      INTEGER
+            feedback      INTEGER,
+            ai_advice     TEXT,
+            ai_language   TEXT,
+            ai_source     TEXT,
+            ai_model      TEXT,
+            ai_created_at TEXT
           )
         ''');
         await db.execute('CREATE INDEX idx_scanned_at ON scan_records(scanned_at DESC)');
         await db.execute('CREATE INDEX idx_class_id ON scan_records(class_id)');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
+        // Additive only: existing scans keep every value they had.
         if (oldVersion < 2) {
           await db.execute('ALTER TABLE scan_records ADD COLUMN feedback INTEGER');
+        }
+        if (oldVersion < 3) {
+          for (final column in const [
+            'ai_advice TEXT',
+            'ai_language TEXT',
+            'ai_source TEXT',
+            'ai_model TEXT',
+            'ai_created_at TEXT',
+          ]) {
+            await db.execute('ALTER TABLE scan_records ADD COLUMN $column');
+          }
         }
       },
     );
@@ -130,6 +147,30 @@ class DatabaseService {
     await _database.update(
       'scan_records',
       {'feedback': feedback},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Stores the advice shown for a scan, with where it came from, so
+  /// reopening the scan costs neither a request nor a fresh speech file (T24).
+  Future<void> saveAdvice(
+    int id, {
+    required String advice,
+    required String language,
+    required String source,
+    String? model,
+    DateTime? createdAt,
+  }) async {
+    await _database.update(
+      'scan_records',
+      {
+        'ai_advice': advice,
+        'ai_language': language,
+        'ai_source': source,
+        'ai_model': model,
+        'ai_created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );

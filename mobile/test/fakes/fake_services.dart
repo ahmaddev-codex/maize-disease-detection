@@ -28,6 +28,31 @@ class FakeDatabaseService implements DatabaseService {
     if (record != null) records[id] = record.copyWith(feedback: feedback);
   }
 
+  /// Advice writes, recorded so tests can assert what was stored (T24).
+  final List<({int id, String language, String source})> adviceWrites = [];
+
+  @override
+  Future<void> saveAdvice(
+    int id, {
+    required String advice,
+    required String language,
+    required String source,
+    String? model,
+    DateTime? createdAt,
+  }) async {
+    adviceWrites.add((id: id, language: language, source: source));
+    final record = records[id];
+    if (record != null) {
+      records[id] = record.copyWith(
+        aiAdvice: advice,
+        aiLanguage: language,
+        aiSource: source,
+        aiModel: model,
+        aiCreatedAt: createdAt ?? DateTime.now().toUtc(),
+      );
+    }
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -37,7 +62,7 @@ class FakeAiAdvisor implements AiAdvisor {
   final List<({int classId, String? cropVariety})> calls = [];
 
   @override
-  Future<String> getAdvice({
+  Future<AdviceResponse> getAdvice({
     required int classId,
     required double confidence,
     required String? cropVariety,
@@ -45,7 +70,11 @@ class FakeAiAdvisor implements AiAdvisor {
     String language = 'English',
   }) async {
     calls.add((classId: classId, cropVariety: cropVariety));
-    return 'Advice for class $classId';
+    return AdviceResponse(
+      text: 'Advice for class $classId',
+      source: 'groq',
+      model: 'fake-model',
+    );
   }
 
   @override
