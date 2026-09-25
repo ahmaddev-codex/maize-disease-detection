@@ -4,7 +4,9 @@
 
 All Python training experiments were conducted on a machine with a CUDA-enabled NVIDIA GPU with a minimum of 8 GB VRAM. The software environment comprised TensorFlow >=2.13, Keras 3, and Python 3.11. Training runs were orchestrated via the `run_all.sh` shell script, which supports both a quick three-epoch sanity run and a full production training run.
 
-Flutter application testing was conducted on an iPhone 17 Pro simulator (iOS 26.2) and on Android hardware (API level 33), using Flutter with Dart SDK 3.3.0. Inference latency measurements were captured from the `latencyMs` field of the `ClassificationResult` object, which wraps a Dart `Stopwatch` around the `ClassifierService.classify()` call.
+Flutter application testing was conducted on an iPhone 17 Pro simulator (iOS 26.2) and on Android hardware (API level 33), using Flutter with Dart SDK 3.3.0. The `latencyMs` field of `ClassificationResult` times the model call alone — preprocessing and inference each run on their own isolate, and capture, file I/O and rendering are outside the measurement. No systematic latency benchmark across devices has been run, so this chapter reports no device latency figure; the benchmark is listed as outstanding work in Chapter 5.
+
+Every accuracy figure below is produced by `src/phase4_edge/evaluate_tflite.py` on the held-out test split and recorded, with the sha256 of the model that produced it, in `models/exports/metrics.json`. Section 4.8 maps each claim to the artefact that supports it.
 
 ## 4.2 Phase 1: CNN Classifier Performance
 
@@ -15,68 +17,79 @@ The quick-run configuration validates the training pipeline — confirming that 
 - Test Accuracy: 27.8%
 - Test Loss: 1.34 (sparse categorical crossentropy)
 
-This result is consistent with random head initialisation and confirms the pipeline is functional without incurring full training cost.
+This result is consistent with random head initialisation and confirms the pipeline is functional without incurring full training cost. It is a pipeline check, not a model result: the figures reported in 4.2.2 come from the full 50-epoch configuration, and the two must not be read as a progression.
 
 ### 4.2.2 Full Training Results (20+30 Epochs)
 
-The full training configuration targets production-quality accuracy consistent with EfficientNet performance on comparable PlantVillage benchmarks:
+The full configuration trains for 50 epochs in two stages (20 with the backbone frozen, 30 fine-tuning). The targets set in Chapter 1 were ≥90% test accuracy and ≥0.88 per-class F1.
 
-- Target Test Accuracy: ≥90.0%
-- Target per-class F1: ≥0.88 (all classes)
+The shipped models are exported from the resulting checkpoint (`models/checkpoints/phase1_stage2_best.keras`) and measured on the held-out test split of 628 images:
 
-Training and validation accuracy curves show convergence over 50 epochs (20 Stage 1 + 30 Stage 2). The confusion matrix on the test set demonstrates strong classification performance across all four classes. The GLS column is the primary source of false negatives, consistent with published findings on GLS under field conditions where early-stage lesions visually overlap with NCLB (Ramcharan et al., 2017).
+| Model | Test accuracy | NCLB F1 | Rust F1 | GLS F1 | Healthy F1 |
+|---|---|---|---|---|---|
+| FP16 TFLite | **93.15%** | 0.889 | 0.972 | 0.786 | 1.000 |
+| INT8 TFLite | 87.74% | 0.783 | 0.947 | 0.678 | 0.989 |
+
+The accuracy target is met by the FP16 export and missed by INT8. The per-class F1 target is met for Rust and Healthy under both, and missed for GLS under both — 0.786 at best. GLS is the primary source of false negatives, consistent with published findings where early-stage GLS lesions visually overlap with NCLB (Ramcharan et al., 2017), and it is also the least represented class in the training set. A GLS result from this system therefore warrants more caution than the headline accuracy suggests.
+
+These figures are measured on PlantVillage photographs, which are captured under controlled conditions. They say nothing about accuracy in a Nigerian field, and no field test set has been assembled (Chapter 5).
 
 ### 4.2.3 Class Imbalance Handling
 
-The GLS class (574 training images against 1,306 for Rust) required explicit imbalance handling. Per-class weights derived from scikit-learn's balanced strategy ensured that misclassifying a GLS leaf incurred a proportionally higher loss contribution than misclassifying a Rust leaf. Post-training confusion matrix analysis confirmed that GLS recall improved substantially compared to an unweighted baseline.
+The GLS class (573 training images against 1,306 for Rust, after the duplicate exclusions described below) required explicit imbalance handling. Per-class weights derived from scikit-learn's balanced strategy ensured that misclassifying a GLS leaf incurred a proportionally higher loss contribution than misclassifying a Rust leaf. Post-training confusion matrix analysis confirmed that GLS recall improved compared to an unweighted baseline, though GLS remains the weakest class at 0.786 F1 under FP16.
+
+**Duplicate exclusions.** Hashing the dataset found two pairs of byte-identical images filed under conflicting labels (Blight and Gray Leaf Spot). One label in each pair must be wrong, so one copy of each pair was excluded — after inspecting both images — and recorded with its reason in `data/annotations/exclusions.csv`. The label build refuses to write a set in which a byte-identical image still carries two labels. This changed the dataset from 4,188 to 4,186 images and, because the stratified split is drawn from that set, the split itself; all figures in this chapter come from the post-exclusion split.
 
 ## 4.3 Phase 3: Multimodal Fusion Results
 
-The fusion model augments CNN predictions with OCR-extracted crop variety information. For scans where variety was captured, the fusion model achieves an accuracy gain of approximately +5–8 percentage points over the CNN-only baseline:
+The fusion model augments CNN predictions with OCR-extracted crop variety information. **No accuracy gain is claimed for it here, because none has been measured on real data.**
 
-| Configuration | Test Accuracy |
-|---------------|---------------|
-| CNN-only (full training target) | ~90.0% |
-| Fusion model | ~95.8% (+5.8 pp) |
-| Quick run (3 epochs, fusion head only) | 42.3% |
+No public dataset pairs a leaf photograph with the variety, batch and planting date of that same plant. The metadata used to train the fusion model is therefore generated, and every row of `labels_with_metadata.csv` is flagged `synthetic=1` by the script that writes it. A gain measured under those conditions would not be evidence that variety metadata helps a diagnosis; it would more likely indicate that the extra parameters, or leakage in the split, had been rewarded.
 
-The improvement is most pronounced for NCLB and GLS, where variety-specific susceptibility data from IITA Nigeria provides a strong prior that resolves visually ambiguous early-stage lesion classifications.
+What can be measured is whether the metadata carries anything at all. `src/phase3_fusion/ablation.py` trains three arms on one split:
+
+| Arm | Metadata vector |
+|---|---|
+| `cnn_only` | all zeros — the branch carries nothing |
+| `fusion` | each image's own vector |
+| `fusion_shuffled` | the same vectors, permuted across images |
+
+The shuffled arm preserves every marginal distribution and destroys only the pairing between an image and its metadata. Fusion must beat *that* arm by more than the run-to-run noise band to count as signal; beating `cnn_only` alone would show only that the additional parameters helped. The result is recorded under `fusion_ablation` in `models/exports/metrics.json`, together with the flag stating that the metadata was synthetic.
+
+The architectural motivation stands — variety-specific susceptibility is real agronomy — but it remains motivation until a paired dataset exists (ADR-002).
 
 ## 4.4 Phase 4: Edge Deployment Benchmarks
 
 ### 4.4.1 Model Size and Compression
 
-| Format | Size | Compression Ratio |
-|--------|------|-------------------|
-| Original Keras model (.keras) | ~47 MB | — |
-| FP16 TFLite | ~23 MB | 2.0× |
-| INT8 TFLite | ~13 MB | 3.6× |
+| Format | Size | Ratio to source |
+|--------|------|-----------------|
+| Source checkpoint (`phase1_stage2_best.keras`) | 140.4 MB | — |
+| FP16 TFLite | 23.3 MB | 6.0× |
+| INT8 TFLite | 13.5 MB | 10.4× |
 
-Both artefacts are bundled within the Flutter application binary. Inference is available offline immediately on first launch, with no download step required.
+Both artefacts are bundled in the application, so inference works on first launch with no download. Both are exported from the same checkpoint, and `metrics.json` records each export's sha256 alongside the sha256 of that checkpoint; re-running the FP16 conversion reproduced the shipped file byte for byte, which is what establishes the link.
+
+The bundled models are also the main contributor to an APK of 148.4 MB, against a stated target of 80 MB (NFR-23). That target is currently missed and is tracked as outstanding work.
 
 ### 4.4.2 Inference Latency
 
 Latency measured as wall-clock time from `interpreter.run()` to output tensor retrieval, excluding image decoding and preprocessing:
 
-| Platform | Quantisation | Latency |
-|----------|-------------|---------|
-| Android mid-range (ARM) | INT8 | ~850 ms |
-| iOS simulator (Apple Silicon host) | INT8 | ~120 ms |
-| Raspberry Pi 4 (ARM Cortex-A72) | INT8 | <2,000 ms |
-| Raspberry Pi 4 | FP16 | ~3,500 ms |
+No device benchmark has been run, so no latency table is given. The application records the model call time for each scan in its database, and inference and preprocessing each run off the UI thread, but a systematic measurement across representative Android hardware — which is what NFR-01 asks for — remains outstanding. Claiming a figure here without that measurement is precisely the practice this chapter is trying to avoid.
 
-INT8 quantisation provides approximately 2–4× latency improvement over FP16 on ARM hardware, consistent with expected INT8 acceleration via ARM NEON SIMD. All Android and iOS results fall below the two-second target from the research objectives.
+The expectation from the literature is that INT8 is faster than FP16 on ARM through NEON acceleration; whether that holds for this model on the target devices, and whether either meets the two-second objective, is unknown until measured.
 
 ### 4.4.3 Accuracy Degradation from Quantisation
 
-Post-training INT8 quantisation with a 200-image calibration set introduces less than 1% accuracy degradation relative to the full-precision baseline:
+Post-training INT8 quantisation uses a 200-image calibration set drawn from the **training split only**. An earlier version sampled the whole label file, which included the test images the model is then scored against; that made the INT8 figure flattering and is corrected here.
 
-| Model | Test Accuracy |
-|-------|---------------|
-| Float32 (Keras) | ~90.0% |
-| INT8 TFLite | ~89.2% |
+| Model | Test accuracy | Size |
+|-------|---------------|------|
+| FP16 TFLite | 93.15% | 23.3 MB |
+| INT8 TFLite | 87.74% | 13.5 MB |
 
-This degradation is within the accepted tolerance for production deployment, given the 3.6× size and latency benefits.
+The cost of INT8 is 5.4 accuracy points, not "less than 1%", and it falls hardest on the weakest class (GLS F1 0.786 → 0.678). Saving 9.8 MB does not justify that on a disease the system already struggles with, so the application loads FP16 first and falls back to INT8 only if FP16 cannot be loaded (ADR-001).
 
 ## 4.5 Application Functional Evaluation
 
@@ -304,12 +317,41 @@ MaizeGuard implements a dual-mode theme based on GitHub Primer colour tokens. Th
 | Lebrini & Gotor | 2024 | AI + remote sensing | Multiple | ~91% | No | No | Partial | No | No | No |
 | Mamat et al. | 2022 | CNN + annotation review | Multiple | ~93% | Partial | No | Lab only | No | No | No |
 | Upadhyay et al. | 2025 | DL + CV review | Multiple | ~95% | Partial | Partial | Lab only | No | No | No |
-| **MaizeGuard** | **2025** | **EfficientNetB3 + OCR fusion (TFLite)** | **Maize** | **95.8%** | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** | **Yes — Yoruba, Igbo, Hausa (YarnGPT)** |
+| **MaizeGuard** | **2026** | **EfficientNetB3 (TFLite FP16)** | **Maize** | **93.15% (PlantVillage test split; no field measurement)** | **Yes** | **Yes** | **No — lab only** | **Yes** | **Diagnosis yes; advice needs a network** | **Yes — Yoruba, Igbo, Hausa (YarnGPT)** |
 
-Studies reporting the highest accuracy figures evaluate systems on different crops under controlled conditions and none incorporates seed label metadata or offline operation. Direct cross-study accuracy comparisons are unreliable because the underlying classification tasks differ in crop, disease set, image source, and number of classes. MaizeGuard achieves 95.8% on the PlantVillage maize benchmark — the same dataset used in prior maize-specific studies — while satisfying all five original capability criteria and additionally delivering a four-language advisory system with authentic Nigerian-language TTS that no existing published system provides. No existing published system for maize disease detection combines edge deployment, field validation, OCR-based metadata integration, offline operation, and Nigerian-language voice output in a single platform designed specifically for smallholder agriculture.
+Studies reporting the highest accuracy figures evaluate systems on different crops under controlled conditions, and none incorporates seed label metadata or offline operation. Direct cross-study accuracy comparisons are unreliable because the underlying classification tasks differ in crop, disease set, image source, and number of classes; the column is included for orientation, not as a ranking.
+
+MaizeGuard reaches 93.15% on the PlantVillage maize test split — the same dataset used in prior maize-specific studies — and delivers a four-language advisory system with Nigerian-language speech that the compared systems do not. Two qualifications belong with that claim. The figure is a laboratory one: this system has not been validated in the field, so the "field validation" capability is not claimed for it. And the accuracy is the FP16 export's; the INT8 model that the size comparison implies scores 87.74%.
 
 ## 4.8 Summary of Results
 
 The EfficientNetB3 CNN reaches 93.15% on the held-out PlantVillage test split (628 images) in its FP16 export, with two-stage transfer learning and class-weighted training. INT8 quantisation takes the model from 23.3 MB to 13.5 MB at a cost of 5.4 accuracy points (87.74%), which is why the application loads FP16 first and treats INT8 as a fallback rather than the default. Per-class F1 under FP16 is 1.00 for Healthy, 0.97 for Rust, 0.89 for NCLB and 0.79 for GLS; every figure here is produced by `src/phase4_edge/evaluate_tflite.py` and recorded with the model hashes in `models/exports/metrics.json`. On-device latency and end-to-end scan time have not been benchmarked, so neither is claimed. The multimodal fusion model is reported through its ablation rather than as an accuracy gain (Section 5.1.2). The application runs diagnosis, GPS-tagged disease mapping, filterable scan history and built-in agronomic recommendations without connectivity, and adds a generated advisory — from a single provider, with its source always shown — when the farmer has supplied a key and has a connection.
 
-Beyond the core diagnostic pipeline, the application implements a four-language support system (English, Yoruba, Igbo, Hausa) with AI advice generated directly in the farmer's chosen language and authentic Nigerian-language text-to-speech via the YarnGPT API. The unified result screen consolidates diagnosis, on-device recommendations, AI advisory, confidence gate, and scan feedback prompt into a single scrollable view. A confidence gate alerts farmers when model confidence falls below 60%, and a scan feedback loop collects correctness assessments to support future model improvement. OCR-extracted seed label fields are presented in editable text fields, allowing farmers to correct recognition errors before they propagate to the scan record.
+Beyond the core diagnostic pipeline, the application implements a four-language support system (English, Yoruba, Igbo, Hausa) with advice generated directly in the farmer's chosen language and Nigerian-language text-to-speech via the YarnGPT API, falling back to whatever voice the device itself has installed. The unified result screen consolidates diagnosis, built-in recommendations, the generated advisory with its source, the confidence gate and the feedback prompt into a single scrollable view. The confidence gate triggers below 0.60 and offers an immediate retake, and a feedback loop collects correctness assessments to support future model improvement. OCR-extracted seed label fields are presented in editable text fields, allowing farmers to correct recognition errors before they reach the scan record.
+
+## 4.9 Claim-to-Artifact Table
+
+Every numeric or capability claim in the abstract and in this chapter is listed here with the artefact that produces it. A claim with no artefact is marked as not measured, and is written as such wherever it appears.
+
+| Claim | Value | Artefact | How to reproduce |
+|---|---|---|---|
+| FP16 test accuracy | 93.15% | `models/exports/metrics.json` → `models["efficientnetb3_maize_fp16.tflite"]["python"]` | `python -m src.phase4_edge.evaluate_tflite --model models/exports/efficientnetb3_maize_fp16.tflite --mode python app` |
+| INT8 test accuracy | 87.74% | same file, INT8 entry | as above with the INT8 model |
+| Per-class F1 (both models) | see 4.2.2 | `per_class` in each entry | as above |
+| Test split size | 628 images | `dataset.split_sizes` in `metrics.json` | `split_dataframe(load_labels_csv(...))` |
+| Dataset size after exclusions | 4,186 images | `data/annotations/labels.csv`, `exclusions.csv` | `python -m src.phase1_cnn.build_labels --check-duplicates` |
+| Conflicting duplicate pairs | 2 (resolved) | `dataset.duplicates` in `metrics.json` | as above |
+| FP16 / INT8 file sizes | 23.3 MB / 13.5 MB | the files in `models/exports/` | `ls -l models/exports/*.tflite` |
+| Source checkpoint size | 140.4 MB | `models/checkpoints/phase1_stage2_best.keras` | `ls -l` |
+| Export provenance (tflite ↔ keras sha256) | recorded | `export.source_keras` in `metrics.json` | `python -m src.phase4_edge.convert_tflite --model models/checkpoints/phase1_stage2_best.keras` |
+| INT8 calibration set | 200 images, training split only | `export.calibration` in `metrics.json` | as above |
+| Release APK size | 148.4 MB (target 80 MB, not met) | `aapt2 dump badging` on the release APK | `flutter build apk --release` then `aapt2 dump badging` |
+| Minimum Android API | 24 | the built APK's manifest | `aapt2 dump badging …` |
+| Fusion accuracy gain | **not claimed** — ablation only | `fusion_ablation` in `metrics.json` | `python -m src.phase3_fusion.ablation --epochs 3` |
+| Fusion metadata provenance | synthetic | `synthetic` column in `labels_with_metadata.csv` | `python -m src.phase1_cnn.build_labels` |
+| On-device inference latency | **not measured** | — | outstanding (Chapter 5) |
+| End-to-end scan time | **not measured** | — | outstanding (Chapter 5) |
+| Field-condition accuracy | **not measured** | — | requires a field test set (Chapter 5) |
+| OCR field-extraction accuracy | **not measured on real labels** | `tests/fixtures/ocr_cases.json` covers parsing only | outstanding (Chapter 5) |
+| Advice source shown to the farmer | always | `mobile/test/advice_cache_test.dart` | `flutter test` |
+| Advice reused on reopening (no second request) | yes | same test file | `flutter test` |

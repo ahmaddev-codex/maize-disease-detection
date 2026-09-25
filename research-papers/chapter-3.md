@@ -102,7 +102,7 @@ After OCR, a rule-based extraction layer — shared between the application and 
 - **Batch Number**: Regular expressions for patterns including `BN-YYYY-NNN`, `BATCH NO: ...`, and `LOT #...`.
 - **Planting Date**: Multi-format date parsing for DD/MM/YYYY, YYYY-MM-DD, and textual formats such as "15 March 2024".
 
-The extracted fields are encoded into a 24-dimensional metadata vector for fusion with CNN features in Phase 3:
+The extracted fields are encoded into a 17-dimensional metadata vector (`METADATA_DIM = NUM_VARIETIES + 4`) for fusion with CNN features in Phase 3:
 
 - Indices 0–12: One-hot encoding of known variety (13 classes)
 - Index 13: Binary flag — batch number present
@@ -114,14 +114,14 @@ On macOS — where ML Kit is not available — the application presents a manual
 
 ### 3.3.4 Phase 3: Multimodal Fusion
 
-The fusion model combines the 256-dimensional feature vector from the CNN's penultimate Dense layer with the 24-dimensional OCR metadata vector using late fusion:
+The fusion model combines the 256-dimensional feature vector from the CNN's penultimate Dense layer with the 17-dimensional OCR metadata vector using late fusion:
 
 ```
 CNN Branch (frozen):
   EfficientNetB3 → Dense(256) → 256-d feature vector
 
 OCR Branch:
-  24-d input → Dense(32, ReLU) → BatchNormalization → 32-d vector
+  17-d input → Dense(32, ReLU) → BatchNormalization → 32-d vector
 
 Fusion Head:
   Concatenate(288-d) → Dense(128, ReLU) → Dropout(0.3) → Dense(4, Softmax)
@@ -154,7 +154,7 @@ Concretely, this meant that the CNN classifier (Phase 1) was trained and evaluat
 | Iteration | Phase | Primary Input | Deliverable |
 |-----------|-------|---------------|-------------|
 | 1 | CNN Classifier | PlantVillage dataset (4,188 images) | Trained EfficientNetB3 `.keras` model |
-| 2 | OCR Subsystem | Seed label photographs | 24-d metadata vector extractor |
+| 2 | OCR Subsystem | Seed label photographs | 17-d metadata vector extractor |
 | 3 | Multimodal Fusion | CNN features + OCR vector | Fused classification model |
 | 4 | Edge Deployment | Trained Keras model | INT8 TFLite artefact (~13 MB) |
 | 5 | Mobile Application | TFLite model, OCR engine, GPS APIs | Flutter Android/iOS application |

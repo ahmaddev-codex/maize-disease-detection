@@ -93,11 +93,13 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 ## Phase 8: Hardening
 - [x] T47 Remove dead code and legacy aliases [Phase 4 · S] — the colors.dart → design-token migration stays deferred
 - [ ] T48 Critical-path integration test [Phases 1–4 · M]
-- [ ] T49 CI gate: analyze, test, pytest, secret scan, banned-claims grep [T48, T02 · S]
+- [x] T49 CI gate: analyze, test, pytest, secret scan, banned-claims grep [T48, T02 · S] — workflow written and the claims gate runs clean locally; a green PR run still needs pushing
 - [ ] **Checkpoint 8:** CI green; release checklist on real devices; final review
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T43: chapter 4 reports measured numbers only — FP16 93.15% / INT8 87.74% with per-class F1, real file sizes, the calibration-leak correction, the duplicate exclusions and the split change — and marks device latency, field accuracy and OCR accuracy as not measured. The comparison-table row no longer claims field validation. A new §4.9 maps every claim to the artefact that produces it and the command that reproduces it. The 3-epoch pipeline check is explicitly separated from the 50-epoch results, which removes the "27.8% then convergence" contradiction.
+- T49: `scripts/check_claims.sh` gates the banned claims, the unsupported figures, stale platform references, committed API keys and the single class-name source; `.github/workflows/ci.yml` runs Flutter analyze/test, pytest and that script.
 - T47: the `geminiKeyProvider` alias, the `/recommendation` route, the unused `widgets/ds.dart` re-export shim and the duplicate `promptName` are gone, and the remaining `classId == 3` literals now use `kHealthyClassId`.
 - T46: REQUIREMENTS now states the Flutter stack, minSdk 24 and app id read from the built APK, the 17-d metadata layout, AdamW with sparse categorical cross-entropy, `Rescaling(1/255)`, and the advisory requirements as built (source always shown, no dose, healthy and low-confidence branches). NFR-01 is marked not-yet-measured, NFR-22 needs restating now that FP16 is primary, and NFR-23 is marked not met (148.4 MB vs 80 MB, T58). DIAGRAMS follows. PLAN.md is marked historical and points at `tasks/plan.md`.
 - T45: README and SYSTEM describe the Flutter app that exists (the "moved to React Native, Flutter kept at deployment/app" note was false — that directory does not exist), Python 3.11, the 17-d metadata vector, Groq/YarnGPT keys, and `src.phase5_uav` commands rather than the deprecated `deployment.uav` shims. Running the documented commands found one that could not work as written (`python src/phase2_ocr/extractor.py` breaks the `src.` package import); it is now the module form.
