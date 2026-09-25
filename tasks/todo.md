@@ -92,12 +92,13 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Phase 8: Hardening
 - [x] T47 Remove dead code and legacy aliases [Phase 4 · S] — the colors.dart → design-token migration stays deferred
-- [ ] T48 Critical-path integration test [Phases 1–4 · M]
+- [x] T48 Critical-path integration test [Phases 1–4 · M] — written as a runnable widget/data test in `test/critical_path_test.dart`; the on-device `integration_test` run stays with the device checkpoints
 - [x] T49 CI gate: analyze, test, pytest, secret scan, banned-claims grep [T48, T02 · S] — workflow written and the claims gate runs clean locally; a green PR run still needs pushing
 - [ ] **Checkpoint 8:** CI green; release checklist on real devices; final review
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T48: `mobile/test/critical_path_test.dart` walks the seam between the pieces — a seed label scanned before a capture reaches storage with the scan, history lists and opens that scan, deleting it removes the row, the photo and the active-scan state, and the result screen shows the diagnosis, the seed card and the advice source (fetched once and stored). Real database work runs in a plain test and the screens run against the in-memory fake, because a real sqflite future never completes under `testWidgets`' clock.
 - T43: chapter 4 reports measured numbers only — FP16 93.15% / INT8 87.74% with per-class F1, real file sizes, the calibration-leak correction, the duplicate exclusions and the split change — and marks device latency, field accuracy and OCR accuracy as not measured. The comparison-table row no longer claims field validation. A new §4.9 maps every claim to the artefact that produces it and the command that reproduces it. The 3-epoch pipeline check is explicitly separated from the 50-epoch results, which removes the "27.8% then convergence" contradiction.
 - T49: `scripts/check_claims.sh` gates the banned claims, the unsupported figures, stale platform references, committed API keys and the single class-name source; `.github/workflows/ci.yml` runs Flutter analyze/test, pytest and that script.
 - T47: the `geminiKeyProvider` alias, the `/recommendation` route, the unused `widgets/ds.dart` re-export shim and the duplicate `promptName` are gone, and the remaining `classId == 3` literals now use `kHealthyClassId`.
