@@ -82,7 +82,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [~] **Checkpoint 6:** demo UAV pipeline gives a correct summary — run 2026-09-25: 45 patches, Rust dominant (53%), no coordinates invented, pytest 116 green; human review outstanding
 
 ## Phase 7: Notebooks, papers, docs
-- [ ] T41 Notebooks 1 and 4 use the real evaluation [T01, T11, T32 · S]
+- [x] T41 Notebooks 1 and 4 use the real evaluation [T01, T11, T32 · S] — both execute clean via nbconvert
 - [ ] T42 Notebooks 2, 3 and 5 re-run against fixed code [T14, T30, T31, T35, T38, T39 · M]
 - [x] T43 Papers: abstract and chapter 4 numbers backed by artifacts [T12, T31, T32, T41, T50, T51 · M] — lab numbers done with a claim-to-artifact table (§4.9); the field and OCR rows read "not measured" until T50/T51/T12
 - [x] T44 Papers: chapters 1, 3 and 5 describe the real system [T18, T24–T29, T39 · M] — per-section reviewer sign-off still outstanding
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T41: notebook 1 reads the recorded test-split results (accuracy, per-class F1, split sizes, remaining conflicting duplicates) instead of displaying a stored confusion-matrix PNG, and notebook 4 states the measured INT8 cost (5.4 points, most of it GLS) and separates this machine's interpreter timings from the device benchmark that has not been run. Both execute top to bottom.
 - T31: the fusion metadata is flagged `synthetic=1` at the point it is generated, and the ablation has been run on the full split: cnn_only 93.63%, fusion 93.79%, fusion_shuffled 93.63%. Fusion beats shuffled by 0.16 points — inside the noise band — so the metadata carries no signal, which is what invented values should produce. Chapters 4 and 5 and ADR-002 now quote those numbers instead of a +5.8-point gain.
 - T48: `mobile/test/critical_path_test.dart` walks the seam between the pieces — a seed label scanned before a capture reaches storage with the scan, history lists and opens that scan, deleting it removes the row, the photo and the active-scan state, and the result screen shows the diagnosis, the seed card and the advice source (fetched once and stored). Real database work runs in a plain test and the screens run against the in-memory fake, because a real sqflite future never completes under `testWidgets`' clock.
 - T43: chapter 4 reports measured numbers only — FP16 93.15% / INT8 87.74% with per-class F1, real file sizes, the calibration-leak correction, the duplicate exclusions and the split change — and marks device latency, field accuracy and OCR accuracy as not measured. The comparison-table row no longer claims field validation. A new §4.9 maps every claim to the artefact that produces it and the command that reproduces it. The 3-epoch pipeline check is explicitly separated from the 50-epoch results, which removes the "27.8% then convergence" contradiction.
