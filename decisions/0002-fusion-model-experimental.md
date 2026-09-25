@@ -36,3 +36,25 @@ Keep the fusion code, but label it experimental:
 ## Consequences
 - Papers describe fusion as an architecture plus ablation, not a performance gain.
 - The Phase 3 gate ("fusion ≥ CNN + 5%") no longer applies and must be removed from `run_all.sh` and REQUIREMENTS.
+
+## How the ablation decides (added with T31, 2026-09-25)
+`src/phase3_fusion/ablation.py` runs three arms on one split:
+
+| Arm | Metadata vector |
+|---|---|
+| `cnn_only` | all zeros — the branch carries nothing |
+| `fusion` | each image's own vector |
+| `fusion_shuffled` | the same vectors permuted across images |
+
+The shuffled arm keeps every marginal distribution and destroys only the
+pairing, so it is the arm that matters: **fusion must beat `fusion_shuffled`
+by more than the noise band (default 0.01) for the metadata to count as
+signal.** Beating `cnn_only` alone shows only that the extra parameters
+helped. The result is written to `models/exports/metrics.json` under
+`fusion_ablation`, carrying `metadata_is_synthetic` so no reader can mistake
+an architecture check for evidence about real farm data.
+
+Until a real paired dataset exists, a favourable ablation on synthetic
+metadata would itself be a red flag: invented values cannot carry signal about
+a disease, so a large gain would point at leakage in the split, not at
+multimodal learning.
