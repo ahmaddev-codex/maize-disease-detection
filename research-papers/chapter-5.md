@@ -8,17 +8,23 @@ The selection of EfficientNetB3 as the classification backbone was motivated by 
 
 The two-stage training protocol (frozen base with classification head training, followed by selective layer unfreezing) is well-suited to small agricultural datasets. Training the full network from a random weight initialisation on 2,932 labelled images would result in severe overfitting. By first training only the classification head and then selectively fine-tuning upper convolutional layers, the model adapts pretrained ImageNet representations to the domain-specific textures of fungal maize lesions while retaining the stable low-level feature detectors learned on millions of natural images.
 
-### 5.1.2 Multimodal Fusion Impact
+### 5.1.2 Multimodal Fusion: an Architecture, Not Yet a Result
 
-The integration of OCR-extracted seed variety metadata as a second input modality reflects the agronomic reality that disease susceptibility is strongly variety-dependent. SAMMAZ 15 and SAMMAZ 29 carry documented resistance to NCLB from the International Institute of Tropical Agriculture (IITA) Nigeria, while several hybrid varieties are highly susceptible to Common Rust. Incorporating this structured prior allows the fusion model to resolve low-confidence detections in a direction consistent with known pathology rather than treating all cultivars as equally susceptible.
+The fusion model is experimental (ADR-002). No public dataset pairs a leaf photograph with the variety, batch and planting date of that same plant, so the metadata used in training is generated — every row of `labels_with_metadata.csv` is flagged `synthetic=1` by the script that writes it. A model trained on invented metadata cannot demonstrate that metadata helps, and any accuracy gain it shows may come from the extra parameters alone.
+
+To keep that distinction testable rather than rhetorical, `src/phase3_fusion/ablation.py` runs three arms on one split: zeroed metadata, the real vectors, and the same vectors permuted across images. The shuffled arm preserves every marginal distribution and destroys only the pairing, so fusion must beat *that* arm by more than the run-to-run noise band for the metadata to count as signal; beating the zeroed arm alone shows only that the extra parameters helped. The result is recorded in `models/exports/metrics.json` under `fusion_ablation`, with the synthetic flag attached. This chapter therefore claims no fusion accuracy figure.
+
+The reasoning that motivates the architecture remains sound, and is stated as motivation rather than as a finding: disease susceptibility is strongly variety-dependent. SAMMAZ 15 and SAMMAZ 29 carry documented resistance to NCLB from the International Institute of Tropical Agriculture (IITA) Nigeria, while several hybrid varieties are highly susceptible to Common Rust. Incorporating this structured prior allows the fusion model to resolve low-confidence detections in a direction consistent with known pathology rather than treating all cultivars as equally susceptible.
 
 The late-fusion approach — concatenating encoded CNN features with encoded metadata at the penultimate layer — was chosen over early fusion because it allows each modality to be preprocessed and encoded independently before combination. It also makes the fusion model robust to missing metadata: when OCR yields no variety information, the variety branch emits a zero vector and the CNN branch's prediction carries full weight, with no degradation in the absence of seed label data.
 
 ### 5.1.3 On-Device vs. Cloud Recommendation
 
-The three-tier recommendation architecture reflects a deliberate engineering choice for deployment in rural Nigeria, where mobile internet connectivity is intermittent and data costs are significant relative to farmer incomes. The on-device `RecommendationEngine` provides actionable, locally relevant advice — Nigerian product brands, growing-season timing, FRAC resistance management codes — without any network dependency. Cloud providers offer richer contextual advice when connectivity permits, but are never a prerequisite for the application's core diagnostic functionality.
+The split between built-in and generated advice reflects a deliberate engineering choice for deployment in rural Nigeria, where mobile internet connectivity is intermittent and data costs are significant relative to farmer incomes. The on-device `RecommendationEngine` provides actionable, locally relevant advice — the chemical groups that control each disease, growing-season timing, resistance-management guidance — without any network dependency. A cloud model offers richer context when connectivity and a key permit, but is never a prerequisite for diagnosis.
 
-In release builds, advisory requests follow the chain: Gemini 2.0 Flash → Groq (`llama-3.3-70b-versatile`) → on-device engine. Groq serves as an automatic secondary cloud provider, inserted specifically to address the scenario where Gemini API rate limits or temporary outages would otherwise cause silent degradation to the on-device engine. With Groq in the chain, a single cloud provider outage is invisible to the farmer: the advisory simply arrives from the secondary provider, with no user interaction or error message. In debug builds, the chain is Groq → Ollama, keeping development traffic off Gemini quota entirely.
+Two constraints govern what either source may say. Neither states a dose: rate, pre-harvest interval and protective equipment are referred to the product label and to an extension officer, because a language model inventing a mixing ratio is a safety failure, not a helpful detail. And neither recommends a product outside the per-disease table of active ingredients; two products widely sold in Nigerian agro-dealer networks — a metalaxyl formulation and a copper formulation — control neither of these fungal pathogens, and both had been named in an earlier version of the prompts and of the Yoruba, Hausa and Igbo voice scripts.
+
+Advisory requests go to one provider, Groq, under a single deadline; when that is not possible the built-in rules answer. An earlier design chained several providers so that an outage would be invisible to the farmer, and that invisibility was the problem: a farmer could not tell whether the words on screen came from a model that had considered their variety and confidence or from a fixed table. The current design makes the source explicit on every result and keeps the generated text with the scan, so it neither changes on reopening nor costs a second request (ADR-003).
 
 This three-tier degradation model is consistent with offline-first design principles for agricultural ICT systems in low-resource environments, where assuming connectivity has consistently caused adoption failure in deployment. The full chain ensures that every scan produces the best available recommendation at that moment — cloud-enhanced when possible, on-device when necessary.
 
@@ -46,7 +52,17 @@ The `PathResolver` service addresses a mobile platform portability challenge tha
 
 4. **iOS Physical Device Testing:** The application was validated on an iPhone 17 Pro simulator (iOS 26.2) and a full iOS build passes codesigning checks. Testing on physical iPhone hardware and submitting to TestFlight for field distribution remained outside the scope of this project and represent a concrete next step toward App Store deployment.
 
-5. **Gemini API Key Requirement for Enhanced Recommendations:** AI-enhanced agronomic advice requires a Google Cloud API key, which involves account creation and may incur costs at scale. The on-device engine provides a fully functional free alternative, but the contextual depth of Gemini's responses is not fully replicable offline.
+5. **Laboratory data only, with no field measurement:** every accuracy figure in this work is measured on a held-out split of PlantVillage photographs. No field-condition test set has been assembled, so the field accuracy of this system is unknown rather than estimated. This is the single largest gap between what is measured and what a farmer would experience.
+
+6. **Gray Leaf Spot remains the weakest class:** under FP16, per-class F1 is 1.00 for Healthy and 0.97 for Rust against 0.79 for GLS (0.68 under INT8). A GLS diagnosis from this system deserves more caution than the headline accuracy implies, and targeted GLS collection remains the highest-value dataset work.
+
+7. **The fusion metadata is synthetic:** no paired dataset exists, so the multimodal extension is reported as an architecture with an ablation rather than as a gain (5.1.2).
+
+8. **The UAV pipeline applies a leaf model to aerial imagery:** the classifier was trained and measured on close-up photographs and has never been evaluated at altitude. The heatmap is a scouting aid for choosing where to walk, and is described as such in the README; treating it as a diagnosis of the plants it colours would be unsupported.
+
+9. **On-device latency has not been measured:** the application records model-only inference time per scan, but no benchmark across representative Android hardware has been run, so no device latency figure is claimed.
+
+10. **Generated advice requires the farmer's own API key:** the longer advisory requires a Groq key, which involves account creation and may incur costs at scale, and release builds ship without one (ADR-003). The built-in rules provide a free alternative that names the same chemistry, but not the same contextual depth; the result screen states which of the two produced the text on screen.
 
 ---
 
@@ -56,7 +72,7 @@ This work makes the following original contributions to the domain of precision 
 
 1. **End-to-end maize disease pipeline for Nigeria:** A complete training and deployment pipeline combining EfficientNetB3 transfer learning with OCR-based seed label metadata fusion, specifically designed and evaluated for Nigerian smallholder farming conditions — including disease classes, product recommendations, and growing-season logic relevant to that context.
 
-2. **Multimodal fusion architecture:** A late-fusion model (Phase 3) combining visual disease features with structured crop variety metadata to resolve low-confidence single-modality detections, with zero-vector robustness when metadata is unavailable.
+2. **Multimodal fusion architecture with an honest ablation:** a late-fusion model (Phase 3) combining visual disease features with structured crop variety metadata, with zero-vector robustness when metadata is unavailable — accompanied by a shuffled-metadata ablation that can distinguish signal from additional parameters, and reported without an accuracy claim until a paired dataset exists.
 
 3. **MaizeGuard Flutter application:** A cross-platform mobile application providing offline-first disease detection, GPS-tagged scan history, geospatial disease mapping, and AI-powered treatment recommendations. The application is built on a clean Riverpod state architecture (`flutter_riverpod ^2.5.1`) with a `ShellRoute` shell, four tabs, and six push routes, and runs on a single Dart codebase across Android and iOS.
 
@@ -64,7 +80,7 @@ This work makes the following original contributions to the domain of precision 
 
 5. **AppEnv — compile-time environment variable system:** A structured pattern for injecting environment-specific configuration (API keys, backend host, model name) at compile time via `--dart-define-from-file=.env.json`, keeping credentials out of source code while enabling debug/release backend switching without conditional logic at the call site.
 
-6. **Context-aware tiered recommendation engine with Groq fallback:** An on-device `RecommendationEngine` with Nigerian agro-dealer fungicide data, growing-season heuristics, FRAC code rotation guidance, trend analysis, and urgency classification — augmented by automatic Gemini 2.0 Flash API routing in release builds, with automatic Groq secondary fallback and final silent fallback to the on-device engine, ensuring uninterrupted advisory delivery regardless of cloud provider availability.
+6. **Context-aware recommendation engine with an optional generated advisory:** an on-device `RecommendationEngine` carrying the chemical groups that control each disease, growing-season heuristics, trend analysis and urgency classification — optionally augmented by a Groq advisory when the farmer has supplied a key and has a connection, with the source of the text always shown.
 
 7. **Language and translation system:** A four-language display system (English, Yoruba, Igbo, Hausa) in which AI advisory responses are generated directly in the farmer's chosen language via a language instruction appended to the cloud provider prompt, and on-device recommendation text can be translated on demand via `AiAdvisor.translateResult()`. Language preference is managed by `displayLanguageProvider` and persisted across application sessions.
 
@@ -111,7 +127,7 @@ This dissertation has presented MaizeGuard — a complete, multi-phase AI system
 - A late-fusion multimodal model combining visual and agronomic features
 - INT8 TFLite quantisation for edge deployment on mobile and single-board hardware
 - A cross-platform Flutter mobile application integrating all components with GPS-tagged scan history, geospatial disease mapping, and AI-powered agronomic recommendations
-- A three-tier AI advisory fallback chain (Gemini 2.0 Flash → Groq → on-device engine in release; Groq → Ollama in debug) ensuring uninterrupted advisory delivery regardless of cloud provider availability
+- A single-provider advisory (Groq) under one deadline, with built-in rules as the stated alternative and the source of every recommendation visible to the farmer
 - A four-language support system (English, Yoruba, Igbo, Hausa) with AI advice generated in the farmer's chosen language and authentic Nigerian-language text-to-speech via the YarnGPT API
 - A unified result screen consolidating diagnosis, recommendations, AI advice, language translation, confidence gate, and scan feedback into a single scrollable consultation view
 - A scan feedback loop and database schema v2 migration that collects farmer-reported correctness assessments to support future supervised model improvement

@@ -89,7 +89,7 @@ The complete scan workflow from camera capture to a fully rendered result was ti
 | Camera capture to ResultScreen (verdict card visible) | ~2.1 s |
 | AI advice section load (on-device engine fallback) | ~0.1 s |
 | AI advice section load (Groq cloud, network-dependent) | ~2.4 s |
-| AI advice section load (Gemini API, network-dependent) | ~3.8 s |
+| Generated advice, when a key and a connection are present (network-dependent) | not measured; bounded by a 20 s deadline |
 
 The complete consultation — verdict, on-device recommendations, and AI advice — is now presented on a single scrollable screen; no navigation to a separate screen is required after the initial result appears. AI advice loads in-place below the on-device recommendation sections once the cloud or on-device engine completes. Image preprocessing — decode, resize to 300 × 300, construct input tensor — contributes approximately 0.3 seconds to the initial screen render time. `ClassifierService.classify()` executes synchronously on the calling isolate; the `_ProcessingOverlay` provides visual feedback through this period and no user-perceptible frame drops were observed on Android API 33 during testing.
 
@@ -120,7 +120,11 @@ On-device recommendations were reviewed by an agronomist familiar with Nigerian 
 
 ### 4.5.5 Recommendation Quality — Cloud Advisory Chain
 
-The Gemini 2.0 Flash model consistently produced contextually appropriate responses with specific product brand mentions. The structured prompt format — numbered sections with ALL-CAPS headers — enabled reliable regex-based section extraction in over 94% of API calls tested. In the remaining 6%, the API returned unstructured prose; the application detected the parse failure and automatically retried the same prompt against the Groq secondary provider (`llama-3.3-70b-versatile`). If the Groq response was also unparseable or unavailable, the application fell back silently to the on-device engine's baseline recommendation. The three-tier chain (Gemini → Groq → on-device engine) ensures that the parse-failure case observed in 6% of Gemini calls does not result in degraded output for the farmer.
+Generated advice comes from one provider, Groq, and the application no longer parses it into sections: the response is displayed as plain text, which removes the class of failure in which a differently formatted reply silently lost content. The structured prompt still asks for numbered sections with plain capital headings, since that reads well aloud, but nothing depends on the model obeying it.
+
+The prompt itself branches on the diagnosis rather than asking for treatment steps unconditionally. A healthy leaf is asked for monitoring advice and told plainly that no fungicide is needed; a result below the low-confidence threshold is asked for retake guidance and names no chemical at all; a confident diagnosis may name only the active ingredients listed for that disease, and is instructed not to state a dose. Where the request cannot be made or produces nothing usable, the built-in rules answer under the same three branches, and the result screen says so.
+
+No figure is given here for how often responses are contextually appropriate: that would require a structured review by an agronomist against a fixed set of scans, which has not been carried out.
 
 ## 4.6 Mobile Application — MaizeGuard
 
@@ -159,7 +163,7 @@ The application uses `go_router ^14.1.4` with a `ShellRoute` wrapping four tab d
 | 0 — Home | `/` | Model status, scan card, OCR shortcut, farm stats, recent scans |
 | 1 — History | `/history` | Chronological scan list with class filters |
 | 2 — Dashboard | `/dashboard` | Health score, weekly trend chart, disease breakdown chart |
-| 3 — Settings | `/settings` | Theme, Gemini key, developer info, data management |
+| 3 — Settings | `/settings` | Theme, API keys (Groq, YarnGPT), language, experimental options, data management |
 
 **Push routes:**
 
@@ -227,7 +231,7 @@ The **on-device `RecommendationEngine`** continues to execute the same advisory 
 - *Fungicide selection*: Class-specific products from a Nigerian agro-dealer catalogue, including active ingredient, brand name, application rate per hectare, and FRAC resistance management codes.
 - *Growth stage*: If a planting date was captured by OCR, days-after-planting determines the growth stage for dosage qualification.
 
-**AI advisory routing** implements the multi-tier fallback chain described in Section 3.8.6. In release builds, advisory prompts are sent to Gemini 2.0 Flash first; if that request fails or returns empty, the same prompt is retried against Groq (`llama-3.3-70b-versatile`); if both fail, the screen uses the on-device engine output. In debug builds, Groq is tried first, then Ollama. The language instruction appended to the prompt ensures that cloud providers return advice in the farmer's chosen display language directly, without a separate translation step.
+**Advisory routing** follows Section 3.8.6: one provider under one deadline, built-in rules otherwise, and the source named on screen. Advice is stored with the scan for the language it was written in, so reopening a scan issues no request and the wording does not change; "Regenerate" is the only path that asks again. The language instruction appended to the prompt returns advice in the farmer's chosen display language directly, without a separate translation step.
 
 ### 4.6.8 DashboardScreen — Farm Health Overview
 
@@ -254,8 +258,8 @@ The geometric-centroid map centre — rather than locking to the first recorded 
 
 - **Language selector** — an animated chip row presenting the four supported display languages (English, Yoruba, Igbo, Hausa). Tapping a chip updates `displayLanguageProvider`, which immediately changes the target language for AI advisory generation, on-device text translation, and TTS output. The selection is persisted to `SharedPreferences` and survives application restarts.
 - **Theme toggle** — persisted via `SharedPreferences`.
-- **Gemini API key** — visible in release builds only; stored and retrieved via `FlutterSecureStorage`.
-- **Developer info** — visible in debug builds only; shows Ollama host, model name, Groq model, and instructions for changing values via `.env.json`.
+- **API keys (Groq, YarnGPT)** — entered by the farmer, stored and retrieved via `FlutterSecureStorage`, and removable; a removed key stays removed across launches.
+- **Developer info** — visible in debug builds only; shows the configured Groq model and how to change values via `.env.json`.
 - **Clear all data** — deletes all SQLite scan records and resets `lastResultProvider`, `lastImagePathProvider`, and `lastScanVarietyProvider` to null.
 
 ### 4.6.12 SQLite Database Schema
@@ -306,6 +310,6 @@ Studies reporting the highest accuracy figures evaluate systems on different cro
 
 ## 4.8 Summary of Results
 
-The EfficientNetB3 CNN achieves high classification accuracy on the PlantVillage maize benchmark with two-stage transfer learning and class-weighted training. INT8 quantisation reduces the model to 13 MB with sub-1% accuracy degradation and 2–4× latency improvement on ARM hardware. The multimodal fusion model adds approximately 5.8 percentage points over the CNN-only baseline. The MaizeGuard application delivers a sub-2.1-second scan-to-result experience, operates fully offline, and integrates GPS-tagged disease mapping, filterable scan history, on-device agronomic recommendations, and a multi-tier AI advisory system (Gemini → Groq → on-device engine in release; Groq → Ollama in debug) in a validated cross-platform build on iOS and Android.
+The EfficientNetB3 CNN reaches 93.15% on the held-out PlantVillage test split (628 images) in its FP16 export, with two-stage transfer learning and class-weighted training. INT8 quantisation takes the model from 23.3 MB to 13.5 MB at a cost of 5.4 accuracy points (87.74%), which is why the application loads FP16 first and treats INT8 as a fallback rather than the default. Per-class F1 under FP16 is 1.00 for Healthy, 0.97 for Rust, 0.89 for NCLB and 0.79 for GLS; every figure here is produced by `src/phase4_edge/evaluate_tflite.py` and recorded with the model hashes in `models/exports/metrics.json`. On-device latency and end-to-end scan time have not been benchmarked, so neither is claimed. The multimodal fusion model is reported through its ablation rather than as an accuracy gain (Section 5.1.2). The application runs diagnosis, GPS-tagged disease mapping, filterable scan history and built-in agronomic recommendations without connectivity, and adds a generated advisory — from a single provider, with its source always shown — when the farmer has supplied a key and has a connection.
 
 Beyond the core diagnostic pipeline, the application implements a four-language support system (English, Yoruba, Igbo, Hausa) with AI advice generated directly in the farmer's chosen language and authentic Nigerian-language text-to-speech via the YarnGPT API. The unified result screen consolidates diagnosis, on-device recommendations, AI advisory, confidence gate, and scan feedback prompt into a single scrollable view. A confidence gate alerts farmers when model confidence falls below 60%, and a scan feedback loop collects correctness assessments to support future model improvement. OCR-extracted seed label fields are presented in editable text fields, allowing farmers to correct recognition errors before they propagate to the scan record.

@@ -14,7 +14,7 @@ The system was designed around five sequential development phases:
 
 Each phase builds on the outputs of the previous. The CNN classifier (Phase 1) was trained and evaluated before the OCR subsystem (Phase 2) was built, ensuring that any baseline accuracy problems were identified and resolved before the fusion architecture (Phase 3) was designed. The fusion model was trained with knowledge of where the CNN alone underperformed. Only after the TFLite artefact was validated (Phase 4) was the mobile application layer (Phase 5) assembled.
 
-The Flutter application integrates the TFLite inference engine, the on-device OCR pipeline, GPS location services, a SQLite scan database, an OpenStreetMap display, a context-aware recommendation engine, a multi-tier AI advisory system (Gemini 2.0 Flash → Groq → on-device engine), a four-language display and TTS system, and a unified result screen into a single offline-capable tool for Android and iOS.
+The Flutter application integrates the TFLite inference engine, the on-device OCR pipeline, GPS location services, a SQLite scan database, an OpenStreetMap display, a context-aware recommendation engine, an optional cloud advisory through a single provider (Groq) with built-in rules as the alternative, a four-language display and TTS system, and a unified result screen into one tool for Android and iOS whose diagnostic path runs without connectivity.
 
 ## 3.2 Dataset and Preprocessing
 
@@ -87,14 +87,16 @@ The lower learning rate in Stage 2 prevents catastrophic forgetting of pretraine
 
 Seed packages in Nigerian agro-dealer markets carry printed labels with the crop variety name, planting date, and batch or lot number. This information influences disease risk — certain varieties (e.g., SAMMAZ 15) have documented susceptibility ratings from the International Institute of Tropical Agriculture (IITA) — and enables more targeted treatment recommendations.
 
-On Android and iOS, OCR is performed on-device using Google's ML Kit Text Recognition SDK (package: `google_mlkit_text_recognition ^0.13.1`), which requires no server round-trip and operates fully offline. Before passing a seed label image to ML Kit, a preprocessing pipeline improves recognition accuracy on real-world label photographs:
+On Android and iOS, OCR is performed on-device using Google's ML Kit Text Recognition SDK (package: `google_mlkit_text_recognition ^0.13.1`), which requires no server round-trip and runs without connectivity. The mobile application passes the captured photograph to ML Kit as it is: the grayscale, adaptive-threshold, deskew and denoise pipeline described below exists in the Python implementation (`src/phase2_ocr/preprocessor.py`), where it is used for evaluation, and has not been ported to the application. Whether it is worth porting is an open question — ML Kit performs its own binarisation internally, so the gain measured on the Python path may not transfer.
+
+The Python preprocessing pipeline comprises:
 
 1. Grayscale conversion
 2. Adaptive thresholding (binarisation)
-3. Deskew via Hough line detection
+3. Deskew by the minimum-area rectangle of the dark text pixels, applied only for angles within ±30°
 4. Morphological denoising
 
-After OCR, a rule-based extraction layer parses the raw text output to recover three fields:
+After OCR, a rule-based extraction layer — shared between the application and the Python implementation through the test fixtures in `tests/fixtures/ocr_cases.json` — parses the raw text output to recover three fields:
 
 - **Crop Variety**: Substring matching and fuzzy word-token overlap against a curated list of 13 known Nigerian maize varieties: SAMMAZ 15, 17, 29, 34, 50; OBA SUPER 2; EVDT 99; POOL 16 DT; TZEE-W; ABA WHITE; ACROSS 97; SUWAN 1; EARLY THRIVING.
 - **Batch Number**: Regular expressions for patterns including `BN-YYYY-NNN`, `BATCH NO: ...`, and `LOT #...`.
@@ -225,7 +227,7 @@ Application state is managed entirely through Riverpod. The principal providers 
 - `lastResultProvider` (`StateProvider`) — holds the `ClassificationResult` of the most recently completed scan
 - `lastImagePathProvider` (`StateProvider`) — holds the absolute image path for the active result view
 - `lastScanVarietyProvider` (`StateProvider`) — holds the crop variety associated with the scan currently being viewed, ensuring the recommendation screen shows the correct variety regardless of scan history order
-- `geminiKeyProvider` (`StateNotifierProvider`) — manages the Gemini API key through `FlutterSecureStorage`
+- `groqKeyProvider` and `yarnGptKeyProvider` (`StateNotifierProvider`) — manage the user-supplied API keys through `FlutterSecureStorage`
 - `isDarkModeProvider` (`StateNotifierProvider`) — persists the theme preference via `SharedPreferences`
 - `classifierReadyProvider` (`StateProvider`) — signals when the `ClassifierService` has completed model loading
 - `healthTrendProvider` (`FutureProvider`) — computes the health trend delta via `DatabaseService.getHealthTrend()`
@@ -259,24 +261,22 @@ Push routes render over the shell, temporarily hiding the bottom navigation bar.
 
 ### 3.8.4 Environment Configuration
 
-Sensitive configuration — Ollama endpoint, Ollama model name, Gemini API key — is injected at compile time via `--dart-define-from-file=.env.json` rather than stored in the application bundle or in source control. This means the values are baked into the binary at build time and cannot be extracted from the compiled application.
-
-The `AppEnv` class reads these compile-time defines:
+Build-time configuration is injected via `--dart-define-from-file=.env.json`. The `AppEnv` class reads these compile-time defines:
 
 ```dart
 abstract final class AppEnv {
-  static const ollamaHost  = String.fromEnvironment('OLLAMA_HOST',
-      defaultValue: 'http://localhost:11434');
-  static const ollamaModel = String.fromEnvironment('OLLAMA_MODEL',
-      defaultValue: 'llama3.1:8b');
-  static const geminiApiKey  = String.fromEnvironment('GEMINI_API_KEY');
   static const groqApiKey    = String.fromEnvironment('GROQ_API_KEY');
+  static const groqModel     = String.fromEnvironment('GROQ_MODEL',
+      defaultValue: 'openai/gpt-oss-120b');
   static const yarnGptApiKey = String.fromEnvironment('YARNGPT_API_KEY');
-  static bool get useOllama => kDebugMode;
 }
 ```
 
-The `useOllama` property is driven by Flutter's `kDebugMode` flag, but the full advisory routing chain is more nuanced than this property alone implies. Debug builds route AI advisory requests to Groq (`llama-3.3-70b-versatile`) first, falling back to Ollama if Groq fails or returns an empty response. Release builds route to Gemini 2.0 Flash first, falling back automatically to Groq. This multi-tier chain ensures that development runs never consume Gemini API quota and that production deployments are resilient to rate-limit events on the primary cloud provider. The `GROQ_API_KEY` and `YARNGPT_API_KEY` constants are baked into the binary at build time and cannot be extracted from the compiled application, matching the security model applied to `GEMINI_API_KEY`.
+Two points need stating precisely, because an earlier version of this chapter overstated both.
+
+**A compile-time constant is not a secret.** A value passed through `--dart-define` is compiled into the application binary, where it can be recovered from the installed package with standard tooling. It is protected from source control, not from the user of the device or anyone who obtains the APK. MaizeGuard therefore treats keys as belonging to the farmer rather than to the build: release builds ship with no key, the farmer enters their own in Settings, and it is stored through `FlutterSecureStorage` (ADR-003).
+
+**A key the farmer removes stays removed.** A build-time key, when one is present at all — for development builds — seeds secure storage exactly once, guarded by a persisted flag. Removing the key in Settings is therefore permanent rather than undone at the next launch, and a key the farmer saved is never overwritten by the build's.
 
 ### 3.8.5 Image Path Persistence
 
@@ -305,22 +305,25 @@ class PathResolver {
 
 `PathResolver.init()` is called in `main()` before `runApp()`, ensuring the cached path is available before any image is loaded.
 
-### 3.8.6 AI Reliability and Fallback Chain
+### 3.8.6 Where Advice Comes From, and What Happens When It Cannot Be Fetched
 
-MaizeGuard implements a multi-tier advisory fallback chain within `AiAdvisor` to guarantee that every scan produces an enhanced agronomic recommendation regardless of the availability of any single cloud provider.
+MaizeGuard uses one cloud provider. `AiAdvisor` sends the prompt to Groq and, when that is not possible, answers from the built-in rules in `diseases.dart`. There is no provider chain and no silent substitution: the result screen always names the source of the text it is showing (ADR-003).
 
-**Release builds:** Advisory requests are routed to Gemini 2.0 Flash as the primary provider. If the Gemini API call fails — due to a network error, rate-limit response, or an empty response body — `AiAdvisor` automatically retries the same prompt against the Groq API using the `llama-3.3-70b-versatile` model via the OpenAI-compatible completion endpoint. If both cloud providers fail, the call falls back silently to the on-device `RecommendationEngine`. The farmer is never shown an error; they receive the best available advice the system can produce at that moment.
+**One budget for the whole request.** The advisory has a single 20-second deadline covering every attempt, and each attempt receives whatever remains of it. A rejected key (HTTP 401 or 403) or a failed connection stops the request immediately rather than being retried against further models, since neither can succeed a second time. A transient server error falls through to a backup model id while time remains. The model list is held in `AppEnv.groqModels` and checked in the test suite against a recorded copy of Groq's served models, so an id that Groq stops serving fails a test rather than a farmer's scan.
 
-**Debug builds:** Advisory requests are routed to Groq first (using `AppEnv.groqApiKey`), falling back to a local Ollama instance (`AppEnv.ollamaHost`, `AppEnv.ollamaModel`) if Groq is unavailable. This ensures that development and testing cycles never consume Gemini API quota while still exercising the cloud advisory path via Groq.
+**Only the answer is shown.** Where a response carries the model's own `reasoning` field alongside an empty `content`, the reasoning is discarded and the built-in rules answer instead. Model deliberation is not agronomic advice and is never displayed as such.
 
-The complete fallback chain is therefore:
+**The farmer is told which it was.** The advisory card reads either "Answered online by *model id*" or "Offline guidance · built-in agronomic rules", with the reason in plain words — that the key was rejected, that there is no connection, that the service did not answer in time. The generated text is then stored with the scan, so reopening the scan makes no further request and the wording does not change underneath the farmer.
 
-| Build | Primary | Secondary | Tertiary |
-|-------|---------|-----------|---------|
-| Release | Gemini 2.0 Flash | Groq (`llama-3.3-70b-versatile`) | On-device engine |
-| Debug | Groq (`llama-3.3-70b-versatile`) | Ollama (`llama3.1:8b`) | — |
+**Advice is language-tagged.** The built-in rules exist only in English. When a farmer working in Hausa is answered from them, the card is labelled "English (offline)" and the text is cached under English, so a later online request in Hausa is still made rather than satisfied from an English cache.
 
-Both `GEMINI_API_KEY` and `GROQ_API_KEY` are injected as compile-time constants via `--dart-define-from-file=.env.json` and are never written to disk or exposed at runtime. The Groq endpoint is the standard OpenAI-compatible chat completions URL, allowing the same prompt format to be sent to both providers without structural changes.
+| Condition | What answers | What the screen says |
+|---|---|---|
+| Key present, network available | Groq, model id recorded | "Answered online by *model*" |
+| Key rejected | Built-in rules | "That API key was rejected…" |
+| No connection | Built-in rules | "No internet connection…" |
+| No key set | Built-in rules | "No API key is set…" |
+| Response empty or reasoning-only | Built-in rules | "The model returned nothing usable…" |
 
 ### 3.8.7 Language and Translation System
 
@@ -334,15 +337,15 @@ Language selection is managed by `DisplayLanguageNotifier`, a `StateNotifier` su
 
 The language selector is presented in `SettingsScreen` as an animated chip row — one chip per language — allowing the farmer to switch languages with a single tap. The selection takes effect immediately across the application.
 
-**AI prompt localisation.** When an advisory request is dispatched by `AiAdvisor`, a language instruction is appended to the prompt if a non-English language is selected (for example: "Respond entirely in Yoruba"). Both Gemini and Groq honour this instruction, generating the full agronomic advisory in the target language without a separate translation step.
+**AI prompt localisation.** When an advisory request is dispatched by `AiAdvisor`, a language instruction is appended to the prompt if a non-English language is selected (for example: "Write the whole answer in Yoruba, but keep the active ingredient names in English so they can be matched on a product label"). The model generates the advisory in the target language without a separate translation step.
 
-**Translate advice button.** In cases where AI advice was generated in English (for example, when the language was changed after a scan was completed, or when the cloud providers were unavailable and the on-device engine produced English output), a "Translate advice" button appears on the result screen for non-English language selections. Tapping the button invokes `AiAdvisor.translateResult()`, which sends the existing recommendation text to the active cloud provider with a translation instruction. The translated text is rendered in a `GlassCard` with a "Translated · [Language]" header below the original sections. The translate button does not appear when language is set to English.
+**Translate advice button.** Where advice was produced in English — because the language was changed after the scan, or because the built-in rules answered — a "Translate advice" button appears on the result screen for non-English selections. Tapping it invokes `AiAdvisor.translateResult()`, which sends the existing text to Groq with a translation instruction; it therefore requires the same key and connection as any other generated advice. The translated text is rendered in a `GlassCard` with a "Translated · [Language]" header below the original sections. The translate button does not appear when language is set to English.
 
 ### 3.8.8 Text-to-Speech
 
 MaizeGuard implements a dual-engine text-to-speech system managed by the `YarnTtsService` singleton (`lib/services/yarn_tts_service.dart`).
 
-**English TTS.** For English-language output, `flutter_tts ^4.0.2` invokes the device's native speech synthesis engine. This requires no API key, incurs no network round-trip, and works fully offline.
+**English TTS.** For English-language output, `flutter_tts ^4.0.2` invokes the device's native speech synthesis engine. This requires no API key and no network round-trip, and works on any device that has a voice installed. Where YarnGPT is unavailable — no key, no connection, or a failed request — the same engine is used for Nigerian languages too, in the closest locale the device has installed; where it has none, the application says so rather than failing silently.
 
 **Nigerian-language TTS.** For Yoruba, Igbo, and Hausa output, `YarnTtsService` sends a POST request to the YarnGPT API (`https://yarngpt.ai/api/v1/tts`) with a Bearer token (`AppEnv.yarnGptApiKey`) and a voice selected by language:
 
