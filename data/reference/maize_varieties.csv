@@ -1,0 +1,24 @@
+# The one list of maize varieties the app and the pipeline match OCR text
+# against (ADR-006). Dart reads a generated copy in
+# mobile/lib/constants/varieties.dart; Python reads this file directly.
+#
+# `verified` says whether the entry has been checked against a citable source.
+# Nothing here is verified yet: these thirteen names came with the original
+# project and no source was recorded for them. They must be checked against the
+# NASC National Catalogue of Crop Varieties (or an IITA/IAR release list)
+# before any paper describes them as registered Nigerian varieties, and before
+# any susceptibility claim is attached to one (T53, Q5).
+name,verified,source,notes
+SAMMAZ 15,no,unverified — inherited from the original project list,Commonly cited in project material as an IAR/IITA release
+SAMMAZ 17,no,unverified — inherited from the original project list,
+SAMMAZ 29,no,unverified — inherited from the original project list,
+SAMMAZ 34,no,unverified — inherited from the original project list,
+SAMMAZ 50,no,unverified — inherited from the original project list,
+OBA SUPER 2,no,unverified — inherited from the original project list,Hybrid name used by Nigerian seed companies
+EVDT 99,no,unverified — inherited from the original project list,
+POOL 16 DT,no,unverified — inherited from the original project list,
+TZEE-W,no,unverified — inherited from the original project list,
+ABA WHITE,no,unverified — inherited from the original project list,
+ACROSS 97,no,unverified — inherited from the original project list,
+SUWAN 1,no,unverified — inherited from the original project list,
+EARLY THRIVING,no,unverified — inherited from the original project list,

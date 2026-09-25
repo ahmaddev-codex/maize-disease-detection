@@ -1,3 +1,8 @@
+// Nigerian maize varieties (FR-14) live in one generated file, so the Dart
+// and Python lists cannot drift apart: see varieties.dart and
+// data/reference/maize_varieties.csv (ADR-006).
+export 'varieties.dart';
+
 /// Class id of the Healthy class.
 const int kHealthyClassId = 3;
 
@@ -164,10 +169,3 @@ const List<DiseaseInfo> kDiseases = [
 
 DiseaseInfo diseaseForClass(int classId) =>
     kDiseases.firstWhere((d) => d.classId == classId, orElse: () => kDiseases[3]);
-
-// Nigerian maize varieties (FR-14)
-const List<String> kNigerianVarieties = [
-  'SAMMAZ 15', 'SAMMAZ 17', 'SAMMAZ 29', 'SAMMAZ 34', 'SAMMAZ 50',
-  'OBA SUPER 2', 'EVDT 99', 'POOL 16 DT', 'TZEE-W', 'ABA WHITE',
-  'ACROSS 97', 'SUWAN 1', 'EARLY THRIVING',
-];

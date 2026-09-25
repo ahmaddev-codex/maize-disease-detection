@@ -24,12 +24,9 @@ import numpy as np
 import pytesseract
 from Levenshtein import distance as _levenshtein
 
-# ── Known variety list (extend as needed) ─────────────────────────────────────
-KNOWN_VARIETIES = [
-    "SAMMAZ 15", "SAMMAZ 17", "SAMMAZ 29", "SAMMAZ 34", "SAMMAZ 50",
-    "OBA SUPER 2", "EVDT 99",  "POOL 16 DT", "TZEE-W",
-    "ABA WHITE",  "ACROSS 97", "SUWAN 1",    "EARLY THRIVING",
-]
+# ── Known variety list ────────────────────────────────────────────────────────
+# One source for both languages: data/reference/maize_varieties.csv (ADR-006).
+from src.common.varieties import KNOWN_VARIETIES  # noqa: E402,F401
 
 VARIETY_SCORE_THRESHOLD = 60   # FR-14: minimum per-word similarity score (0–100)
 
