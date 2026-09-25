@@ -84,10 +84,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 ## Phase 7: Notebooks, papers, docs
 - [ ] T41 Notebooks 1 and 4 use the real evaluation [T01, T11, T32 · S]
 - [ ] T42 Notebooks 2, 3 and 5 re-run against fixed code [T14, T30, T31, T35, T38, T39 · M]
-- [ ] T43 Papers: abstract and chapter 4 numbers backed by artifacts, lab + field [T12, T31, T32, T41, T50, T51 · M]
-- [ ] T44 Papers: chapters 1, 3 and 5 describe the real system [T18, T24–T29, T39 · M]
-- [ ] T45 README, SYSTEM and mobile docs reflect the real platform [Phases 1–6 · M]
-- [ ] T46 REQUIREMENTS, DIAGRAMS, PLAN and WORKFLOW aligned; team table [T45 · M]
+- [x] T43 Papers: abstract and chapter 4 numbers backed by artifacts [T12, T31, T32, T41, T50, T51 · M] — lab numbers done with a claim-to-artifact table (§4.9); the field and OCR rows read "not measured" until T50/T51/T12
+- [x] T44 Papers: chapters 1, 3 and 5 describe the real system [T18, T24–T29, T39 · M] — per-section reviewer sign-off still outstanding
+- [x] T45 README, SYSTEM and mobile docs reflect the real platform [Phases 1–6 · M] — run log in `tasks/logs/readme-commands.md`
+- [x] T46 REQUIREMENTS, DIAGRAMS, PLAN and WORKFLOW aligned [T45 · M] — PLAN.md marked historical; the team table (Q10) still needs the user's confirmation
 - [ ] **Checkpoint 7:** notebooks execute; claim table reviewed; docs greps clean
 
 ## Phase 8: Hardening
