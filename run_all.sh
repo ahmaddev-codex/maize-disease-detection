@@ -329,20 +329,20 @@ echo ""
 mkdir -p data/uav
 
 echo ">>> Step 6a: Generating demo flight plan ..."
-$VENV -m deployment.uav.flight_planner \
+$VENV -m src.phase5_uav.flight_planner \
   --demo \
   --output data/uav/mission.waypoints
 echo ""
 
 echo ">>> Step 6b: Patch inference on synthetic orthomosaic ..."
-$VENV -m deployment.uav.patch_runner \
+$VENV -m src.phase5_uav.patch_runner \
   --demo \
   --model models/exports/efficientnetb3_maize_int8.tflite \
   --output data/uav/patch_predictions.csv
 echo ""
 
 echo ">>> Step 6c: Generating disease heatmap ..."
-$VENV -m deployment.uav.heatmap \
+$VENV -m src.phase5_uav.heatmap \
   --csv    data/uav/patch_predictions.csv \
   --output data/uav/disease_heatmap.html
 echo ""
@@ -373,8 +373,8 @@ echo "║    cd mobile && flutter run                                      ║"
 echo "║    cd mobile && flutter build apk --release                      ║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  Live UAV (real drone — see REQUIREMENTS.md §6.5)               ║"
-echo "║    python -m deployment.uav.live_server                          ║"
-echo "║    python -m deployment.uav.drone_telemetry \\                    ║"
+echo "║    python -m src.phase5_uav.live_server                          ║"
+echo "║    python -m src.phase5_uav.drone_telemetry \\                    ║"
 echo "║        --connect udp:0.0.0.0:14550 \\                             ║"
 echo "║        --mission data/uav/mission.waypoints \\                    ║"
 echo "║        --server  http://localhost:5000                            ║"

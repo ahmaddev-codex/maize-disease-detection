@@ -2,7 +2,7 @@
 
 A multimodal AI system for detecting maize crop diseases, targeting Nigerian smallholder farmers. Combines an EfficientNetB3 CNN classifier with on-device OCR for seed label metadata, GPS-tagged history, AI agronomic advice, and a UAV live disease heatmap dashboard.
 
-**Mobile:** Flutter 3.x (Android + iOS) · **ML:** Python 3.12 + TensorFlow 2.16  
+**Mobile:** Flutter 3.x (Android + iOS) · **ML:** Python 3.11 + TensorFlow 2.16  
 **Team:** Tijani · Oshodilawal · Olapade
 
 ---
@@ -35,7 +35,7 @@ Maize (*Zea mays*) is a staple crop across sub-Saharan Africa. Disease outbreaks
 
 - **Instant leaf disease classification** — EfficientNetB3 TFLite, fully offline, < 500 ms on mid-range Android
 - **Seed label OCR** — reads crop variety, batch number, and planting date from seed bags via ML Kit
-- **AI agronomic advice** — on-device rule engine + optional Gemini 2.0 Flash or local Ollama backend
+- **AI agronomic advice** — built-in rules on the device, plus an optional Groq advisory when a key and a connection are present; the result always says which one answered
 - **GPS-tagged scan history** — filterable, with per-scan notes and an OpenStreetMap farm map
 - **Dashboard analytics** — farm health score, 7-day trend, disease breakdown charts
 - **UAV live heatmap** — Flask + Socket.IO dashboard with real-time Leaflet.js disease map
@@ -83,7 +83,7 @@ Leaf Image (300×300 RGB)        Seed Label Photo
          │                              │
          │                              ▼
          │                      Metadata Encoder
-         │                      24-d float32 vector
+         │                      17-d float32 vector
          │                              │
          └──────────────┬───────────────┘
                         │ Concatenate (288-d)
@@ -180,7 +180,7 @@ maize-disease-detection/
 | CocoaPods | latest | `sudo gem install cocoapods` |
 | JDK | 17+ | Android builds |
 | Android SDK | API 21+ | Android Studio or CLI |
-| Python | 3.12 | TF 2.16 does not support 3.13+ |
+| Python | 3.11 | The version the pipeline is developed and tested on; TF 2.16 does not support 3.13+ |
 | Tesseract | 5+ | `brew install tesseract` / `apt install tesseract-ocr` |
 | Kaggle CLI | configured | `~/.kaggle/kaggle.json` for dataset download |
 
@@ -199,9 +199,12 @@ bash mobile/setup.sh --android
 ```bash
 cp mobile/.env.json.example mobile/.env.json
 # Edit .env.json:
-# GEMINI_API_KEY  → production Gemini key (release builds only)
-# OLLAMA_HOST     → Ollama server URL (debug builds, default: http://localhost:11434)
-# OLLAMA_MODEL    → model name (debug builds, default: llama3.1:8b)
+# GROQ_API_KEY     → optional, for generated agronomic advice (development builds)
+# YARNGPT_API_KEY  → optional, for Yoruba/Igbo/Hausa speech
+#
+# Release builds ship with no keys: the farmer enters their own in Settings,
+# where they are stored in the platform keystore (ADR-003). A key removed
+# there stays removed.
 ```
 
 **3. Run:**
@@ -292,13 +295,13 @@ pip install flask flask-socketio
 **3. Generate a demo flight plan:**
 
 ```bash
-python -m deployment.uav.flight_planner --demo --output data/uav/mission.waypoints
+python -m src.phase5_uav.flight_planner --demo --output data/uav/mission.waypoints
 ```
 
 **4. Run patch inference on a synthetic orthomosaic:**
 
 ```bash
-python -m deployment.uav.patch_runner \
+python -m src.phase5_uav.patch_runner \
   --demo \
   --model  models/exports/efficientnetb3_maize_int8.tflite \
   --output data/uav/patch_predictions.csv
@@ -307,7 +310,7 @@ python -m deployment.uav.patch_runner \
 **5. Generate the heatmap:**
 
 ```bash
-python -m deployment.uav.heatmap \
+python -m src.phase5_uav.heatmap \
   --csv    data/uav/patch_predictions.csv \
   --output data/uav/disease_heatmap.html
 ```
@@ -317,7 +320,7 @@ Open `data/uav/disease_heatmap.html` in a browser — it shows a Folium interact
 **6. (Optional) Start the live web dashboard:**
 
 ```bash
-python -m deployment.uav.live_server
+python -m src.phase5_uav.live_server
 # → Open http://localhost:5000
 ```
 
@@ -331,14 +334,14 @@ Connects to a real MAVLink drone (Pixhawk / ArduCopter / PX4), uploads the surve
 
 ```bash
 source .venv/bin/activate
-python -m deployment.uav.live_server
+python -m src.phase5_uav.live_server
 # → Open http://localhost:5000
 ```
 
 **Terminal 2 — Generate the mission file:**
 
 ```bash
-python -m deployment.uav.flight_planner \
+python -m src.phase5_uav.flight_planner \
   --farm-geojson data/uav/farm_boundary.geojson \
   --altitude 30 \
   --output   data/uav/mission.waypoints
@@ -348,25 +351,25 @@ python -m deployment.uav.flight_planner \
 
 ```bash
 # USB / SiK radio (serial)
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect /dev/ttyUSB0:57600 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000
 
 # UDP — MAVProxy, SITL, or WiFi bridge
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect udp:0.0.0.0:14550 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000
 
 # TCP — companion computer or direct WiFi
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect tcp:192.168.1.1:5760 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000
 
 # Arm and enter AUTO mode automatically after mission upload
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect udp:0.0.0.0:14550 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000 \
@@ -391,7 +394,7 @@ sim_vehicle.py -v ArduCopter --console --map
 mavproxy.py --master tcp:127.0.0.1:5760 --out udp:127.0.0.1:14550
 
 # Terminal C — connect drone_telemetry as normal
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect udp:0.0.0.0:14550 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000
@@ -474,7 +477,7 @@ python -m src.phase1_cnn.evaluate \
   --csv   data/annotations/labels.csv
 
 # Phase 2 — OCR a seed label
-python src/phase2_ocr/extractor.py --image data/raw/seed_labels/sample_label.jpg
+python -m src.phase2_ocr.extractor --image data/raw/seed_labels/sample_label.jpg
 
 # Phase 3 — train fusion model
 python -m src.phase3_fusion.train_fusion \
@@ -503,12 +506,12 @@ All inference runs on-device — no internet required for core features.
 | **Home** | App launch | Scan hero card, farm stats, recent scans, seed label shortcut |
 | **Camera** | Centre scan button | Live camera with framing guide and brightness feedback |
 | **Result** | After scan | Disease class, confidence bars, symptoms, treatments, prevention |
-| **AI Advice** | "Get AI Advice" on Result | Bottom sheet — on-device rule engine + Gemini / Ollama advice |
+| **AI Advice** | Advice card on Result | Built-in agronomic rules, or a Groq advisory when a key and a connection are present — the card names which |
 | **OCR** | "Scan Seed Label" on Home | Extracts crop variety, batch number, planting date from seed bag |
 | **Map** | Map icon on Home app bar | OpenStreetMap with GPS-tagged disease pins |
 | **Dashboard** | Stats tab | Farm health score, 7-day bar chart, disease breakdown |
 | **History** | History tab | All scans with filter chips, long-press to add notes or delete |
-| **Settings** | Settings tab | Dark/light theme, Gemini API key, Ollama config, clear data |
+| **Settings** | Settings tab | Theme, Groq and YarnGPT keys, language, experimental crop-to-box toggle, purge local data |
 
 ### Key Flutter Packages
 
@@ -524,7 +527,7 @@ All inference runs on-device — no internet required for core features.
 | Navigation | `go_router` |
 | Charts | `fl_chart` |
 | Secure storage | `flutter_secure_storage` |
-| AI networking | `http` (Gemini API / Ollama) |
+| AI networking | `http` (Groq chat completions, YarnGPT speech) |
 | Fonts | `google_fonts` (DM Sans) |
 
 ### Useful Flutter Commands (run from `mobile/`)

@@ -5,8 +5,10 @@
 
 ---
 
-> ⚠️ **Mobile platform updated 2026-06-13:** Flutter → React Native 0.73 (Android-first).  
-> Active mobile source: `mobile/`   Flutter kept at `deployment/app/` for reference.
+> **Mobile platform:** Flutter 3.x (Android and iOS). The active — and only —
+> mobile source is `mobile/`. An earlier note in this file described a move to
+> React Native 0.73 with Flutter kept at `deployment/app/`; that move never
+> happened, `deployment/app/` does not exist, and the note has been removed.
 
 ## Table of Contents
 
@@ -87,7 +89,7 @@ maize-disease-detection/
 │   ├── phase2_ocr/
 │   │   ├── preprocessor.py     # Image: grayscale, threshold, deskew, denoise
 │   │   ├── extractor.py        # Tesseract 5 OCR + field parsing (variety/batch/date)
-│   │   └── encoder.py          # 24-d metadata feature vector
+│   │   └── encoder.py          # 17-d metadata feature vector (13 varieties + 4)
 │   │
 │   ├── phase3_fusion/
 │   │   ├── fusion_model.py     # Functional API: CNN branch + OCR branch → dense head
@@ -229,7 +231,7 @@ Raw image
   → Denoise (morphological open)
   → Tesseract 5 (Latin script, PSM 6 — uniform block)
   → Fuzzy field extraction (extractor.py)
-  → 24-d feature vector (encoder.py)
+  → 17-d feature vector (encoder.py)
 ```
 
 ### Extracted Fields
@@ -272,7 +274,7 @@ particularly for disease-variety correlations (e.g. NCLB risk in SAMMAZ varietie
 ### Architecture
 
 ```
-Image Input (300×300×3)               OCR vector (24-d)
+Image Input (300×300×3)               OCR vector (17-d)
   └─ EfficientNetB3 backbone (frozen)   └─ Dense(32, ReLU)
        └─ GlobalAveragePooling2D              └─ Dropout(0.2)
             └─ Dense(256, ReLU)                    │
@@ -401,97 +403,84 @@ with colour-coded disease markers and a confidence heatmap overlay.
 
 ---
 
-## 8. React Native Mobile App
+## 8. Flutter Mobile App
 
-The primary farmer-facing tool. Runs EfficientNetB3 TFLite entirely on-device
-with no network connection required.
+The primary farmer-facing tool, in `mobile/`. Classification runs entirely on
+the device; generated advice and Nigerian-language speech need a network and a
+key the farmer supplies.
 
 ### Supported Platforms
 
-| Feature | Android | macOS |
-|---------|---------|-------|
+| Feature | Android | iOS |
+|---------|---------|-----|
 | TFLite inference | ✅ | ✅ |
-| Live camera | ✅ | ❌ (camera package — Android/iOS only) |
+| Live camera | ✅ | ✅ |
 | Gallery picker | ✅ | ✅ |
-| OCR seed scanner | ✅ | ❌ (ML Kit — Android/iOS only) |
+| OCR seed scanner | ✅ | ✅ |
+| Generated advice (Groq) | needs key + network | needs key + network |
+| Yoruba / Igbo / Hausa speech | YarnGPT, else device voice | YarnGPT, else device voice |
 
 ### Architecture
 
 ```
 main.dart
-  └─ HomeScreen
-       ├─ MaizeClassifier (classifier.dart)
-       │    ├─ Interpreter.fromAsset() — loads TFLite model from assets/models/
-       │    ├─ compute() isolate — image decode + resize (300×300, [0,255])
-       │    └─ interpreter.run() — INT8 quantized inference
+  └─ GoRouter shell (home · history · map · settings)
+       ├─ ClassifierService (services/classifier_service.dart)
+       │    ├─ loads FP16 first, falls back to INT8 (ADR-001)
+       │    ├─ Isolate.run() — decode + bilinear resize to 300×300
+       │    ├─ IsolateInterpreter — inference off the UI thread
+       │    └─ classifier_postprocess.dart — dequantise, renormalise
        │
-       ├─ CameraScreen (Android/iOS only)
-       │    ├─ camera package — CameraController + CameraPreview
-       │    ├─ Brightness hint (frame sampling every 15 frames)
-       │    └─ Tap-to-focus + exposure point
+       ├─ CameraScreen
+       │    ├─ camera package — yuv420 (Android) / bgra8888 (iOS) stream
+       │    ├─ luma.dart — real brightness hint from the Y plane
+       │    ├─ optional crop to the on-screen box (off by default)
+       │    └─ pending seed-label chip from the OCR scan
        │
-       ├─ ResultScreen
-       │    ├─ LinearPercentIndicator — confidence bar
-       │    ├─ Class score matrix (all 4 classes)
-       │    └─ Treatment recommendation card
+       ├─ ResultScreen — renders one saved scan
+       │    ├─ confidence meter and low-confidence retake
+       │    ├─ built-in recommendations from diseases.dart
+       │    ├─ advice card naming its source (model, or built-in rules)
+       │    └─ feedback prompt ("Was this diagnosis right?")
        │
-       └─ OcrScreen (Android/iOS only)
-            └─ OcrService → google_mlkit_text_recognition
+       └─ OcrService → google_mlkit_text_recognition
+            └─ ocr_parser.dart — variety, batch number, planting date
 ```
 
-### macOS Native Setup (required once)
+### Setup
 
 ```bash
-cd deployment/app
-
-# 1. Download the TFLite dylib (10 MB, one-time):
-curl -L "https://github.com/CaptainDario/DaKanji-Dependencies/releases/download/v3.0.0/libtensorflowlite_c-mac.dylib.zip" \
-  -o /tmp/tf.zip && unzip /tmp/tf.zip -d /tmp/
-cp /tmp/libtensorflowlite_c-mac.dylib \
-  ~/.pub-cache/hosted/pub.dev/tflite_flutter-0.12.1/macos/libtensorflowlite_c.dylib
-
-# 2. Install CocoaPods dependencies:
-cd macos && pod install && cd ..
-
-# 3. Copy TFLite models to assets:
-cp models/exports/efficientnetb3_maize_int8.tflite deployment/app/assets/models/
-cp models/exports/efficientnetb3_maize_fp16.tflite deployment/app/assets/models/
-
-# 4. Run:
-flutter run -d macos
-```
-
-### Android Setup
-
-```bash
-cd deployment/app
+cd mobile
+bash setup.sh          # copies the measured models into assets/models,
+                       # refusing any model whose sha256 is not in metrics.json
 flutter pub get
-flutter run -d <device-id>     # or: flutter build apk --release
+flutter run --dart-define-from-file=.env.json
 ```
 
-The Android build requires no manual native library steps — tflite_flutter
-downloads the JNI `.so` via Gradle automatically.
+`.env.json` is optional: without keys the app still classifies, and the
+advice card says it is using the built-in rules. Release builds ship with no
+keys at all (ADR-003).
 
 ### Inference Pipeline Detail
 
 ```dart
-// classifier.dart
+// classifier_service.dart
 
-// 1. Load bytes from file (checks sandbox on macOS)
-final bytes = await imageFile.readAsBytes();
+// 1. Preprocess off the UI thread (image decode + bilinear resize to 300×300)
+final input = await Isolate.run(() => preprocessForModel(bytes, size: 300));
 
-// 2. Decode + resize in a Flutter compute isolate (avoids UI jank)
-final input = await compute(_preprocessCompute, _PrepareArgs(bytes, tensorType, 300));
-// → List<List<List<List<num>>>> shape [1, 300, 300, 3]
+// 2. Run on an IsolateInterpreter so the UI keeps its frames
+await isolateInterpreter.run(inputTensor, outputTensor);
 
-// 3. Allocate output list tflite_flutter can write into directly
-final output = [List<int>.filled(4, 0)];  // INT8 model
-
-// 4. Run inference (synchronous, fast — <500ms on modern Android)
-interpreter.run(input, output);
-
-// 5. Dequantize: score = (rawValue - zeroPoint) * scale
+// 3. One shared post-processing rule, checked against the Python pipeline's
+//    fixtures: dequantise with the tensor's own (scale, zeroPoint), renormalise
+//    by the sum, never apply a softmax to probabilities.
+final probabilities = probabilitiesFrom(raw, integerOutput: !isFloatOutput,
+                                        scale: scale, zeroPoint: zeroPoint);
 ```
+
+The stored `latency_ms` is model time only — it excludes capture, decode and
+saving, so it must not be quoted as scan-to-result time.
 
 ---
 
@@ -592,7 +581,7 @@ python -m deployment.uav.heatmap        --demo
 ### Python (training + edge + UAV)
 
 ```bash
-# Requires Python 3.12, brew-installed tesseract 5
+# Requires Python 3.11, brew-installed tesseract 5
 brew install tesseract
 
 bash setup_env.sh       # creates .venv/, installs requirements.txt
@@ -618,14 +607,12 @@ Key packages:
 # Install Flutter SDK: https://docs.flutter.dev/get-started/install
 flutter --version   # should be 3.x
 
-cd deployment/app
+cd mobile
+bash setup.sh        # copies the measured TFLite models into assets/models
 flutter pub get
 
-# Android:
-flutter run -d android
-
-# macOS: follow Section 8 macOS Native Setup first, then:
-flutter run -d macos
+# Android or iOS device / emulator:
+flutter run --dart-define-from-file=.env.json
 ```
 
 
@@ -654,13 +641,15 @@ flutter run -d macos
 | 3 — Multimodal Fusion | Olapade + Tijani | 🟡 Run `--full` to converge |
 | 4 — TFLite Export | Oshodilawal | ✅ Complete |
 | 5 — UAV Integration | Oshodilawal | ✅ Code complete — test with real orthomosaic |
-| Flutter App | Oshodilawal | ✅ Android + macOS working |
+| Flutter App | Oshodilawal | Android and iOS; see `tasks/todo.md` for the outstanding device checks |
 
 ### Adding New Maize Varieties / Diseases
 
 1. Add images to `data/raw/field_photos/<ClassName>/`
-2. Update `MAPPING` in `run_all.sh` step 0
-3. Update `CLASS_NAMES` in `src/phase1_cnn/model.py` and all inference scripts
-4. Update `classNames` in `deployment/app/lib/services/classifier.dart`
-5. Add `DiseaseInfo` entry in `deployment/app/lib/models/prediction.dart`
-6. Retrain: `bash run_all.sh --full`
+2. Update `CLASS_FOLDERS` in `src/phase1_cnn/build_labels.py`
+3. Update `CLASS_NAMES` / `SHORT_NAMES` in `src/common/labels.py` — every
+   Python module reads them from there (ADR-006)
+4. Add the matching `DiseaseInfo` entry, including its `actives`, in
+   `mobile/lib/constants/diseases.dart`; the names must match `labels.py`,
+   and `tests/test_postprocess.py` checks that they do
+5. Retrain: `bash run_all.sh --full`
