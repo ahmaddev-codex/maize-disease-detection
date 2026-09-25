@@ -373,7 +373,13 @@ python -m deployment.uav.drone_telemetry \
   --auto-arm
 ```
 
-As the drone flies each waypoint, `drone_telemetry.py` runs TFLite inference on the captured patch and POSTs the result to the live server — appearing instantly as a coloured disease marker on the map.
+As the drone reaches each waypoint (`MISSION_ITEM_REACHED`), `drone_telemetry.py` classifies the newest capture that it has not already processed and POSTs the result to the live server, where it appears as a coloured marker on the map.
+
+**What this assumes, and what it does not show**
+
+- **You supply the captures.** `drone_telemetry.py` does not command the camera or download photos. It watches `--image-dir` for image files, which something else must put there — MAVLink FTP, a companion computer writing frames from an RTSP stream, or a card reader on the ground. Each waypoint consumes at most one new file; if the camera has not written one yet, that waypoint is skipped with a message rather than re-posting the previous photo.
+- **A file is only used once**, and only if it is newer than the last one used, so a slow camera cannot make one photo appear at several waypoints.
+- **The classifier is a leaf model, not an aerial one.** It was trained and measured on close-up leaf photographs (PlantVillage), and has never been evaluated on imagery taken from a drone at altitude. Treat UAV output as an exploratory heatmap for deciding where to walk and scout, not as a diagnosis of those plants. The measured leaf-photo numbers are in `models/exports/metrics.json`; there is no aerial equivalent yet.
 
 **Test without real hardware using ArduCopter SITL:**
 

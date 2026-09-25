@@ -74,7 +74,13 @@ import numpy as np
 from PIL import Image
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-CLASS_NAMES = ["NCLB", "Rust", "GLS", "Healthy"]
+from src.common.labels import SHORT_NAMES as CLASS_NAMES  # noqa: E402
+from src.common.postprocess import postprocess  # noqa: E402
+
+# ArduPilot sets MISSION_CURRENT when it *starts* flying to a waypoint; the
+# photo taken there does not exist yet. MISSION_ITEM_REACHED is the event that
+# means the drone is over the point (T40).
+MISSION_REACHED_MESSAGE = "MISSION_ITEM_REACHED"
 PATCH_SIZE  = 300
 HEARTBEAT_TIMEOUT_S = 10
 TELEMETRY_HZ = 2          # how often to POST position to live server
@@ -203,6 +209,7 @@ class DroneState:
         self.current_wp: int = 0
         self.fix_type: int = 0       # 0=no fix, 3=3D fix
         self.satellites: int = 0
+        self.reached_waypoints: list = []
         self.lock = threading.Lock()
 
     def update_position(self, msg) -> None:
@@ -229,6 +236,16 @@ class DroneState:
         with self.lock:
             self.current_wp = seq
 
+    def note_waypoint_reached(self, seq: int) -> None:
+        with self.lock:
+            self.reached_waypoints.append(seq)
+
+    def take_reached_waypoints(self) -> list:
+        """Waypoints reached since the last call, oldest first."""
+        with self.lock:
+            reached, self.reached_waypoints = self.reached_waypoints, []
+            return reached
+
     def snapshot(self) -> dict:
         with self.lock:
             return {
@@ -243,6 +260,87 @@ class DroneState:
                 "fix_type":     self.fix_type,
                 "satellites":   self.satellites,
             }
+
+
+# ── Captures ─────────────────────────────────────────────────────────────────
+
+class CaptureTracker:
+    """Hands out each new capture in a directory exactly once.
+
+    The loop this replaces classified whichever file was newest every time a
+    waypoint event arrived, so a slow camera meant the previous waypoint's
+    photo was posted again under the new waypoint's number (T40).
+    """
+
+    def __init__(self, image_dir: str, suffixes=(".jpg", ".jpeg", ".png")):
+        self.image_dir = image_dir
+        self.suffixes = suffixes
+        # Watermark: (mtime, filename) of the last capture handed out. A photo
+        # that appears with an older timestamp belongs to an earlier waypoint
+        # and is not reprocessed (T40).
+        self.watermark: Optional[tuple] = None
+        self.last_capture: Optional[str] = None
+
+    def _candidates(self):
+        try:
+            names = os.listdir(self.image_dir)
+        except OSError as exc:
+            print(f"[WARN] capture directory unreadable: {exc}")
+            return []
+        found = []
+        for name in names:
+            if not name.lower().endswith(self.suffixes):
+                continue
+            path = os.path.join(self.image_dir, name)
+            try:
+                stat = os.stat(path)
+            except OSError:
+                continue
+            # A file the camera has created but not finished writing is not a
+            # capture yet; it will be picked up on a later pass.
+            if stat.st_size == 0:
+                continue
+            found.append((stat.st_mtime, name, path))
+        return sorted(found)
+
+    def next_capture(self) -> Optional[str]:
+        """The oldest capture newer than the last one taken, or None."""
+        for mtime, name, path in self._candidates():
+            key = (mtime, name)
+            if self.watermark is not None and key <= self.watermark:
+                continue
+            self.watermark = key
+            self.last_capture = path
+            return path
+        return None
+
+
+def handle_waypoint_reached(seq: int, tracker: "CaptureTracker", classify,
+                            snapshot: dict, post) -> Optional[dict]:
+    """Classifies the capture taken at this waypoint and posts it, once.
+
+    Returns the posted payload, or None when there is no new capture or the
+    classification produced nothing.
+    """
+    capture = tracker.next_capture()
+    if capture is None:
+        print(f"[INFO] waypoint {seq} reached but no new capture yet — skipping.")
+        return None
+
+    result = classify(capture)
+    if not result:
+        print(f"[SKIP] {os.path.basename(capture)} produced no result.")
+        return None
+
+    payload = {
+        **result,
+        "lat": snapshot.get("lat"),
+        "lon": snapshot.get("lon"),
+        "waypoint": seq,
+        "image": os.path.basename(capture),
+    }
+    post(payload)
+    return payload
 
 
 # ── TFLite patch inference ────────────────────────────────────────────────────
@@ -280,21 +378,17 @@ def classify_patch(interp, image_path: str) -> Optional[dict]:
         interp.invoke()
         latency_ms = (time.perf_counter() - t0) * 1000
 
-        raw = interp.get_tensor(out["index"])[0].astype(np.float32)
-        if out["dtype"] == np.uint8:
-            scale, zp = out["quantization"]
-            raw = (raw - zp) * scale
-        if raw.max() > 1.0 or raw.min() < 0.0:
-            e = np.exp(raw - raw.max())
-            raw = e / e.sum()
-
-        class_id   = int(np.argmax(raw))
-        confidence = float(raw[class_id])
+        raw = interp.get_tensor(out["index"])[0]
+        # The shared rule: dequantise with the tensor's own parameters,
+        # renormalise, never softmax probabilities (T33).
+        probs = postprocess(raw, out["quantization"])
+        class_id   = int(np.argmax(probs))
+        confidence = float(probs[class_id])
         return {
             "class_id":   class_id,
             "class_name": CLASS_NAMES[class_id],
             "confidence": round(confidence, 4),
-            "scores":     [round(float(s), 4) for s in raw],
+            "scores":     [round(float(s), 4) for s in probs],
             "latency_ms": round(latency_ms, 1),
         }
     except Exception as exc:
@@ -336,6 +430,10 @@ def telemetry_loop(master, state: DroneState, server_url: str,
             state.update_heartbeat(msg)
         elif mtype == "MISSION_CURRENT":
             state.update_mission_current(msg.seq)
+        elif mtype == MISSION_REACHED_MESSAGE:
+            # The drone is over the point now — this, not MISSION_CURRENT, is
+            # when a capture exists to classify (T40).
+            state.note_waypoint_reached(msg.seq)
 
         # POST telemetry to live server at TELEMETRY_HZ
         now = time.monotonic()
@@ -468,8 +566,8 @@ def main():
     print("       Open your browser at that URL to see the real-time map.")
     print("       Press Ctrl+C to stop.\n")
 
-    # ── Main loop: watch for MISSION_ITEM_REACHED and trigger inference ───────
-    last_wp_reached = -1
+    # ── Main loop: act on MISSION_ITEM_REACHED, one capture at a time ────────
+    tracker = CaptureTracker(args.image_dir)
 
     try:
         while True:
@@ -482,43 +580,19 @@ def main():
             wp_str  = f"WP={snap['current_wp']}"
             print(f"\r  {pos_str}  {wp_str}  {bat_str}  {fix_str}      ", end="", flush=True)
 
-            # Check for new waypoint reached
-            # MISSION_ITEM_REACHED is caught in the telemetry thread;
-            # we detect it via current_wp change here for simplicity
-            current_wp = snap["current_wp"]
-            if current_wp != last_wp_reached and current_wp > 0:
-                last_wp_reached = current_wp
-                print(f"\n[WP] Reached waypoint {current_wp}")
-
-                # Look for the most recently downloaded image from the drone camera
-                # (assumes drone saves images to args.image_dir via MAVLink FTP or RTSP capture)
-                captures = sorted([
-                    os.path.join(args.image_dir, f)
-                    for f in os.listdir(args.image_dir)
-                    if f.lower().endswith((".jpg", ".jpeg", ".png"))
-                ], key=os.path.getmtime, reverse=True)
-
-                if captures:
-                    latest = captures[0]
-                    print(f"  Classifying: {os.path.basename(latest)}")
-                    result = classify_patch(interp, latest)
-                    if result:
-                        print(f"  Result: {result['class_name']} "
-                              f"({result['confidence']:.1%})  "
-                              f"latency={result['latency_ms']:.0f}ms")
-                        # POST patch result to live server
-                        patch_payload = {
-                            **result,
-                            "lat":       snap["lat"],
-                            "lon":       snap["lon"],
-                            "waypoint":  current_wp,
-                            "image":     os.path.basename(latest),
-                        }
-                        post_json(f"{args.server}/patch", patch_payload)
-                    else:
-                        print("  [SKIP] Inference returned no result.")
-                else:
-                    print(f"  [INFO] No capture found in {args.image_dir}")
+            for seq in state.take_reached_waypoints():
+                print(f"\n[WP] Reached waypoint {seq}")
+                payload = handle_waypoint_reached(
+                    seq=seq,
+                    tracker=tracker,
+                    classify=lambda path: classify_patch(interp, path),
+                    snapshot=snap,
+                    post=lambda body: post_json(f"{args.server}/patch", body),
+                )
+                if payload:
+                    print(f"  {payload['image']}: {payload['class_name']} "
+                          f"({payload['confidence']:.1%})  "
+                          f"latency={payload['latency_ms']:.0f}ms")
 
             time.sleep(0.5)
 
