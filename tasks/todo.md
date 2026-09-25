@@ -91,13 +91,14 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [ ] **Checkpoint 7:** notebooks execute; claim table reviewed; docs greps clean
 
 ## Phase 8: Hardening
-- [ ] T47 Remove dead code and legacy aliases [Phase 4 · S]
+- [x] T47 Remove dead code and legacy aliases [Phase 4 · S] — the colors.dart → design-token migration stays deferred
 - [ ] T48 Critical-path integration test [Phases 1–4 · M]
 - [ ] T49 CI gate: analyze, test, pytest, secret scan, banned-claims grep [T48, T02 · S]
 - [ ] **Checkpoint 8:** CI green; release checklist on real devices; final review
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T47: the `geminiKeyProvider` alias, the `/recommendation` route, the unused `widgets/ds.dart` re-export shim and the duplicate `promptName` are gone, and the remaining `classId == 3` literals now use `kHealthyClassId`.
 - T46: REQUIREMENTS now states the Flutter stack, minSdk 24 and app id read from the built APK, the 17-d metadata layout, AdamW with sparse categorical cross-entropy, `Rescaling(1/255)`, and the advisory requirements as built (source always shown, no dose, healthy and low-confidence branches). NFR-01 is marked not-yet-measured, NFR-22 needs restating now that FP16 is primary, and NFR-23 is marked not met (148.4 MB vs 80 MB, T58). DIAGRAMS follows. PLAN.md is marked historical and points at `tasks/plan.md`.
 - T45: README and SYSTEM describe the Flutter app that exists (the "moved to React Native, Flutter kept at deployment/app" note was false — that directory does not exist), Python 3.11, the 17-d metadata vector, Groq/YarnGPT keys, and `src.phase5_uav` commands rather than the deprecated `deployment.uav` shims. Running the documented commands found one that could not work as written (`python src/phase2_ocr/extractor.py` breaks the `src.` package import); it is now the module form.
 - T44: the papers now describe the app that exists — one advisory provider (no Gemini, no Ollama, no provider chain), keys that belong to the farmer with the compile-time-constant claim corrected, no mobile OCR preprocessing claim, the FP16-first decision with measured costs, and a limitations section that states lab-only data, the GLS gap, synthetic fusion metadata, the UAV domain mismatch and the unmeasured device latency.

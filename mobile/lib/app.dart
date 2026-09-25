@@ -34,7 +34,6 @@ final _router = GoRouter(
     ),
     GoRoute(path: '/camera', builder: (_, __) => const CameraScreen()),
     GoRoute(path: '/result', builder: (_, __) => const ResultScreen()),
-    GoRoute(path: '/recommendation', builder: (_, __) => const ResultScreen()),
     GoRoute(path: '/ocr', builder: (_, __) => const OcrScreen()),
     GoRoute(path: '/map', builder: (_, __) => const MapScreen()),
   ],

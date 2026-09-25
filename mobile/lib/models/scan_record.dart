@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../constants/diseases.dart';
+
 class ScanRecord {
   final int? id;
   final String imagePath;
@@ -55,7 +57,7 @@ class ScanRecord {
       (aiAdvice != null && aiLanguage == language) ? aiAdvice : null;
 
   bool get hasGps => latitude != null && longitude != null;
-  bool get isHealthy => classId == 3;
+  bool get isHealthy => classId == kHealthyClassId;
 
   Map<String, dynamic> toMap() => {
     if (id != null) 'id': id,

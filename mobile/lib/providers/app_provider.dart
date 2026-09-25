@@ -235,20 +235,12 @@ class YarnGptKeyNotifier extends StateNotifier<String?> {
   }
 }
 
-// Backwards compatibility alias for components being refactored
-final geminiKeyProvider = groqKeyProvider;
 
 // ── Display language ───────────────────────────────────────────────────────────
 enum DisplayLanguage { english, yoruba, igbo, hausa }
 
 extension DisplayLanguageX on DisplayLanguage {
   String get label => switch (this) {
-    DisplayLanguage.english => 'English',
-    DisplayLanguage.yoruba  => 'Yoruba',
-    DisplayLanguage.igbo    => 'Igbo',
-    DisplayLanguage.hausa   => 'Hausa',
-  };
-  String get promptName => switch (this) {
     DisplayLanguage.english => 'English',
     DisplayLanguage.yoruba  => 'Yoruba',
     DisplayLanguage.igbo    => 'Igbo',
