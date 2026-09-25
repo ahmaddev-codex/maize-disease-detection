@@ -1,0 +1,34 @@
+{
+  "total_patches": 250,
+  "disease_patches": 145,
+  "healthy_patches": 105,
+  "disease_rate_pct": 58.0,
+  "classes": {
+    "NCLB": {
+      "count": 48,
+      "pct": 19.2,
+      "mean_confidence": 0.785,
+      "severity": "high"
+    },
+    "Rust": {
+      "count": 59,
+      "pct": 23.6,
+      "mean_confidence": 0.788,
+      "severity": "medium"
+    },
+    "GLS": {
+      "count": 38,
+      "pct": 15.2,
+      "mean_confidence": 0.751,
+      "severity": "medium"
+    },
+    "Healthy": {
+      "count": 105,
+      "pct": 42.0,
+      "mean_confidence": 0.766,
+      "severity": "low"
+    }
+  },
+  "avg_latency_ms": null,
+  "recommendation": "58% of field affected. Dominant: Rust. Apply triazole fungicide (propiconazole) early. Rust spreads rapidly in cool humid conditions."
+}

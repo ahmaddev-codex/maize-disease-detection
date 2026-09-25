@@ -188,14 +188,24 @@ def build_folium_map(predictions: List[Dict], output_html: str = "") -> Any:
         if conf < CONFIDENCE_THRESHOLDS.get("medium", 0.55):
             continue   # skip low-confidence detections from the marker layer
 
+        # Latency and patch indices are optional: demo rows and some CSVs
+        # carry neither, and a missing field must not break the map (T38/T42).
+        latency = p.get("latency_ms")
+        latency_row = (f"Latency    : {latency:.0f} ms<br>"
+                       if isinstance(latency, (int, float)) else "")
+        patch_row = p.get("patch_row")
+        patch_col = p.get("patch_col")
+        patch_line = (f"Patch      : row {patch_row}, col {patch_col}<br>"
+                      if patch_row is not None and patch_col is not None else "")
+        synthetic_line = ("<i>synthetic demo row</i><br>" if p.get("synthetic") else "")
+
         popup_html = f"""
         <div style="font-family:monospace;font-size:12px;min-width:180px">
           <b style="color:{info['color']}">{info['label']}</b><br>
-          Confidence : {conf:.1%}<br>
+          {synthetic_line}Confidence : {conf:.1%}<br>
           Severity   : {info['severity'].upper()}<br>
           Lat / Lon  : {p['lat']:.5f}, {p['lon']:.5f}<br>
-          Patch      : row {p['patch_row']}, col {p['patch_col']}<br>
-          Latency    : {p['latency_ms']:.0f} ms
+          {patch_line}{latency_row}
         </div>"""
         folium.CircleMarker(
             location=(p["lat"], p["lon"]),
@@ -382,7 +392,9 @@ def print_summary(summary: Dict) -> None:
     print("\n──── UAV survey summary ─────────────────────────────")
     print(f"  Total patches analysed : {summary['total_patches']}")
     print(f"  Disease patches        : {summary['disease_patches']}  ({summary['disease_rate_pct']}%)")
-    print(f"  Avg inference latency  : {summary['avg_latency_ms']} ms/patch")
+    latency = summary.get("avg_latency_ms")
+    print(f"  Avg inference latency  : "
+          f"{f'{latency} ms/patch' if latency is not None else 'not recorded'}")
     print()
     for cls, info in summary["classes"].items():
         bar = "█" * max(0, int(info["pct"] / 2))
