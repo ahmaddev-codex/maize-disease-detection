@@ -1,4 +1,13 @@
-# Maize Disease Detection — Build Plan
+# Maize Disease Detection — Build Plan (historical)
+
+> **Superseded.** This is the original build plan, kept as a record of how the
+> project was first sequenced. It describes an earlier platform decision and
+> earlier targets, and it is not maintained.
+>
+> The live plan is **`tasks/plan.md`** (tasks T01–T58, with acceptance criteria
+> and verification), and the live checklist is **`tasks/todo.md`**. Measured
+> results live in `models/exports/metrics.json`; decisions live in `decisions/`.
+
 
 **Project**: CNN + OCR multimodal system for maize disease detection in Nigerian smallholder farms
 **Team**: Olapade (CNN/CV) · Tijani (OCR) · Oshodilawal (Edge/UI)
@@ -100,9 +109,14 @@ planting_date →  days-since-epoch or seasonal bucket
 
 ---
 
-## React Native App — Sprint A: Core ✅
-> ⚠️ Platform migrated from Flutter → React Native 0.73 (Android-first) on 2026-06-13.
-> Source: `mobile/`   Flutter source kept at `deployment/app/` for reference only.
+## Mobile App — Sprint A: Core ✅
+> **This section is inaccurate and is kept only as a record.** It was written
+> against a planned migration from Flutter to React Native 0.73 that never
+> happened: `mobile/` is a Flutter project, `deployment/app/` does not exist,
+> and the React Native packages listed below (VisionCamera, Skia,
+> react-native-fast-tflite, op-sqlite, victory-native, react-native-maps) are
+> not dependencies of this project. The Flutter equivalents are listed in
+> `REQUIREMENTS.md` §7.2. The advisory is Groq-only (ADR-003), not Gemini.
 
 - [x] `mobile/` — React Native project scaffolded (Android-first)
 - [x] Camera screen — VisionCamera v4, green corner guide, brightness frame processor

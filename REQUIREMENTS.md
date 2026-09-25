@@ -2,7 +2,7 @@
 
 **Project Title:** MaizeGuard — AI-Powered Maize Disease Detection System  
 **Team:** Olapade (CNN/CV) · Tijani (OCR) · Oshodilawal (Edge/UI)  
-**Platform:** React Native (Android-first) + Python ML backend  
+**Platform:** Flutter 3.x (Android and iOS) + Python 3.11 ML pipeline  
 **Version:** 1.0  
 
 ---
@@ -24,7 +24,7 @@
 
 ## 1. Project Overview
 
-MaizeGuard is a multimodal AI system for detecting diseases in maize (corn) crops. It combines a Convolutional Neural Network (CNN) for leaf image classification with an Optical Character Recognition (OCR) subsystem for seed label parsing. The system targets Nigerian smallholder farmers and delivers on-device inference via a React Native Android application, with optional cloud-assisted AI advice through the Google Gemini API.
+MaizeGuard is a multimodal AI system for detecting diseases in maize (corn) crops. It combines a Convolutional Neural Network (CNN) for leaf image classification with an Optical Character Recognition (OCR) subsystem for seed label parsing. The system targets Nigerian smallholder farmers and delivers on-device inference via a Flutter application for Android and iOS, with optional cloud-assisted advice through a single provider (Groq) when the farmer supplies a key.
 
 ### Problem Statement
 Maize diseases such as Northern Corn Leaf Blight (NCLB), Common Rust, and Gray Leaf Spot cause significant yield losses among smallholder farmers in Nigeria who lack timely access to agronomic expertise. Early detection and treatment recommendations can prevent losses of up to 40–70% per season.
@@ -110,16 +110,20 @@ A mobile application running a quantised EfficientNetB3 model fully on-device (n
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-27 | The app SHALL generate agronomic recommendations using an on-device rule engine when no API key is configured | Must Have |
-| FR-28 | When a Gemini API key is configured, the app SHALL send a structured prompt to Gemini 2.0 Flash and display the AI-generated response | Should Have |
+| FR-28 | When a Groq API key is configured, the app SHALL send a diagnosis-appropriate prompt to Groq and display the response as plain text, naming the model that answered | Should Have |
+| FR-28a | The app SHALL show, for every advisory, whether it came from a model or from the built-in rules, and why the built-in rules were used | Must Have |
+| FR-28b | No advisory — generated or built-in — SHALL state a dose, rate or mixing ratio; these SHALL be referred to the product label and to an extension officer | Must Have |
+| FR-28c | For a healthy leaf the app SHALL state that no fungicide is needed; below the low-confidence threshold it SHALL ask for a better photograph and name no chemical | Must Have |
+| FR-28d | Advice SHALL be stored with the scan and reused for the same scan and language, so reopening a scan issues no further request | Should Have |
 | FR-29 | On-device recommendations SHALL account for: disease class, confidence level, scan trend (worsening/stable/improving), Nigerian farming season (main/off/dry), and specific fungicide options available in Nigeria | Must Have |
-| FR-30 | The Gemini API key SHALL be stored in encrypted device secure storage (Keychain), not in plain text | Must Have |
+| FR-30 | API keys SHALL be stored in platform secure storage (Android Keystore / iOS Keychain), never in plain text, and release builds SHALL ship with no key of the project's own (ADR-003) | Must Have |
 
 ### 3.8 Settings
 
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-31 | The app SHALL support light and dark mode themes | Should Have |
-| FR-32 | The user SHALL be able to save or clear the Gemini API key from settings | Must Have |
+| FR-32 | The user SHALL be able to save or clear the Groq and YarnGPT keys from settings, and a cleared key SHALL stay cleared across launches | Must Have |
 | FR-33 | The settings screen SHALL display model status and metadata (model name, size, class count) | Should Have |
 
 ---
@@ -130,7 +134,7 @@ A mobile application running a quantised EfficientNetB3 model fully on-device (n
 
 | ID | Requirement | Target |
 |---|---|---|
-| NFR-01 | Inference latency (image capture → result displayed) | ≤ 2,000ms on Android API 24+, mid-range device |
+| NFR-01 | Inference latency (image capture → result displayed) | ≤ 2,000 ms on Android API 24+, mid-range device. **Not yet measured on a device** (T12); the `latency_ms` stored per scan is model time only and must not be quoted against this target |
 | NFR-02 | App cold start to Home screen ready | ≤ 4 seconds |
 | NFR-03 | TFLite model load time | ≤ 3 seconds (GPU delegate) / ≤ 5 seconds (CPU fallback) |
 | NFR-04 | Database write per scan | ≤ 50ms |
@@ -166,7 +170,7 @@ A mobile application running a quantised EfficientNetB3 model fully on-device (n
 | ID | Requirement |
 |---|---|
 | NFR-16 | API keys SHALL be stored using Android Keystore-backed secure storage, never in SharedPreferences or plain files |
-| NFR-17 | All network communication (Gemini API) SHALL use HTTPS only |
+| NFR-17 | All network communication (Groq, YarnGPT, OpenStreetMap tiles) SHALL use HTTPS only |
 | NFR-18 | The app SHALL NOT transmit captured images to external servers |
 
 ### 4.6 Usability
@@ -181,8 +185,8 @@ A mobile application running a quantised EfficientNetB3 model fully on-device (n
 
 | ID | Requirement | Target |
 |---|---|---|
-| NFR-22 | TFLite INT8 model size | ≤ 15MB bundled in APK |
-| NFR-23 | Total APK size | ≤ 80MB |
+| NFR-22 | Bundled TFLite model size | ≤ 15 MB for INT8 (measured 13.5 MB ✓). The app loads FP16 (23.3 MB) first for accuracy (ADR-001), so the bundled models total 36.8 MB and this requirement needs restating |
+| NFR-23 | Total APK size | ≤ 80 MB. **Not met:** the release APK measures 148.4 MB (T58) |
 
 ---
 
@@ -221,7 +225,7 @@ All splits are **stratified** by class to preserve class proportions across sets
 | Step | Detail |
 |---|---|
 | Resize | All images resized to 300×300 pixels (EfficientNetB3 native resolution) |
-| Normalisation | **None applied externally.** EfficientNetB3 includes an internal `Rescaling(1/127.5, offset=-1)` layer; inputs are passed as raw [0, 255] uint8 |
+| Normalisation | **None applied externally.** EfficientNetB3 includes an internal `Rescaling(1/255)` layer; inputs are passed as float32 in [0, 255] |
 | Augmentation (train only) | Horizontal flip, rotation ±20°, zoom ±15%, brightness ±10%, contrast ±10% |
 
 ### 5.5 Data Annotation Format
@@ -246,7 +250,7 @@ Extended annotations with OCR metadata in `data/annotations/labels_with_metadata
 ```
 Input: [1, 300, 300, 3]  uint8 [0, 255]
   └─► EfficientNetB3 backbone (ImageNet pretrained)
-       Internal: Rescaling(1/127.5, offset=-1)
+       Internal: Rescaling(1/255)
        MBConv blocks with Squeeze-Excitation
   └─► GlobalAveragePooling2D → (1536,)
   └─► BatchNormalization
@@ -266,7 +270,7 @@ Output: [1, 4]  float32  (class probabilities)
 | Stage 2 — Fine-tuning | 30 | 1×10⁻⁵ | Layers 0–99 frozen; 100+ trainable |
 
 **Training Configuration:**
-- Optimizer: Adam
+- Optimizer: AdamW (weight decay 1e-4), loss `sparse_categorical_crossentropy`
 - Loss: Categorical Crossentropy
 - Callbacks: EarlyStopping (patience=5), ReduceLROnPlateau (patience=3), ModelCheckpoint
 - Class weights: Applied to address GLS class imbalance (574 vs 1,306 images)
@@ -293,7 +297,7 @@ Output: [1, 4]  float32  (class probabilities)
 | `batch_number` | Regex (BN-YYYY-NNN / LOT # / BATCH NO:) | "BN-2024-001" |
 | `planting_date` | Multi-pattern regex + ISO normalisation | "2024-03-15" |
 
-**Feature Encoding:** 24-dimensional vector: 13-d one-hot (variety) + 1 (batch present) + 1 (batch year) + 2 (planting month sin/cos) + 7 (padding)
+**Feature Encoding:** 17-dimensional vector (`METADATA_DIM = NUM_VARIETIES + 4` in `src/phase2_ocr/encoder.py`): 13-d one-hot (variety, all zeros = unknown) + 1 (batch present) + 1 (batch year / 2030) + 2 (planting month sin/cos). There is no padding.
 
 ### 6.3 Multimodal Fusion (Phase 3)
 
@@ -311,7 +315,7 @@ Fusion:
 ```
 
 - Target: ≥ CNN baseline + 5% accuracy gain
-- Training: Adam (LR=5×10⁻⁴), 50 epochs, same augmentation as Phase 1
+- Training: AdamW (LR=5×10⁻⁴), 50 epochs, same augmentation as Phase 1
 
 ### 6.4 Edge Deployment (Phase 4)
 
@@ -340,26 +344,27 @@ Fusion:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  PRESENTATION LAYER                                      │
-│  React Native screens (Android)                         │
+│  Flutter screens (Android + iOS)                        │
 │  Home · Camera · Result · OCR · Dashboard               │
-│  History · Map · Recommendation · Settings              │
+│  History · Map · Settings                               │
 ├─────────────────────────────────────────────────────────┤
 │  BUSINESS LOGIC LAYER                                    │
-│  classifier.ts   — TFLite inference + INT8 dequant      │
-│  ocrService.ts   — ML Kit OCR + regex field extraction  │
-│  recommendationEngine.ts — on-device rule engine        │
-│  aiAdvisor.ts    — Gemini 2.0 Flash API client          │
-│  locationService.ts — GPS tagging                        │
+│  classifier_service.dart — TFLite inference (isolate)   │
+│  classifier_postprocess.dart — dequantise + renormalise │
+│  ocr_service.dart + ocr_parser.dart — ML Kit + parsing  │
+│  recommendation_engine.dart — built-in rules            │
+│  ai_advisor.dart — Groq client, reports its source      │
+│  location_service.dart — GPS tagging                    │
 ├─────────────────────────────────────────────────────────┤
 │  DATA LAYER                                              │
-│  op-sqlite (local SQLite) — scan_records table          │
-│  AsyncStorage — theme preference                        │
-│  Android Keychain — Gemini API key                      │
-│  react-native-fast-tflite — model in memory             │
+│  sqflite (local SQLite) — scan_records table (v3)       │
+│  SharedPreferences — theme, language, flags             │
+│  flutter_secure_storage — Groq and YarnGPT keys         │
+│  tflite_flutter — model in memory                       │
 ├─────────────────────────────────────────────────────────┤
 │  ML CORE                                                 │
-│  efficientnetb3_maize_int8.tflite  (~13MB)              │
-│  efficientnetb3_maize_fp16.tflite  (~23MB, fallback)    │
+│  efficientnetb3_maize_fp16.tflite  (23.3 MB, primary)   │
+│  efficientnetb3_maize_int8.tflite  (13.5 MB, fallback)  │
 │  Trained on PlantVillage, 4 classes, 300×300 input      │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -368,22 +373,23 @@ Fusion:
 
 | Component | Technology | Version |
 |---|---|---|
-| Mobile framework | React Native | 0.73.6 |
-| Language | TypeScript | 5.0.4 |
-| TFLite inference | react-native-fast-tflite | ^1.3.0 |
-| Camera | react-native-vision-camera | ^4.3.2 |
-| Image preprocessing | @shopify/react-native-skia | ^1.2.3 |
-| OCR | @react-native-ml-kit/text-recognition | ^1.1.0 |
-| Database | @op-engineering/op-sqlite | ^8.0.5 |
-| Maps | react-native-maps + OSM UrlTile | ^1.14.0 |
-| Charts | victory-native | ^41.6.0 |
-| Navigation | @react-navigation/native | ^6.1.17 |
-| State management | Zustand | ^4.5.2 |
-| Secure storage | react-native-keychain | ^8.2.0 |
-| GPS | react-native-geolocation-service | ^5.3.1 |
+| Mobile framework | Flutter | 3.x (Dart SDK ≥ 3.3) |
+| Language | Dart | 3.x |
+| TFLite inference | tflite_flutter | 0.11.0 |
+| Camera | camera | ^0.11 |
+| Image preprocessing | image (Dart) | ^4 |
+| OCR | google_mlkit_text_recognition | ^0.13.1 |
+| Database | sqflite | ^2 |
+| Maps | flutter_map + OpenStreetMap tiles | ^7 |
+| Navigation | go_router | ^14 |
+| State management | Riverpod | ^2 |
+| Secure storage | flutter_secure_storage | ^9 |
+| GPS | geolocator | ^13 |
+| Speech | flutter_tts (device) + YarnGPT (Nigerian languages) | ^4 |
 | ML training | TensorFlow / Keras | 2.16.2 |
-| OCR training pipeline | Python + Tesseract 5 | 3.12 |
-| Minimum Android API | API 24 (Android 7.0) | — |
+| OCR pipeline | Python + Tesseract 5 | 3.11 |
+| Minimum Android API | API 24 (Android 7.0) — read from the built APK | — |
+| Application ID | `com.ahmaddev.maizeguard` (ADR-005) | — |
 
 ### 7.3 Data Flow
 
@@ -399,7 +405,7 @@ Fusion:
          → SQLite INSERT scan_records
          → Navigate to Result screen
          → (Optional) Navigate to Recommendation
-         → aiAdvisor (Gemini API or on-device engine)
+         → ai_advisor (Groq when a key and a connection exist, else built-in rules)
 ```
 
 **OCR Flow:**
@@ -453,7 +459,7 @@ Classifier  Pipeline    Model       Deployment   Integration
    │           │           │           │            │
    └───────────┴───────────┴───────────┴────────────┘
                         Mobile App (parallel track)
-                   React Native (Android-first)
+                   Flutter (Android + iOS)
 ```
 
 **Phase Gate Criteria:**
@@ -482,7 +488,7 @@ Classifier  Pipeline    Model       Deployment   Integration
 
 #### 9.1 Architectural Diagram
 Present the four-layer architecture diagram from Section 7.1 with explanations:
-- **Presentation Layer** — React Native UI, handles user interaction, camera, display
+- **Presentation Layer** — Flutter UI, handles user interaction, camera, display
 - **Business Logic Layer** — Services that orchestrate inference, OCR, database operations, and AI advice
 - **Data Layer** — Local SQLite for persistence, secure storage for API keys, in-memory TFLite model
 - **ML Core** — Quantised TFLite models bundled with the APK
@@ -490,7 +496,7 @@ Present the four-layer architecture diagram from Section 7.1 with explanations:
 #### 9.2 Data Flow Diagram (DFD)
 
 **Level 0 (Context Diagram):**
-- External entities: Farmer, PlantVillage Dataset, Gemini API
+- External entities: Farmer, PlantVillage Dataset, Groq API, YarnGPT API
 - System: MaizeGuard
 - Flows: Image → MaizeGuard → Disease Report; Training Data → MaizeGuard (model training)
 
@@ -500,7 +506,7 @@ Present the four-layer architecture diagram from Section 7.1 with explanations:
 - Process 3.0: TFLite Inference (EfficientNetB3)
 - Process 4.0: Result Generation (dequantise, argmax, disease lookup)
 - Process 5.0: Persistence (GPS tag, SQLite INSERT)
-- Process 6.0: Recommendation (on-device engine / Gemini API)
+- Process 6.0: Recommendation (built-in rules / Groq API)
 - Data store: D1 — scan_records (SQLite)
 
 #### 9.3 Entity Relationship Diagram (ERD)
@@ -581,7 +587,7 @@ Tesseract 5 uses a Long Short-Term Memory (LSTM) recurrent neural network for se
 | Dashboard | Health score arc (e.g. 72/100), 7-day bar chart, disease breakdown | Trend monitoring over time, not just per-scan |
 | History Screen | Filterable list with disease colour labels, GPS icon, confidence | Full audit trail of all scans |
 | Map Screen | OSM map with coloured disease markers | Spatial disease distribution across the farm |
-| Recommendation | On-device vs Gemini AI advice badge, formatted action steps | Two-tier advice system explained |
+| Recommendation | Built-in vs generated advice, with the source named on the card | Two-source advice system explained |
 | Settings | Dark/light toggle, API key input, model metadata | User control and transparency |
 
 #### 9.10 Model Training, Testing and Evaluation Results (Data-Driven Project)
