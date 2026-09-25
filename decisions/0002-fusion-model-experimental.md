@@ -54,6 +54,11 @@ helped. The result is written to `models/exports/metrics.json` under
 `fusion_ablation`, carrying `metadata_is_synthetic` so no reader can mistake
 an architecture check for evidence about real farm data.
 
+**First run (2026-09-25, 3 epochs per arm, frozen backbone):** `cnn_only`
+93.63%, `fusion` 93.79%, `fusion_shuffled` 93.63%. Fusion exceeds shuffled by
+0.16 points — inside the noise band — so the synthetic metadata carries no
+signal, as expected.
+
 Until a real paired dataset exists, a favourable ablation on synthetic
 metadata would itself be a red flag: invented values cannot carry signal about
 a disease, so a large gain would point at leakage in the split, not at

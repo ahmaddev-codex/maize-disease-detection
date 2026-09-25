@@ -54,7 +54,19 @@ What can be measured is whether the metadata carries anything at all. `src/phase
 | `fusion` | each image's own vector |
 | `fusion_shuffled` | the same vectors, permuted across images |
 
-The shuffled arm preserves every marginal distribution and destroys only the pairing between an image and its metadata. Fusion must beat *that* arm by more than the run-to-run noise band to count as signal; beating `cnn_only` alone would show only that the additional parameters helped. The result is recorded under `fusion_ablation` in `models/exports/metrics.json`, together with the flag stating that the metadata was synthetic.
+The shuffled arm preserves every marginal distribution and destroys only the pairing between an image and its metadata. Fusion must beat *that* arm by more than the run-to-run noise band to count as signal; beating `cnn_only` alone would show only that the additional parameters helped.
+
+The run (3 epochs per arm, frozen backbone, the same 2,930 / 628 / 628 split, test set of 628 images) gives:
+
+| Arm | Test accuracy | Test loss |
+|---|---|---|
+| `cnn_only` | 93.63% | 0.1640 |
+| `fusion` | 93.79% | 0.1638 |
+| `fusion_shuffled` | 93.63% | 0.1690 |
+
+Fusion exceeds the CNN-only arm by 0.16 points and the shuffled arm by the same 0.16 points — both inside the 1-point noise band, and fusion-versus-shuffled is the comparison that matters. **The metadata carries no signal here**, which is the expected result when the metadata is invented: a model cannot learn a relationship that was never put into the data. Had fusion beaten the shuffled arm substantially, that would have been a reason to suspect leakage in the split rather than evidence of multimodal learning.
+
+The result is recorded under `fusion_ablation` in `models/exports/metrics.json`, together with the flag stating that the metadata was synthetic and the configuration of the run.
 
 The architectural motivation stands — variety-specific susceptibility is real agronomy — but it remains motivation until a paired dataset exists (ADR-002).
 

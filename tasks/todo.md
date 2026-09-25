@@ -57,7 +57,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Phase 5: ML pipeline integrity (parallel with Phases 1–4)
 - [x] T30 Fusion training crash fixed (Prove-It) [— · S]
-- [ ] T31 Fusion metadata policy and ablation (ADR-002) [T30, T01 · M]
+- [x] T31 Fusion metadata policy and ablation (ADR-002) [T30, T01 · M] — full run recorded: fusion beats shuffled by 0.16 pts, inside the noise band
 - [x] T32 Model provenance and train-only INT8 calibration [T01 · M] — code landed with the T34 commit (4b36697); exports re-made and re-measured
 - [x] T33 Shared Python labels and post-processing [T01 · M] — UAV modules still hold their own names (T39/T40)
 - [x] T34 Dataset hygiene: conflicting-label duplicates excluded [T01 · M] — split changed, metrics regenerated (INT8 88.08→87.26, FP16 91.10→93.15 on the new split)
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- T31: the fusion metadata is flagged `synthetic=1` at the point it is generated, and the ablation has been run on the full split: cnn_only 93.63%, fusion 93.79%, fusion_shuffled 93.63%. Fusion beats shuffled by 0.16 points — inside the noise band — so the metadata carries no signal, which is what invented values should produce. Chapters 4 and 5 and ADR-002 now quote those numbers instead of a +5.8-point gain.
 - T48: `mobile/test/critical_path_test.dart` walks the seam between the pieces — a seed label scanned before a capture reaches storage with the scan, history lists and opens that scan, deleting it removes the row, the photo and the active-scan state, and the result screen shows the diagnosis, the seed card and the advice source (fetched once and stored). Real database work runs in a plain test and the screens run against the in-memory fake, because a real sqflite future never completes under `testWidgets`' clock.
 - T43: chapter 4 reports measured numbers only — FP16 93.15% / INT8 87.74% with per-class F1, real file sizes, the calibration-leak correction, the duplicate exclusions and the split change — and marks device latency, field accuracy and OCR accuracy as not measured. The comparison-table row no longer claims field validation. A new §4.9 maps every claim to the artefact that produces it and the command that reproduces it. The 3-epoch pipeline check is explicitly separated from the 50-epoch results, which removes the "27.8% then convergence" contradiction.
 - T49: `scripts/check_claims.sh` gates the banned claims, the unsupported figures, stale platform references, committed API keys and the single class-name source; `.github/workflows/ci.yml` runs Flutter analyze/test, pytest and that script.
