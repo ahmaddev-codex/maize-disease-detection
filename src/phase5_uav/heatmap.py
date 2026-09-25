@@ -69,7 +69,21 @@ CONFIDENCE_THRESHOLDS = {"high": 0.80, "medium": 0.55}
 
 # ── CSV loading ───────────────────────────────────────────────────────────────
 
+def _optional_float(value) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def load_predictions(csv_path: str) -> List[Dict[str, Any]]:
+    """Reads a patch prediction CSV.
+
+    Coordinates are optional: a survey of a non-georeferenced image reports
+    pixel positions only (T39), and the class summary is still worth having.
+    """
     with open(csv_path, newline="") as f:
         reader = csv.DictReader(f)
         rows = []
@@ -77,14 +91,20 @@ def load_predictions(csv_path: str) -> List[Dict[str, Any]]:
             rows.append({
                 "patch_row":  int(r["patch_row"]),
                 "patch_col":  int(r["patch_col"]),
-                "lat":        float(r["lat"]),
-                "lon":        float(r["lon"]),
+                "lat":        _optional_float(r.get("lat")),
+                "lon":        _optional_float(r.get("lon")),
                 "class_id":   int(r["class_id"]),
                 "class_name": r["class_name"],
                 "confidence": float(r["confidence"]),
-                "latency_ms": float(r["latency_ms"]),
+                "latency_ms": _optional_float(r.get("latency_ms")),
             })
     return rows
+
+
+def _located(predictions: List[Dict]) -> List[Dict]:
+    """Only the patches that have coordinates to put on a map."""
+    return [p for p in predictions
+            if p.get("lat") is not None and p.get("lon") is not None]
 
 
 def make_demo_predictions(n: int = 200) -> List[Dict[str, Any]]:
@@ -117,6 +137,13 @@ def make_demo_predictions(n: int = 200) -> List[Dict[str, Any]]:
 
 def build_folium_map(predictions: List[Dict], output_html: str = "") -> Any:
     if not HAS_FOLIUM:
+        return None
+
+    predictions = _located(predictions)
+    if not predictions:
+        print("No patch has coordinates, so no map was drawn. "
+              "Re-run the patch runner on a georeferenced image, or pass "
+              "--origin-lat/--origin-lon/--gsd.")
         return None
 
     lats = [p["lat"] for p in predictions]
@@ -210,6 +237,11 @@ def build_folium_map(predictions: List[Dict], output_html: str = "") -> Any:
 
 def build_static_map(predictions: List[Dict], output_png: str) -> None:
     if not HAS_MPL:
+        return
+
+    predictions = _located(predictions)
+    if not predictions:
+        print(f"No patch has coordinates, so {output_png} was not drawn.")
         return
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7),

@@ -100,6 +100,35 @@ def test_the_deprecated_import_path_warns_but_still_works():
     assert hasattr(shim, "main")
 
 
+def test_predictions_without_coordinates_still_produce_a_summary(tmp_path):
+    """A non-georeferenced survey has no lat/lon (T39); the summary is still valid."""
+    csv_path = tmp_path / "patches.csv"
+    csv_path.write_text(
+        "patch_row,patch_col,pixel_row,pixel_col,class_id,class_name,confidence,latency_ms\n"
+        "0,0,0,0,1,Rust,0.91,120.0\n"
+        "0,1,0,150,3,Healthy,0.88,118.0\n"
+    )
+
+    rows = heatmap.load_predictions(str(csv_path))
+    assert len(rows) == 2
+    assert rows[0].get("lat") is None
+
+    summary = heatmap.build_summary(rows, str(tmp_path / "summary.json"))
+    assert summary["total_patches"] == 2
+    assert summary["disease_patches"] == 1
+
+
+def test_maps_are_skipped_rather_than_crashing_without_coordinates(tmp_path):
+    rows = [
+        {"class_name": "Rust", "confidence": 0.9, "latency_ms": 100.0},
+        {"class_name": "Healthy", "confidence": 0.9, "latency_ms": 100.0},
+    ]
+
+    assert heatmap.build_folium_map(rows, str(tmp_path / "map.html")) is None
+    heatmap.build_static_map(rows, str(tmp_path / "map.png"))  # must not raise
+    assert not (tmp_path / "map.html").exists()
+
+
 def test_the_stale_root_package_is_gone():
     assert not (Path(__file__).parents[1] / "uav").exists(), \
         "the diverged root uav/ copy is back (ADR-004: src/phase5_uav is canonical)"

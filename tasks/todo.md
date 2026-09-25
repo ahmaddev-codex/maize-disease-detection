@@ -79,7 +79,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 - [x] T38 Heatmap dominant disease, summary filename, Agg backend only in `main()` [T37 · S]
 - [x] T39 Patch runner vegetation mask and CRS / no fabricated coordinates [T37, T33 · M] — the UTM reprojection test skips unless rasterio (GDAL) is installed
 - [x] T40 Drone telemetry: each new capture once, on `MISSION_ITEM_REACHED` [T37, T33 · M]
-- [ ] **Checkpoint 6:** demo UAV pipeline gives a correct summary
+- [~] **Checkpoint 6:** demo UAV pipeline gives a correct summary — run 2026-09-25: 45 patches, Rust dominant (53%), no coordinates invented, pytest 116 green; human review outstanding
 
 ## Phase 7: Notebooks, papers, docs
 - [ ] T41 Notebooks 1 and 4 use the real evaluation [T01, T11, T32 · S]
@@ -98,6 +98,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Brackets after a title li
 
 ## Doc impacts log
 Behaviour changes to carry into Phase 7 (add one line per task as it lands):
+- Checkpoint 6 found that the heatmap required lat/lon, which T39 stopped inventing: coordinates are now optional there — a non-georeferenced survey still gets its class summary and recommendation, and the maps are skipped with a message instead of crashing.
 - T40: the drone classifies on `MISSION_ITEM_REACHED` (not when it starts flying to a waypoint), takes each capture at most once and only if it is newer than the last, skips a waypoint with a message when the camera has not written a photo yet, and uses the shared labels and post-processing. The README now says who is expected to supply the captures and states plainly that the leaf model has never been evaluated on aerial imagery.
 - T32: INT8 calibration now samples the training split only (it used to draw from the whole label set, test images included), so the INT8 model was re-converted and re-measured: 87.74% on the cleaned test split. Both exports record the checkpoint they came from — FP16 rebuilt byte-for-byte from `models/checkpoints/phase1_stage2_best.keras`, which confirms that checkpoint is the source of the shipped models — and `metrics.json` now links each tflite sha256 to its source keras sha256, with the calibration split and image count. The app's bundled assets were refreshed via `mobile/setup.sh`.
 - T39: UAV patches are selected by an Excess Green vegetation index instead of a red/green ratio (shaded canopy is kept; roads, sky and bare soil are still skipped, and a wholly brown canopy is a documented limitation); GeoTIFF patch centres are reprojected from the file's CRS to WGS 84, and an image with neither a georeference nor `--origin-lat/--origin-lon/--gsd` now produces pixel coordinates with a warning instead of invented coordinates near Ibadan. Demo output carries no coordinates at all.
