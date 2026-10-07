@@ -104,7 +104,7 @@ def _to_input_tensor(batch: np.ndarray, input_detail: dict) -> np.ndarray:
 
 # ── Evaluation ─────────────────────────────────────────────────────────────────
 
-def evaluate_model(model_path: str, df: pd.DataFrame, mode: str, num_threads: int = 4) -> Dict:
+def evaluate_model(model_path: str, df: pd.DataFrame, mode: str, num_threads: int = 4, tta: bool = False) -> Dict:
     """Run every image in df through the model and return accuracy + per-class metrics."""
     import tensorflow as tf
 
@@ -122,6 +122,16 @@ def evaluate_model(model_path: str, df: pd.DataFrame, mode: str, num_threads: in
         interpreter.invoke()
         raw = interpreter.get_tensor(output_detail["index"])[0]
         probs = dequantize_and_normalize(raw, output_detail["quantization"])
+
+        if tta:
+            # 2-view TTA: average predictions of original and horizontal flip
+            batch_flip = np.flip(batch, axis=2)
+            interpreter.set_tensor(input_detail["index"], _to_input_tensor(batch_flip, input_detail))
+            interpreter.invoke()
+            raw_flip = interpreter.get_tensor(output_detail["index"])[0]
+            probs_flip = dequantize_and_normalize(raw_flip, output_detail["quantization"])
+            probs = 0.5 * (probs + probs_flip)
+
         y_true.append(int(label))
         y_pred.append(int(np.argmax(probs)))
 
@@ -243,6 +253,8 @@ def parse_args(argv: Optional[Sequence[str]] = None):
     p.add_argument("--output", default=DEFAULT_OUTPUT, help="metrics.json to create or update")
     p.add_argument("--mode",   nargs="+", choices=sorted(RESAMPLING), default=DEFAULT_MODES)
     p.add_argument("--threads", type=int, default=4)
+    p.add_argument("--tta",    action="store_true", default=False,
+                   help="Enable 2-view Test-Time Augmentation (original + horizontal flip)")
     return p.parse_args(argv)
 
 
@@ -278,7 +290,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             "output": _tensor_info(interpreter.get_output_details()[0]),
         }
         for mode in args.mode:
-            result = evaluate_model(model_path, test_df, mode, num_threads=args.threads)
+            result = evaluate_model(model_path, test_df, mode, num_threads=args.threads, tta=args.tta)
             result.update({
                 "csv": args.csv,
                 "split": "test",

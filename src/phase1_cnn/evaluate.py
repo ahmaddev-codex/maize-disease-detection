@@ -22,7 +22,7 @@ from src.phase1_cnn.data_pipeline import build_datasets, CLASS_NAMES
 EXPORT_DIR = "models/exports"
 
 
-def evaluate(model_path: str, csv_path: str, batch_size: int = 32):
+def evaluate(model_path: str, csv_path: str, batch_size: int = 32, tta: bool = False):
     model = tf.keras.models.load_model(model_path)
 
     _, _, test_ds, _ = build_datasets(csv_path=csv_path, batch_size=batch_size)
@@ -31,6 +31,12 @@ def evaluate(model_path: str, csv_path: str, batch_size: int = 32):
     y_true, y_pred = [], []
     for images, labels in test_ds:
         preds = model.predict(images, verbose=0)
+        if tta:
+            # 2-view TTA: average predictions of original and horizontally flipped images
+            flipped = tf.image.flip_left_right(images)
+            preds_flip = model.predict(flipped, verbose=0)
+            preds = 0.5 * (preds + preds_flip)
+
         y_true.extend(labels.numpy())
         y_pred.extend(np.argmax(preds, axis=1))
 
@@ -39,7 +45,8 @@ def evaluate(model_path: str, csv_path: str, batch_size: int = 32):
 
     # Accuracy
     acc = np.mean(y_true == y_pred)
-    print(f"\nTest Accuracy: {acc * 100:.2f}%")
+    mode_str = " (with TTA)" if tta else ""
+    print(f"\nTest Accuracy{mode_str}: {acc * 100:.2f}%")
 
     # Per-class report
     print("\nClassification Report:")
@@ -74,9 +81,11 @@ def parse_args():
     p.add_argument("--model",      default="models/exports/efficientnetb3_maize.keras")
     p.add_argument("--csv",        default="data/annotations/labels.csv")
     p.add_argument("--batch-size", type=int, default=32)
+    p.add_argument("--tta",        action="store_true", default=False,
+                   help="Enable 2-view Test-Time Augmentation (original + horizontal flip)")
     return p.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    evaluate(args.model, args.csv, args.batch_size)
+    evaluate(args.model, args.csv, args.batch_size, tta=args.tta)

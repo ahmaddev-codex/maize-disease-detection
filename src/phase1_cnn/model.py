@@ -14,18 +14,30 @@ DROPOUT_RATE       = 0.4
 FINE_TUNE_AT_LAYER = 100   # unfreeze from this layer index during stage 2
 
 
-def build_model(num_classes: int = NUM_CLASSES) -> Model:
-    """
-    Build EfficientNetB3 with a custom classification head.
+BACKBONES = {
+    "efficientnetb3": tf.keras.applications.EfficientNetB3,
+    "efficientnetv2_s": tf.keras.applications.EfficientNetV2S,
+    "efficientnetv2_m": tf.keras.applications.EfficientNetV2M,
+}
 
-    Input must be [0, 255] float32 — EfficientNetB3 contains an internal
-    Rescaling(1/255) layer; do NOT pre-normalise in the data pipeline.
+
+def build_model(num_classes: int = NUM_CLASSES, backbone: str = "efficientnetb3") -> Model:
+    """
+    Build EfficientNet backbone with a custom classification head.
+
+    Input must be [0, 255] float32 — EfficientNet architectures contain internal
+    rescaling and normalisation layers; do NOT pre-normalise in the data pipeline.
 
     Head: GAP → BN → Dense(512, relu) → Dropout(0.4) → Dense(256, relu)
           → Dropout(0.3) → softmax(4)
     A two-layer head gives the model more capacity for Stage 1 head training.
     """
-    base = tf.keras.applications.EfficientNetB3(
+    backbone_key = backbone.lower().replace("-", "_")
+    if backbone_key not in BACKBONES:
+        raise ValueError(f"Unknown backbone '{backbone}'. Choose from {list(BACKBONES.keys())}")
+
+    app_fn = BACKBONES[backbone_key]
+    base = app_fn(
         include_top=False,
         weights="imagenet",
         input_shape=(*IMG_SIZE, 3),
@@ -34,7 +46,6 @@ def build_model(num_classes: int = NUM_CLASSES) -> Model:
 
     inputs = tf.keras.Input(shape=(*IMG_SIZE, 3), name="image_input")
 
-    # EfficientNetB3 includes its own internal preprocessing (rescaling + normalisation).
     # Pass training=False so base BN layers always use stored population statistics
     # during Stage 1 — this is the standard fine-tuning pattern.
     x = base(inputs, training=False)
@@ -48,7 +59,7 @@ def build_model(num_classes: int = NUM_CLASSES) -> Model:
     x = layers.Dropout(0.3, name="dropout_2")(x)
     outputs = layers.Dense(num_classes, activation="softmax", name="predictions")(x)
 
-    model = Model(inputs, outputs, name="EfficientNetB3_Maize")
+    model = Model(inputs, outputs, name=f"{backbone_key}_maize")
     return model
 
 
@@ -74,6 +85,18 @@ def compile_model(
     return model
 
 
+def _get_base_layer(model: Model) -> Model:
+    """Find the base convolutional model inside the enclosing model."""
+    for layer in model.layers:
+        if isinstance(layer, tf.keras.Model):
+            return layer
+    # Fallback to the first non-input layer
+    for layer in model.layers[1:]:
+        if hasattr(layer, "layers"):
+            return layer
+    return model.layers[1]
+
+
 def unfreeze_for_finetuning(
     model: Model,
     fine_tune_at: int = FINE_TUNE_AT_LAYER,
@@ -92,7 +115,7 @@ def unfreeze_for_finetuning(
     afterwards — reusing the same model instance causes Keras 3 / TF 2.16 to
     retain Adam slot variables sized for the frozen variable set.
     """
-    base = model.get_layer("efficientnetb3")
+    base = _get_base_layer(model)
     base.trainable = True
 
     for i, layer in enumerate(base.layers):

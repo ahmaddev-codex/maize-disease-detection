@@ -43,8 +43,8 @@ except ImportError:
 from src.common.labels import CLASS_NAMES  # noqa: E402
 from src.common.postprocess import postprocess  # noqa: E402
 
-DEFAULT_INT8_PATH = "models/exports/efficientnetb3_maize_int8.tflite"
 DEFAULT_FP16_PATH = "models/exports/efficientnetb3_maize_fp16.tflite"
+DEFAULT_INT8_PATH = "models/exports/efficientnetb3_maize_int8.tflite"
 
 
 class EdgeClassifier:
@@ -205,12 +205,12 @@ def main():
     # Resolve model path
     model_path = args.model
     if not model_path:
-        if os.path.exists(DEFAULT_INT8_PATH):
-            model_path = DEFAULT_INT8_PATH
-        elif os.path.exists(DEFAULT_FP16_PATH):
+        if os.path.exists(DEFAULT_FP16_PATH):
             model_path = DEFAULT_FP16_PATH
+        elif os.path.exists(DEFAULT_INT8_PATH):
+            model_path = DEFAULT_INT8_PATH
         else:
-            print(f"[!] No model specified and defaults not found: {DEFAULT_INT8_PATH}")
+            print(f"[!] No model specified and defaults not found: {DEFAULT_FP16_PATH}")
             sys.exit(1)
 
     print(f"[*] Initializing Edge Classifier: {model_path} (threads={args.threads})")
