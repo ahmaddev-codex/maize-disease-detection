@@ -166,7 +166,7 @@ def convert_fp16(model_path: str, out_path: str):
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def convert_int8(model_path: str, csv_path: str, out_path: str):
+def convert_int8(model_path: str, csv_path: str, out_path: str, n_calib: int = CALIB_IMAGES):
     """
     Full INT8 quantization — smallest size, fastest on Pi/Jetson NPU.
     Both weights and activations are quantized; requires representative data.
@@ -177,7 +177,7 @@ def convert_int8(model_path: str, csv_path: str, out_path: str):
         saved_model_dir = _load_as_saved_model(model_path, tmp_dir)
         converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_dir)
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        converter.representative_dataset = make_representative_dataset(csv_path)
+        converter.representative_dataset = make_representative_dataset(csv_path, n=n_calib)
 
         # Force all ops to INT8 (fallback to float for unsupported ops)
         converter.target_spec.supported_ops = [
@@ -187,7 +187,7 @@ def convert_int8(model_path: str, csv_path: str, out_path: str):
         converter.inference_input_type  = tf.uint8
         converter.inference_output_type = tf.uint8
 
-        print(f"Running INT8 calibration on {CALIB_IMAGES} images — this takes a minute...")
+        print(f"Running INT8 calibration on {n_calib} images — this takes a minute...")
         tflite_model = converter.convert()
 
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -201,7 +201,7 @@ def convert_int8(model_path: str, csv_path: str, out_path: str):
             source_keras=model_path,
             precision="int8",
             calibration_csv=csv_path,
-            calibration_images=len(calibration_sample(csv_path)),
+            calibration_images=len(calibration_sample(csv_path, n=n_calib)),
         ))
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -262,6 +262,8 @@ def parse_args():
                    help="Export INT8 model (default: on)")
     p.add_argument("--no-fp16",  dest="fp16", action="store_false")
     p.add_argument("--no-int8",  dest="int8", action="store_false")
+    p.add_argument("--calib-images", type=int, default=CALIB_IMAGES,
+                   help=f"Number of calibration images for INT8 (default: {CALIB_IMAGES})")
     p.add_argument("--verify",   action="store_true", default=True,
                    help="Run quick accuracy check on converted models")
     p.add_argument("--no-verify", dest="verify", action="store_false")
@@ -283,7 +285,7 @@ if __name__ == "__main__":
             verify_tflite(FP16_PATH, args.csv)
 
     if args.int8:
-        convert_int8(args.model, args.csv, INT8_PATH)
+        convert_int8(args.model, args.csv, INT8_PATH, n_calib=args.calib_images)
         if args.verify:
             verify_tflite(INT8_PATH, args.csv)
 

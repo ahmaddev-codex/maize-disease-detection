@@ -1,4 +1,4 @@
-"""T37/T38: the UAV survey summary, and the deprecated import path.
+"""T37/T38: the UAV survey summary.
 
 `_recommend` picked the most common class of all, so a field that is mostly
 healthy was reported as "Dominant: Healthy" with an agronomist referral, and

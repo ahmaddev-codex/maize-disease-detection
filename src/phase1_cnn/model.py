@@ -55,12 +55,20 @@ def build_model(num_classes: int = NUM_CLASSES) -> Model:
 def compile_model(
     model: Model,
     learning_rate: float = 1e-3,
+    one_hot: bool = False,
+    label_smoothing: float = 0.0,
+    weight_decay: float = 1e-4,
 ) -> Model:
+    if one_hot or label_smoothing > 0:
+        loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=label_smoothing)
+    else:
+        loss = "sparse_categorical_crossentropy"
+
     model.compile(
         optimizer=tf.keras.optimizers.AdamW(
-            learning_rate=learning_rate, weight_decay=1e-4
+            learning_rate=learning_rate, weight_decay=weight_decay
         ),
-        loss="sparse_categorical_crossentropy",
+        loss=loss,
         metrics=["accuracy"],
     )
     return model
@@ -70,31 +78,45 @@ def unfreeze_for_finetuning(
     model: Model,
     fine_tune_at: int = FINE_TUNE_AT_LAYER,
     learning_rate: float = 1e-5,
+    one_hot: bool = False,
+    label_smoothing: float = 0.0,
+    freeze_bn: bool = True,
+    weight_decay: float = 1e-5,
 ) -> Model:
     """
-    Stage 2: unfreeze all layers from fine_tune_at onwards in the base model.
-    Use a much lower learning rate to avoid destroying pre-trained weights.
+    Stage 2: unfreeze base model layers from fine_tune_at onwards.
+    Keep BatchNormalization layers frozen so population statistics stay stable.
+    Use a lower learning rate to preserve pre-trained feature extractors.
 
     NOTE: always call this on a *freshly built* model and load Stage 1 weights
     afterwards — reusing the same model instance causes Keras 3 / TF 2.16 to
-    retain Adam slot variables sized for the frozen variable set, which crashes
-    on the first update step with "Incompatible shapes: [0] vs [...]".
+    retain Adam slot variables sized for the frozen variable set.
     """
     base = model.get_layer("efficientnetb3")
     base.trainable = True
 
-    for layer in base.layers[:fine_tune_at]:
-        layer.trainable = False
+    for i, layer in enumerate(base.layers):
+        if i < fine_tune_at:
+            layer.trainable = False
+        elif freeze_bn and isinstance(layer, layers.BatchNormalization):
+            layer.trainable = False
+        else:
+            layer.trainable = True
 
     total     = len(base.layers)
     trainable = sum(1 for l in base.layers if l.trainable)
-    print(f"Fine-tuning: {trainable}/{total} base layers unfrozen (from layer {fine_tune_at})")
+    print(f"Fine-tuning: {trainable}/{total} base layers trainable (from layer {fine_tune_at}, freeze_bn={freeze_bn})")
+
+    if one_hot or label_smoothing > 0:
+        loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=label_smoothing)
+    else:
+        loss = "sparse_categorical_crossentropy"
 
     model.compile(
         optimizer=tf.keras.optimizers.AdamW(
-            learning_rate=learning_rate, weight_decay=1e-5
+            learning_rate=learning_rate, weight_decay=weight_decay
         ),
-        loss="sparse_categorical_crossentropy",
+        loss=loss,
         metrics=["accuracy"],
     )
     return model
