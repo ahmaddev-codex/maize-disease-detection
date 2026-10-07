@@ -4,9 +4,10 @@
 > project was first sequenced. It describes an earlier platform decision and
 > earlier targets, and it is not maintained.
 >
-> The live plan is **`tasks/plan.md`** (tasks T01–T58, with acceptance criteria
-> and verification), and the live checklist is **`tasks/todo.md`**. Measured
-> results live in `models/exports/metrics.json`; decisions live in `decisions/`.
+> The task plan that replaced it (tasks T01–T58) has been retired from the
+> working tree; it is preserved in git history (`git show dc0d595:tasks/plan.md`,
+> `git show dc0d595:tasks/todo.md`). Measured results live in
+> `models/exports/metrics.json`; decisions live in `decisions/`.
 
 
 **Project**: CNN + OCR multimodal system for maize disease detection in Nigerian smallholder farms
@@ -101,9 +102,9 @@ planting_date →  days-since-epoch or seasonal bucket
 ## Phase 5 — UAV Integration ✅
 > Goal: GPS-tagged disease heatmap from aerial imagery using OpenDroneMap + model inference.
 
-- [x] `deployment/uav/flight_planner.py` — grid mission generator → MAVLink .waypoints (QGC/Mission Planner)
-- [x] `deployment/uav/patch_runner.py` — tile orthomosaic → TFLite inference per patch → CSV
-- [x] `deployment/uav/heatmap.py` — Folium interactive HTML map + matplotlib static PNG
+- [x] `src/phase5_uav/flight_planner.py` — grid mission generator → MAVLink .waypoints (QGC/Mission Planner)
+- [x] `src/phase5_uav/patch_runner.py` — tile orthomosaic → TFLite inference per patch → CSV
+- [x] `src/phase5_uav/heatmap.py` — Folium interactive HTML map + matplotlib static PNG
 - [x] Demo mode (`--demo`) works without hardware — synthetic orthomosaic + predictions
 - [ ] Test with real GeoTIFF orthomosaic from OpenDroneMap
 

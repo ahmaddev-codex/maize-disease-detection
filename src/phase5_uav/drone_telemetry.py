@@ -6,27 +6,27 @@ disease heatmap updates in real-time as the drone flies the survey mission.
 
 ── Connection options ───────────────────────────────────────────────────────────
   Serial / USB (Pixhawk connected via USB):
-      python -m deployment.uav.drone_telemetry --connect /dev/ttyUSB0:57600
+      python -m src.phase5_uav.drone_telemetry --connect /dev/ttyUSB0:57600
 
   Serial / SiK 915 MHz radio:
-      python -m deployment.uav.drone_telemetry --connect /dev/ttyUSB0:57600
+      python -m src.phase5_uav.drone_telemetry --connect /dev/ttyUSB0:57600
 
   UDP (MAVProxy / SITL / WiFi video link bridged with MAVProxy):
-      python -m deployment.uav.drone_telemetry --connect udp:0.0.0.0:14550
+      python -m src.phase5_uav.drone_telemetry --connect udp:0.0.0.0:14550
 
   TCP (Companion computer or direct WiFi to drone):
-      python -m deployment.uav.drone_telemetry --connect tcp:192.168.1.1:5760
+      python -m src.phase5_uav.drone_telemetry --connect tcp:192.168.1.1:5760
 
 ── Typical workflow ─────────────────────────────────────────────────────────────
   # Terminal 1 — start the live web dashboard
-  python -m deployment.uav.live_server
+  python -m src.phase5_uav.live_server
 
   # Terminal 2 — generate the mission (or use an existing .waypoints file)
-  python -m deployment.uav.flight_planner --farm-geojson data/uav/farm_boundary.geojson \\
+  python -m src.phase5_uav.flight_planner --farm-geojson data/uav/farm_boundary.geojson \\
       --output data/uav/mission.waypoints
 
   # Terminal 3 — connect the drone and begin the survey
-  python -m deployment.uav.drone_telemetry \\
+  python -m src.phase5_uav.drone_telemetry \\
       --connect udp:0.0.0.0:14550 \\
       --mission data/uav/mission.waypoints \\
       --model   models/exports/efficientnetb3_maize_int8.tflite \\

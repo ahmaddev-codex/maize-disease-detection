@@ -4,12 +4,12 @@ Reads the patch prediction CSV from patch_runner.py and produces an interactive
 Folium map (HTML) and a static matplotlib figure with disease overlays.
 
 Usage:
-    python -m deployment.uav.heatmap \
+    python -m src.phase5_uav.heatmap \
         --csv    data/uav/patch_predictions.csv \
         --output data/uav/disease_heatmap.html
 
     # Quick demo — generates synthetic predictions first:
-    python -m deployment.uav.heatmap --demo
+    python -m src.phase5_uav.heatmap --demo
 
 Outputs:
     data/uav/disease_heatmap.html   — interactive Folium map (open in browser)

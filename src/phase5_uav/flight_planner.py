@@ -4,7 +4,7 @@ Generates a grid survey mission (waypoints) over a farm polygon and writes a
 MAVLink-compatible mission file readable by Mission Planner / QGroundControl.
 
 Usage:
-    python -m deployment.uav.flight_planner \
+    python -m src.phase5_uav.flight_planner \
         --farm-geojson  data/uav/farm_boundary.geojson \
         --altitude      30 \
         --overlap       80 \

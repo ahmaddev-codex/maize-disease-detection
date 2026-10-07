@@ -6,10 +6,10 @@ each patch is classified.
 
 Usage:
     # Terminal 1 — start this server
-    python -m deployment.uav.live_server
+    python -m src.phase5_uav.live_server
 
     # Terminal 2 — connect the drone (streams to this server automatically)
-    python -m deployment.uav.drone_telemetry \\
+    python -m src.phase5_uav.drone_telemetry \\
         --connect udp:0.0.0.0:14550 \\
         --mission data/uav/mission.waypoints \\
         --server  http://localhost:5000
@@ -343,7 +343,7 @@ def main():
     print()
     print("  Waiting for drone connection...")
     print("  Run in another terminal:")
-    print(f"    python -m deployment.uav.drone_telemetry \\")
+    print(f"    python -m src.phase5_uav.drone_telemetry \\")
     print(f"        --connect udp:0.0.0.0:14550 \\")
     print(f"        --mission data/uav/mission.waypoints \\")
     print(f"        --server  http://localhost:{args.port}")

@@ -6,13 +6,13 @@ disease predictions.
 
 Usage:
     # From a real orthomosaic (GeoTIFF) + world file:
-    python -m deployment.uav.patch_runner \
+    python -m src.phase5_uav.patch_runner \
         --image  data/uav/orthomosaic.tif \
         --model  models/exports/efficientnetb3_maize_int8.tflite \
         --output data/uav/patch_predictions.csv
 
     # Quick demo on a synthetic image:
-    python -m deployment.uav.patch_runner --demo
+    python -m src.phase5_uav.patch_runner --demo
 
 Pipeline:
     1. Load orthomosaic (GeoTIFF via rasterio if available, else PIL/OpenCV)

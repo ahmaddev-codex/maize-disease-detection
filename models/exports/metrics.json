@@ -364,5 +364,44 @@
       "cnn_frozen": true
     },
     "recorded_at": "2026-09-25T20:39:59+00:00"
+  },
+  "ocr": {
+    "synthetic": {
+      "n": 200,
+      "set": "data/synthetic/seed_tags",
+      "seed": 42,
+      "per_field": {
+        "crop_variety": {
+          "accuracy": 0.995,
+          "correct": 199,
+          "missing": 1,
+          "wrong": 0
+        },
+        "batch_number": {
+          "accuracy": 1.0,
+          "correct": 200,
+          "missing": 0,
+          "wrong": 0
+        },
+        "planting_date": {
+          "accuracy": 1.0,
+          "correct": 200,
+          "missing": 0,
+          "wrong": 0
+        }
+      },
+      "failures": [
+        {
+          "image": "images/tag_0167.jpg",
+          "field": "crop_variety",
+          "expected": "TZEE-W",
+          "got": null
+        }
+      ],
+      "source": "synthetic",
+      "engine": "tesseract (python pipeline)",
+      "caveat": "Rendered tags, not photographs of real seed bags; bounds the parser rather than field performance. The app uses ML Kit, not Tesseract.",
+      "evaluated_at": "2026-09-25T21:07:17+00:00"
+    }
   }
 }

@@ -31,7 +31,7 @@ report "no unsupported figures in research-papers" \
 # ── Components the project does not use (T44, T45, T46) ──────────────────────
 stale_platform='Gemini|Ollama|llama-3\.3|React Native|deployment/app|24-d'
 report "no stale platform references in the live docs" \
-  "$(grep -rnE "$stale_platform" README.md SYSTEM.md REQUIREMENTS.md DIAGRAMS.md WORKFLOW.md research-papers/*.md mobile/README.md 2>/dev/null \
+  "$(grep -rnE "$stale_platform" README.md SYSTEM.md REQUIREMENTS.md DIAGRAMS.md research-papers/*.md mobile/README.md 2>/dev/null \
       | grep -v 'never happened\|does not exist\|is inaccurate and is kept\|not dependencies of this project\|kept at .deployment/app\|The Flutter equivalents are listed' || true)"
 
 # ── Secrets (ADR-003) ────────────────────────────────────────────────────────

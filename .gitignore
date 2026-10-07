@@ -19,6 +19,9 @@ htmlcov/
 # ── Datasets & Large Data ────────────────────────────────────────────────────
 data/raw/plantvillage/
 data/raw/synthetic/
+# Generated seed tags: reproducible from
+#   python -m src.phase2_ocr.synth_labels --n 200 --seed 42
+data/synthetic/seed_tags/images/
 data/raw/field_photos/
 data/uav/patch_predictions.csv
 data/uav/disease_heatmap.html

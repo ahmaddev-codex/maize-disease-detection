@@ -1,37 +1,146 @@
 {
-  "_doc": "Shared OCR parsing cases for mobile/lib/services/ocr_parser.dart and src/phase2_ocr/extractor.py (ADR-006). expected=null means no value should be extracted.",
-  "dates": [
-    {"text": "Planting Date: 15/03/2024", "expected": "2024-03-15"},
-    {"text": "Date: 5-3-2024", "expected": "2024-03-05"},
-    {"text": "Tested 07.11.2023", "expected": "2023-11-07"},
-    {"text": "Packed 2024-03-15", "expected": "2024-03-15"},
-    {"text": "Sown 15 March 2024", "expected": "2024-03-15"},
-    {"text": "Test date 1 Aug 2023", "expected": "2023-08-01"},
-    {"text": "Test Date: 31/13/2024", "expected": null},
-    {"text": "Date: 30/02/2024", "expected": null},
-    {"text": "Net weight 2kg purity 99%", "expected": null}
-  ],
-  "varieties": [
-    {"text": "SAMMAZ-17 Hybrid\nPlanting Date: 15/03/2024", "expected": "SAMMAZ 17"},
-    {"text": "SAMMAZ-17 Hybrid Planting Date: 15/03/2024", "expected": "SAMMAZ 17"},
-    {"text": "OBA SUPER 2", "expected": "OBA SUPER 2"},
-    {"text": "Oba Super-2 maize seed", "expected": "OBA SUPER 2"},
-    {"text": "Variety: SAMMAZ 15 (HYBRID)", "expected": "SAMMAZ 15"},
-    {"text": "EVDT-99 Purity 99.2%", "expected": "EVDT 99"},
-    {"text": "Net wt 2kg SUWAN-1 lot 15", "expected": "SUWAN 1"},
-    {"text": "SAMAZ 15 improved seed", "expected": "SAMMAZ 15"},
-    {"text": "TZEE-W white maize", "expected": "TZEE-W"},
-    {"text": "EARLY MATURING yellow", "expected": null},
-    {"text": "SAMMAZ 16", "expected": null},
-    {"text": "Net weight 2kg, purity 99%", "expected": null}
-  ],
-  "batches": [
-    {"text": "Batch No: BN-2024-042", "expected": "BN-2024-042"},
-    {"text": "BATCH NO: 12345", "expected": "12345"},
-    {"text": "Lot No. 24-0071", "expected": "24-0071"},
-    {"text": "LOT-2024-007", "expected": "LOT-2024-007"},
-    {"text": "BATCH-2024-NG04", "expected": "BATCH-2024-NG04"},
-    {"text": "Lot: A1234", "expected": "A1234"},
-    {"text": "Purity 99% Germination 90%", "expected": null}
-  ]
+ "_doc": "Shared OCR parsing cases for mobile/lib/services/ocr_parser.dart and src/phase2_ocr/extractor.py (ADR-006). expected=null means no value should be extracted.",
+ "dates": [
+  {
+   "text": "Planting Date: 15/03/2024",
+   "expected": "2024-03-15"
+  },
+  {
+   "text": "Date: 5-3-2024",
+   "expected": "2024-03-05"
+  },
+  {
+   "text": "Tested 07.11.2023",
+   "expected": "2023-11-07"
+  },
+  {
+   "text": "Packed 2024-03-15",
+   "expected": "2024-03-15"
+  },
+  {
+   "text": "Sown 15 March 2024",
+   "expected": "2024-03-15"
+  },
+  {
+   "text": "Test date 1 Aug 2023",
+   "expected": "2023-08-01"
+  },
+  {
+   "text": "Test Date: 31/13/2024",
+   "expected": null
+  },
+  {
+   "text": "Date: 30/02/2024",
+   "expected": null
+  },
+  {
+   "text": "Net weight 2kg purity 99%",
+   "expected": null
+  }
+ ],
+ "varieties": [
+  {
+   "text": "SAMMAZ-17 Hybrid\nPlanting Date: 15/03/2024",
+   "expected": "SAMMAZ 17"
+  },
+  {
+   "text": "SAMMAZ-17 Hybrid Planting Date: 15/03/2024",
+   "expected": "SAMMAZ 17"
+  },
+  {
+   "text": "OBA SUPER 2",
+   "expected": "OBA SUPER 2"
+  },
+  {
+   "text": "Oba Super-2 maize seed",
+   "expected": "OBA SUPER 2"
+  },
+  {
+   "text": "Variety: SAMMAZ 15 (HYBRID)",
+   "expected": "SAMMAZ 15"
+  },
+  {
+   "text": "EVDT-99 Purity 99.2%",
+   "expected": "EVDT 99"
+  },
+  {
+   "text": "Net wt 2kg SUWAN-1 lot 15",
+   "expected": "SUWAN 1"
+  },
+  {
+   "text": "SAMAZ 15 improved seed",
+   "expected": "SAMMAZ 15"
+  },
+  {
+   "text": "TZEE-W white maize",
+   "expected": "TZEE-W"
+  },
+  {
+   "text": "EARLY MATURING yellow",
+   "expected": null
+  },
+  {
+   "text": "SAMMAZ 16",
+   "expected": null
+  },
+  {
+   "text": "Net weight 2kg, purity 99%",
+   "expected": null
+  }
+ ],
+ "batches": [
+  {
+   "text": "Batch No: BN-2024-042",
+   "expected": "BN-2024-042"
+  },
+  {
+   "text": "BATCH NO: 12345",
+   "expected": "12345"
+  },
+  {
+   "text": "Lot No. 24-0071",
+   "expected": "24-0071"
+  },
+  {
+   "text": "LOT-2024-007",
+   "expected": "LOT-2024-007"
+  },
+  {
+   "text": "BATCH-2024-NG04",
+   "expected": "BATCH-2024-NG04"
+  },
+  {
+   "text": "Lot: A1234",
+   "expected": "A1234"
+  },
+  {
+   "text": "Purity 99% Germination 90%",
+   "expected": null
+  },
+  {
+   "text": "| Lor NuMBER : 20250611 |",
+   "expected": "20250611",
+   "why": "Tesseract reads LOT as 'Lor' and NUMBER as 'NuMBER'; a one-character slip in the label must not lose the field (T51)."
+  },
+  {
+   "text": "| LOT NUMBER : LOT.2023-686 |",
+   "expected": "LOT-2023-686",
+   "why": "The hyphen after the LOT prefix is read as a period; the code is normalised back (T51)."
+  },
+  {
+   "text": "LOT NUMBER _ : 20220291",
+   "expected": "20220291",
+   "why": "An underscore drawn between the label and the colon (T51)."
+  },
+  {
+   "text": "BATGH NO: BN-2026-118",
+   "expected": "BN-2026-118",
+   "why": "'BATCH' misread as 'BATGH'; the prefixed code still stands on its own."
+  },
+  {
+   "text": "NET WEIGHT : 10 KG",
+   "expected": null,
+   "why": "A line with a number but no lot label must not be taken as a batch number."
+  }
+ ]
 }

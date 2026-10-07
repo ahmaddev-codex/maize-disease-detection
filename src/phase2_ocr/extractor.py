@@ -130,22 +130,72 @@ def _extract_variety(text: str) -> Optional[str]:
     return best
 
 
-_PREFIXED_CODE = re.compile(r"\b(?:BN|LOT|BATCH)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b", re.IGNORECASE)
+# A lot code that carries its own prefix. The separator may be read as a
+# period or a space: "LOT.2023-686" is the same code as "LOT-2023-686" (T51).
+# Punctuation separator only: "LOT 2024" with a space is ambiguous with the
+# label "LOT NUMBER", which the labelled branch below handles.
+_PREFIXED_CODE = re.compile(
+    r"\b(BN|LOT|BATCH)[-.]([A-Z0-9]*\d[A-Z0-9]*(?:[-.][A-Z0-9]+)*)\b", re.IGNORECASE
+)
+
+# A labelled value: "LOT NUMBER : 20220291". The separator run tolerates the
+# stray underscores and periods OCR leaves between the label and the colon.
 _LABELLED_CODE = re.compile(
-    r"\b(?:BATCH|LOT)\s*(?:NUMBER|NUM|NO)?\.?\s*[:#]?\s*([A-Z0-9][A-Z0-9\-/]*)",
+    r"\b(?:BATCH|LOT)\s*(?:NUMBER|NUM|NO)?[\s._\-]*[:#]?[\s._]*([A-Z0-9][A-Z0-9\-./]*)",
     re.IGNORECASE,
 )
+
+# Tesseract confuses letters in the label itself — "LOT" becomes "Lor", "BATCH"
+# becomes "BATGH". Anything before a colon that is nearly one of these labels
+# counts as one.
+_LABEL_WORDS = ("LOT", "BATCH", "LOTNUMBER", "BATCHNO", "LOTNO", "BATCHNUMBER")
+_VALUE_AFTER_COLON = re.compile(r"^([A-Z0-9][A-Z0-9\-./]*)", re.IGNORECASE)
+
+
+def _looks_like_label(fragment: str) -> bool:
+    """True when `fragment` is a lot/batch label, allowing for OCR slips."""
+    from Levenshtein import distance as _distance
+
+    cleaned = re.sub(r"[^A-Z]", "", fragment.upper())
+    if not cleaned or len(cleaned) > 14:
+        return False
+    for word in _LABEL_WORDS:
+        # One slip in a short word, two in a longer one.
+        budget = 1 if len(word) <= 5 else 2
+        if _distance(cleaned, word) <= budget:
+            return True
+    return False
+
+
+def _normalise_code(code: str) -> str:
+    """Puts a prefixed code back into its canonical form."""
+    code = code.upper().strip(" .:-_")
+    return re.sub(r"(?<=[A-Z0-9])\.(?=[A-Z0-9])", "-", code)
 
 
 def _extract_batch(text: str) -> Optional[str]:
     """Return the batch/lot code without its 'Batch No:' style label, or None."""
-    prefixed = _PREFIXED_CODE.search(text)
-    if prefixed:
-        return prefixed.group(0).upper()
-    for m in _LABELLED_CODE.finditer(text):
-        value = m.group(1)
-        if re.search(r"\d", value):
-            return value.upper()
+    for line in text.splitlines():
+        prefixed = _PREFIXED_CODE.search(line)
+        if prefixed:
+            return _normalise_code(f"{prefixed.group(1).upper()}-{prefixed.group(2)}")
+
+    for line in text.splitlines():
+        for m in _LABELLED_CODE.finditer(line):
+            value = m.group(1)
+            if re.search(r"\d", value):
+                return _normalise_code(value)
+
+    # Last resort: a label the OCR mangled, followed by a colon and a value.
+    for line in text.splitlines():
+        if ":" not in line:
+            continue
+        label, _, rest = line.partition(":")
+        if not _looks_like_label(label):
+            continue
+        value = _VALUE_AFTER_COLON.match(rest.strip())
+        if value and re.search(r"\d", value.group(1)):
+            return _normalise_code(value.group(1))
     return None
 
 

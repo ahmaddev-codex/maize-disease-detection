@@ -123,13 +123,14 @@ maize-disease-detection/
 │   ├── lib/
 │   │   ├── main.dart
 │   │   ├── app.dart               ← GoRouter + shell nav
-│   │   ├── screens/               ← 8 screens (home, camera, result, ocr…)
+│   │   ├── screens/               ← 9 screens (splash, home, camera, result, ocr…)
 │   │   ├── services/              ← TFLite · OCR · SQLite · AI advisor
 │   │   ├── providers/             ← Riverpod state
-│   │   ├── models/                ← ScanRecord · ClassificationResult
-│   │   ├── constants/             ← Colors · diseases · varieties
+│   │   ├── models/                ← ScanRecord · ClassificationResult · FarmStats
+│   │   ├── constants/             ← Colors · diseases · varieties · thresholds
 │   │   ├── config/                ← AppEnv (.env.json reader)
-│   │   └── widgets/               ← GlassCard · DuotoneIcon · AiAdviceSheet
+│   │   ├── l10n/                  ← Offline advice · voice scripts
+│   │   └── design_system/         ← Tokens · theme · AppCard · ConfidenceMeter · AudioAdvisoryBar
 │   ├── assets/models/             ← TFLite model files (.tflite)
 │   ├── android/                   ← Android native project
 │   ├── ios/                       ← iOS Xcode project
@@ -138,28 +139,35 @@ maize-disease-detection/
 │   ├── .env.json.example          ← Template
 │   └── setup.sh                   ← One-shot setup (copies models, pod install)
 │
-├── src/                           ← Python ML training pipeline
+├── src/                           ← Python ML pipeline
+│   ├── common/                    ← Class names · post-processing · variety list (single sources)
 │   ├── phase1_cnn/                ← EfficientNetB3 training & evaluation
-│   ├── phase2_ocr/                ← Tesseract OCR extractor & encoder
-│   ├── phase3_fusion/             ← Multimodal fusion model
-│   └── phase4_edge/               ← TFLite conversion (INT8 + FP16 export)
-│
-├── deployment/
-│   └── uav/
+│   ├── phase2_ocr/                ← Tesseract OCR extractor, encoder, synthetic tags & evaluation
+│   ├── phase3_fusion/             ← Multimodal fusion model & ablation
+│   ├── phase4_edge/               ← TFLite conversion (INT8 + FP16) & evaluation
+│   └── phase5_uav/                ← UAV pipeline (canonical, ADR-004)
 │       ├── flight_planner.py      ← Grid mission → QGC .waypoints file
 │       ├── patch_runner.py        ← Orthomosaic tiling + TFLite inference
 │       ├── heatmap.py             ← Folium HTML + matplotlib PNG heatmaps
 │       ├── drone_telemetry.py     ← Live MAVLink drone connection + mission upload
 │       └── live_server.py         ← Flask + Socket.IO real-time map dashboard
 │
+├── deployment/uav/                ← Deprecated shims re-exporting src.phase5_uav (to be removed)
+│
 ├── data/
 │   ├── raw/plantvillage/          ← PlantVillage dataset images
 │   ├── raw/seed_labels/           ← Seed label images for OCR testing
-│   └── annotations/               ← labels.csv · labels_with_metadata.csv
+│   ├── synthetic/seed_tags/       ← Generated seed tags for OCR evaluation
+│   └── annotations/               ← labels.csv · labels_with_metadata.csv · exclusions.csv
 │
 ├── models/
-│   └── exports/                   ← Trained .keras + .tflite files
+│   └── exports/                   ← .tflite files + metrics.json (every reported number)
 │
+├── decisions/                     ← Architecture decision records (ADR-001 … ADR-006)
+├── notebooks/                     ← One notebook per phase
+├── research-papers/               ← Abstract, chapters 1–5, references
+├── scripts/                       ← check_claims.sh · sync_varieties.py
+├── tests/                         ← pytest suite
 ├── logs/                          ← TensorBoard training logs
 ├── setup_env.sh                   ← Python venv setup
 ├── run_all.sh                     ← Full pipeline runner (Phases 1–5)

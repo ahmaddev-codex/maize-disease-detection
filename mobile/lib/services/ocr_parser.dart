@@ -55,20 +55,73 @@ String? _isoDate(int year, int month, int day) {
 
 // ── Batch / lot number ────────────────────────────────────────────────────────
 
-final _prefixedCode = RegExp(r'\b(?:BN|LOT|BATCH)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b', caseSensitive: false);
-final _labelledCode = RegExp(
-  r'\b(?:BATCH|LOT)\s*(?:NUMBER|NUM|NO)?\.?\s*[:#]?\s*([A-Z0-9][A-Z0-9\-/]*)',
+// A code carrying its own prefix. The separator may be read as a period, so
+// "LOT.2023-686" is the same code as "LOT-2023-686". Only punctuation counts
+// as the separator: "LOT NUMBER" is a label, not a code (T51).
+final _prefixedCode = RegExp(
+  r'\b(BN|LOT|BATCH)[-.]([A-Z0-9]*\d[A-Z0-9]*(?:[-.][A-Z0-9]+)*)\b',
   caseSensitive: false,
 );
 
+// A labelled value: "LOT NUMBER _ : 20220291". The separator run tolerates the
+// stray underscores and periods OCR leaves between the label and the colon.
+final _labelledCode = RegExp(
+  r'\b(?:BATCH|LOT)\s*(?:NUMBER|NUM|NO)?[\s._\-]*[:#]?[\s._]*([A-Z0-9][A-Z0-9\-./]*)',
+  caseSensitive: false,
+);
+
+// Tesseract and ML Kit both mangle the label itself — "LOT" becomes "Lor",
+// "BATCH" becomes "BATGH". Anything before a colon that is nearly one of these
+// counts as a label.
+const _labelWords = ['LOT', 'BATCH', 'LOTNUMBER', 'BATCHNO', 'LOTNO', 'BATCHNUMBER'];
+final _valueAfterColon = RegExp(r'^([A-Z0-9][A-Z0-9\-./]*)', caseSensitive: false);
+final _digit = RegExp(r'\d');
+
+bool _looksLikeLabel(String fragment) {
+  final cleaned = fragment.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
+  if (cleaned.isEmpty || cleaned.length > 14) return false;
+  for (final word in _labelWords) {
+    final budget = word.length <= 5 ? 1 : 2;
+    if (_levenshtein(cleaned, word) <= budget) return true;
+  }
+  return false;
+}
+
+/// Puts a prefixed code back into its canonical form.
+String _normaliseCode(String code) {
+  var value = code.toUpperCase();
+  value = value.replaceAll(RegExp(r'^[\s.:_-]+|[\s.:_-]+$'), '');
+  return value.replaceAllMapped(
+    RegExp(r'(?<=[A-Z0-9])\.(?=[A-Z0-9])'),
+    (_) => '-',
+  );
+}
+
 /// Returns the batch/lot code without its "Batch No:" style label, or null.
 String? parseBatch(String text) {
-  final prefixed = _prefixedCode.firstMatch(text);
-  if (prefixed != null) return prefixed[0]!.toUpperCase();
+  final lines = text.split('\n');
 
-  for (final m in _labelledCode.allMatches(text)) {
-    final value = m[1]!;
-    if (RegExp(r'\d').hasMatch(value)) return value.toUpperCase();
+  for (final line in lines) {
+    final prefixed = _prefixedCode.firstMatch(line);
+    if (prefixed != null) {
+      return _normaliseCode('${prefixed[1]!.toUpperCase()}-${prefixed[2]!}');
+    }
+  }
+
+  for (final line in lines) {
+    for (final m in _labelledCode.allMatches(line)) {
+      final value = m[1]!;
+      if (_digit.hasMatch(value)) return _normaliseCode(value);
+    }
+  }
+
+  // Last resort: a label the OCR mangled, followed by a colon and a value.
+  for (final line in lines) {
+    final colon = line.indexOf(':');
+    if (colon < 0) continue;
+    if (!_looksLikeLabel(line.substring(0, colon))) continue;
+    final match = _valueAfterColon.firstMatch(line.substring(colon + 1).trim());
+    if (match != null && _digit.hasMatch(match[1]!)) return _normaliseCode(match[1]!);
   }
   return null;
 }

@@ -351,10 +351,10 @@ edge-device disease mapping.
 
 ```bash
 # Demo (built-in 1-ha farm near Ibadan):
-python -m deployment.uav.flight_planner --demo
+python -m src.phase5_uav.flight_planner --demo
 
 # Real farm boundary:
-python -m deployment.uav.flight_planner \
+python -m src.phase5_uav.flight_planner \
   --farm-geojson data/uav/farm_boundary.geojson \
   --altitude 30 \
   --overlap  80 \
@@ -371,10 +371,10 @@ Output `.waypoints` file is directly importable by:
 
 ```bash
 # Demo (synthetic orthomosaic):
-python -m deployment.uav.patch_runner --demo
+python -m src.phase5_uav.patch_runner --demo
 
 # Real GeoTIFF orthomosaic:
-python -m deployment.uav.patch_runner \
+python -m src.phase5_uav.patch_runner \
   --image  data/uav/orthomosaic.tif \
   --model  models/exports/efficientnetb3_maize_int8.tflite \
   --output data/uav/patch_predictions.csv \
@@ -384,7 +384,7 @@ python -m deployment.uav.patch_runner \
 ### Step 3 — Disease Heatmap
 
 ```bash
-python -m deployment.uav.heatmap \
+python -m src.phase5_uav.heatmap \
   --csv    data/uav/patch_predictions.csv \
   --output data/uav/disease_heatmap.html
 ```
@@ -569,9 +569,9 @@ bash run_all.sh --full
 python -m src.phase1_cnn.train    --csv data/annotations/labels.csv
 python -m src.phase1_cnn.evaluate --model models/exports/efficientnetb3_maize.keras --csv data/annotations/labels.csv
 python -m src.phase4_edge.convert_tflite
-python -m deployment.uav.flight_planner --demo
-python -m deployment.uav.patch_runner   --demo
-python -m deployment.uav.heatmap        --demo
+python -m src.phase5_uav.flight_planner --demo
+python -m src.phase5_uav.patch_runner   --demo
+python -m src.phase5_uav.heatmap        --demo
 ```
 
 ---
@@ -641,7 +641,7 @@ flutter run --dart-define-from-file=.env.json
 | 3 — Multimodal Fusion | Olapade + Tijani | 🟡 Run `--full` to converge |
 | 4 — TFLite Export | Oshodilawal | ✅ Complete |
 | 5 — UAV Integration | Oshodilawal | ✅ Code complete — test with real orthomosaic |
-| Flutter App | Oshodilawal | Android and iOS; see `tasks/todo.md` for the outstanding device checks |
+| Flutter App | Oshodilawal | Android and iOS; outstanding device checks: on-device latency benchmark, full scan journey on a device, release APK size (148 MB vs the 80 MB requirement) |
 
 ### Adding New Maize Varieties / Diseases
 
