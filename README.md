@@ -152,8 +152,6 @@ maize-disease-detection/
 │       ├── drone_telemetry.py     ← Live MAVLink drone connection + mission upload
 │       └── live_server.py         ← Flask + Socket.IO real-time map dashboard
 │
-├── deployment/uav/                ← Deprecated shims re-exporting src.phase5_uav (to be removed)
-│
 ├── data/
 │   ├── raw/plantvillage/          ← PlantVillage dataset images
 │   ├── raw/seed_labels/           ← Seed label images for OCR testing
