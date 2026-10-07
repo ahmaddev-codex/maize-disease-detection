@@ -1,4 +1,4 @@
-"""T37/T38: the UAV survey summary, and the deprecated import path.
+"""T37/T38: the UAV survey summary.
 
 `_recommend` picked the most common class of all, so a field that is mostly
 healthy was reported as "Dominant: Healthy" with an agronomist referral, and
@@ -7,7 +7,6 @@ to import it.
 """
 import importlib
 import json
-import warnings
 from collections import Counter
 from pathlib import Path
 
@@ -88,16 +87,6 @@ def test_the_summary_filename_follows_the_output_stem():
     assert heatmap.summary_path_for("data/uav/disease_heatmap.html") == \
         "data/uav/disease_heatmap_summary.json"
     assert heatmap.summary_path_for("out/map.html").endswith("_summary.json")
-
-
-def test_the_deprecated_import_path_warns_but_still_works():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        shim = importlib.import_module("deployment.uav.heatmap")
-        importlib.reload(shim)
-
-    assert any(issubclass(w.category, DeprecationWarning) for w in caught)
-    assert hasattr(shim, "main")
 
 
 def test_predictions_without_coordinates_still_produce_a_summary(tmp_path):

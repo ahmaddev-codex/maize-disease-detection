@@ -33,6 +33,75 @@ def build_augmentation():
     ], name="augmentation")
 
 
+# ── MixUp / CutMix (training only, batch level) ───────────────────────────────
+#
+# Both blend pairs of images inside a batch and blend their one-hot labels by
+# the same proportion, which discourages over-confident predictions on the
+# NCLB/GLS boundary where most test errors sit. They need one-hot labels.
+
+MIX_MODES = ("none", "mixup", "cutmix", "both")
+
+
+def _sample_beta(alpha: float) -> tf.Tensor:
+    """One draw from Beta(alpha, alpha), via two Gamma draws."""
+    a = tf.random.gamma([], alpha)
+    b = tf.random.gamma([], alpha)
+    return a / (a + b)
+
+
+def mixup(images: tf.Tensor, labels: tf.Tensor, alpha: float = 0.2):
+    lam = _sample_beta(alpha)
+    idx = tf.random.shuffle(tf.range(tf.shape(images)[0]))
+    images = lam * images + (1.0 - lam) * tf.gather(images, idx)
+    labels = lam * labels + (1.0 - lam) * tf.gather(labels, idx)
+    return images, labels
+
+
+def cutmix(images: tf.Tensor, labels: tf.Tensor, alpha: float = 1.0):
+    h, w = IMG_SIZE
+    lam = _sample_beta(alpha)
+    cut = tf.sqrt(1.0 - lam)
+    cut_h = tf.cast(cut * h, tf.int32)
+    cut_w = tf.cast(cut * w, tf.int32)
+    cy = tf.random.uniform([], 0, h, dtype=tf.int32)
+    cx = tf.random.uniform([], 0, w, dtype=tf.int32)
+    y1 = tf.clip_by_value(cy - cut_h // 2, 0, h)
+    y2 = tf.clip_by_value(cy + cut_h // 2, 0, h)
+    x1 = tf.clip_by_value(cx - cut_w // 2, 0, w)
+    x2 = tf.clip_by_value(cx + cut_w // 2, 0, w)
+
+    rows = tf.range(h)[:, None]
+    cols = tf.range(w)[None, :]
+    inside = (rows >= y1) & (rows < y2) & (cols >= x1) & (cols < x2)
+    mask = tf.cast(inside, images.dtype)[None, :, :, None]
+
+    idx = tf.random.shuffle(tf.range(tf.shape(images)[0]))
+    images = images * (1.0 - mask) + tf.gather(images, idx) * mask
+    # Label weight follows the area actually pasted, after clipping at the edges.
+    pasted = tf.cast((y2 - y1) * (x2 - x1), tf.float32) / float(h * w)
+    labels = (1.0 - pasted) * labels + pasted * tf.gather(labels, idx)
+    return images, labels
+
+
+def mix_batch(images, labels, mode: str = "mixup", prob: float = 0.5):
+    """Apply MixUp and/or CutMix to a batch with probability `prob`."""
+    if mode not in MIX_MODES:
+        raise ValueError(f"mix mode must be one of {MIX_MODES}, got {mode!r}")
+    if mode == "none" or prob <= 0:
+        return images, labels
+
+    def _mixed():
+        if mode == "mixup":
+            return mixup(images, labels)
+        if mode == "cutmix":
+            return cutmix(images, labels)
+        return tf.cond(tf.random.uniform([]) < 0.5,
+                       lambda: mixup(images, labels),
+                       lambda: cutmix(images, labels))
+
+    return tf.cond(tf.random.uniform([]) < prob, _mixed, lambda: (images, labels))
+
+
 # ── Image loading ──────────────────────────────────────────────────────────────
 
 def load_and_preprocess(image_path: str, label: int):
@@ -91,15 +160,25 @@ def df_to_dataset(
     augment: bool = False,
     shuffle: bool = True,
     batch_size: int = BATCH_SIZE,
+    one_hot: bool = False,
+    mix: str = "none",
+    mix_prob: float = 0.5,
 ) -> tf.data.Dataset:
-    """Convert a labelled DataFrame into a batched tf.data.Dataset."""
+    """Convert a labelled DataFrame into a batched tf.data.Dataset.
+
+    one_hot   — emit float one-hot labels (needed for label smoothing / mixing)
+    mix       — "none" | "mixup" | "cutmix" | "both"; requires one_hot
+    """
+    if mix != "none" and not one_hot:
+        raise ValueError("MixUp/CutMix blend labels, so they need one_hot=True")
+
     paths  = df["image_path"].values
     labels = df["label"].values.astype(np.int32)
 
     ds = tf.data.Dataset.from_tensor_slices((paths, labels))
 
     if shuffle:
-        ds = ds.shuffle(buffer_size=len(df), seed=42)
+        ds = ds.shuffle(buffer_size=len(df), seed=42, reshuffle_each_iteration=True)
 
     ds = ds.map(load_and_preprocess, num_parallel_calls=AUTOTUNE)
 
@@ -110,8 +189,17 @@ def df_to_dataset(
             num_parallel_calls=AUTOTUNE
         )
 
-    ds = ds.batch(batch_size).prefetch(AUTOTUNE)
-    return ds
+    if one_hot:
+        ds = ds.map(lambda x, y: (x, tf.one_hot(y, NUM_CLASSES)),
+                    num_parallel_calls=AUTOTUNE)
+
+    ds = ds.batch(batch_size)
+
+    if mix != "none":
+        ds = ds.map(lambda x, y: mix_batch(x, y, mode=mix, prob=mix_prob),
+                    num_parallel_calls=AUTOTUNE)
+
+    return ds.prefetch(AUTOTUNE)
 
 
 # ── Public entry point ─────────────────────────────────────────────────────────
@@ -119,11 +207,15 @@ def df_to_dataset(
 def build_datasets(
     csv_path: str = "data/annotations/labels.csv",
     batch_size: int = BATCH_SIZE,
+    one_hot: bool = False,
+    mix: str = "none",
+    mix_prob: float = 0.5,
 ):
     """
     Load labels.csv and return (train_ds, val_ds, test_ds, class_weights).
 
     class_weights is a dict {int: float} suitable for model.fit().
+    MixUp/CutMix (if any) is applied to the training set only.
     """
     df = load_labels_csv(csv_path)
 
@@ -136,9 +228,12 @@ def build_datasets(
 
     print(f"Dataset split — train: {len(train_df)} | val: {len(val_df)} | test: {len(test_df)}")
 
-    train_ds = df_to_dataset(train_df, augment=True,  shuffle=True,  batch_size=batch_size)
-    val_ds   = df_to_dataset(val_df,   augment=False, shuffle=False, batch_size=batch_size)
-    test_ds  = df_to_dataset(test_df,  augment=False, shuffle=False, batch_size=batch_size)
+    train_ds = df_to_dataset(train_df, augment=True,  shuffle=True,  batch_size=batch_size,
+                             one_hot=one_hot, mix=mix, mix_prob=mix_prob)
+    val_ds   = df_to_dataset(val_df,   augment=False, shuffle=False, batch_size=batch_size,
+                             one_hot=one_hot)
+    test_ds  = df_to_dataset(test_df,  augment=False, shuffle=False, batch_size=batch_size,
+                             one_hot=one_hot)
 
     # Compute class weights to handle imbalance
     counts = train_df["label"].value_counts().sort_index()
