@@ -1,44 +1,45 @@
-# Core ML — TF 2.16 supports Python 3.12 and Apple Silicon natively
-tensorflow==2.16.2
-numpy==1.26.4
-scikit-learn==1.4.2
+# Core ML — TF 2.16+ (supports Python 3.11-3.13)
+tensorflow>=2.16.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
 
 # Image processing
-opencv-python==4.9.0.80
-Pillow==10.3.0
+opencv-python>=4.9.0.80
+Pillow>=10.3.0
 
 # OCR
-pytesseract==0.3.10
-fuzzywuzzy==0.18.0
-python-Levenshtein==0.25.1
+pytesseract>=0.3.10
+fuzzywuzzy>=0.18.0
+python-Levenshtein>=0.25.1
 
 # Data / visualisation
-pandas==2.2.2
-matplotlib==3.8.4
-seaborn==0.13.2
+pandas>=2.2.0
+matplotlib>=3.8.0
+seaborn>=0.13.0
 
 # UAV mapping — interactive HTML heatmaps
-folium==0.16.0
+folium>=0.16.0
 
 # UAV live web dashboard (live_server.py)
-flask==3.0.3
-flask-socketio==5.3.6
-gevent==24.2.1
-gevent-websocket==0.10.1
+flask>=3.0.0
+flask-socketio>=5.3.0
+gevent>=24.2.0
+gevent-websocket>=0.10.1
 
 # Notebooks, tests and dataset download
-ipykernel==7.3.0
-pytest==9.1.1
-kaggle==2.2.4
+ipykernel>=6.29.0
+pytest>=8.0.0
+kaggle>=1.6.0
+kagglehub>=0.2.0
 
 # Utilities
-tqdm==4.66.4
-pyyaml==6.0.1
-requests==2.31.0
+tqdm>=4.66.0
+pyyaml>=6.0.0
+requests>=2.31.0
 
 # ── Drone / MAVLink (Phase 5 live connection) ─────────────────────────────────
 # Connects to Pixhawk / ArduCopter / PX4 via serial, UDP, or TCP
-pymavlink==2.4.41
+pymavlink>=2.4.40
 
 # ── GeoTIFF orthomosaic support (optional, Phase 5) ──────────────────────────
 # Install separately if you have real drone imagery:
