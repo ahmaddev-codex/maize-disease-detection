@@ -70,19 +70,25 @@ def _adaptive_threshold(gray: np.ndarray) -> np.ndarray:
     )
 
 
+MAX_DESKEW_DEG = 30.0   # larger estimates are unreliable; leave the image as captured
+
+
 def _deskew(binary: np.ndarray) -> np.ndarray:
-    """Detect skew angle via Hough lines and rotate to correct it."""
-    coords = np.column_stack(np.where(binary > 0))
+    """Estimate text skew from the dark text pixels and rotate it level."""
+    # Text is dark on a white background after THRESH_BINARY. Measuring the
+    # white pixels instead fits the whole page (a 90-degree rectangle on
+    # OpenCV >= 4.5) and rotated every label sideways.
+    coords = np.column_stack(np.where(binary < 128))[:, ::-1].astype(np.float32)  # (x, y)
     if len(coords) < 10:
         return binary
 
-    angle = cv2.minAreaRect(coords)[-1]
+    (_, _), (width, height), angle = cv2.minAreaRect(coords)
+    # OpenCV >= 4.5 reports the angle in (0, 90]; express the tilt in [-45, 45).
+    if width < height:
+        angle -= 90
+    angle = (angle + 45) % 90 - 45
 
-    # minAreaRect returns angle in [-90, 0); normalise to [-45, 45]
-    if angle < -45:
-        angle = 90 + angle
-
-    if abs(angle) < 0.5:   # skip trivial rotations
+    if abs(angle) < 0.5 or abs(angle) > MAX_DESKEW_DEG:
         return binary
 
     h, w = binary.shape

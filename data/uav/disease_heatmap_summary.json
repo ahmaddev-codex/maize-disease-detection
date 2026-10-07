@@ -1,8 +1,8 @@
 {
   "total_patches": 45,
-  "disease_patches": 10,
-  "healthy_patches": 35,
-  "disease_rate_pct": 22.2,
+  "disease_patches": 24,
+  "healthy_patches": 21,
+  "disease_rate_pct": 53.3,
   "classes": {
     "NCLB": {
       "count": 0,
@@ -11,9 +11,9 @@
       "severity": "high"
     },
     "Rust": {
-      "count": 10,
-      "pct": 22.2,
-      "mean_confidence": 0.642,
+      "count": 24,
+      "pct": 53.3,
+      "mean_confidence": 0.878,
       "severity": "medium"
     },
     "GLS": {
@@ -23,12 +23,12 @@
       "severity": "medium"
     },
     "Healthy": {
-      "count": 35,
-      "pct": 77.8,
-      "mean_confidence": 0.933,
+      "count": 21,
+      "pct": 46.7,
+      "mean_confidence": 0.806,
       "severity": "low"
     }
   },
-  "avg_latency_ms": 99.7,
-  "recommendation": "22% of field affected. Dominant: Healthy. Consult agronomist for targeted treatment."
+  "avg_latency_ms": 277.9,
+  "recommendation": "53% of field affected. Dominant: Rust. Apply triazole fungicide (propiconazole) early. Rust spreads rapidly in cool humid conditions."
 }

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../constants/diseases.dart';
+
 class ScanRecord {
   final int? id;
   final String imagePath;
@@ -16,6 +18,15 @@ class ScanRecord {
   final String? plantingDate;
   final DateTime scannedAt;
   final String? notes;
+  // 1 = correct, 0 = incorrect, -1 = unsure, null = no feedback
+  final int? feedback;
+
+  // Advice generated for this scan, kept so reopening it costs nothing (T24).
+  final String? aiAdvice;
+  final String? aiLanguage;
+  final String? aiSource;
+  final String? aiModel;
+  final DateTime? aiCreatedAt;
 
   const ScanRecord({
     this.id,
@@ -33,10 +44,20 @@ class ScanRecord {
     this.plantingDate,
     required this.scannedAt,
     this.notes,
+    this.feedback,
+    this.aiAdvice,
+    this.aiLanguage,
+    this.aiSource,
+    this.aiModel,
+    this.aiCreatedAt,
   });
 
+  /// The stored advice, but only when it was written in [language].
+  String? adviceFor(String language) =>
+      (aiAdvice != null && aiLanguage == language) ? aiAdvice : null;
+
   bool get hasGps => latitude != null && longitude != null;
-  bool get isHealthy => classId == 3;
+  bool get isHealthy => classId == kHealthyClassId;
 
   Map<String, dynamic> toMap() => {
     if (id != null) 'id': id,
@@ -52,9 +73,24 @@ class ScanRecord {
     'crop_variety':  cropVariety,
     'batch_number':  batchNumber,
     'planting_date': plantingDate,
-    'scanned_at':    scannedAt.toIso8601String(),
+    'scanned_at':    scannedAt.toUtc().toIso8601String(),
     'notes':         notes,
+    'feedback':      feedback,
+    'ai_advice':     aiAdvice,
+    'ai_language':   aiLanguage,
+    'ai_source':     aiSource,
+    'ai_model':      aiModel,
+    'ai_created_at': aiCreatedAt?.toUtc().toIso8601String(),
   };
+
+  ClassificationResult toResult() => ClassificationResult(
+    classId: classId,
+    className: className,
+    shortName: shortName,
+    confidence: confidence,
+    allScores: allScores,
+    latencyMs: latencyMs,
+  );
 
   factory ScanRecord.fromMap(Map<String, dynamic> m) => ScanRecord(
     id:            m['id'] as int?,
@@ -72,11 +108,27 @@ class ScanRecord {
     cropVariety:   m['crop_variety'] as String?,
     batchNumber:   m['batch_number'] as String?,
     plantingDate:  m['planting_date'] as String?,
-    scannedAt:     DateTime.parse(m['scanned_at'] as String),
+    scannedAt:     DateTime.parse(m['scanned_at'] as String).toUtc(),
     notes:         m['notes'] as String?,
+    feedback:      m['feedback'] as int?,
+    aiAdvice:      m['ai_advice'] as String?,
+    aiLanguage:    m['ai_language'] as String?,
+    aiSource:      m['ai_source'] as String?,
+    aiModel:       m['ai_model'] as String?,
+    aiCreatedAt:   m['ai_created_at'] == null
+                       ? null
+                       : DateTime.parse(m['ai_created_at'] as String).toUtc(),
   );
 
-  ScanRecord copyWith({String? notes}) => ScanRecord(
+  ScanRecord copyWith({
+    String? notes,
+    int? feedback,
+    String? aiAdvice,
+    String? aiLanguage,
+    String? aiSource,
+    String? aiModel,
+    DateTime? aiCreatedAt,
+  }) => ScanRecord(
     id:            id,
     imagePath:     imagePath,
     classId:       classId,
@@ -92,6 +144,12 @@ class ScanRecord {
     plantingDate:  plantingDate,
     scannedAt:     scannedAt,
     notes:         notes ?? this.notes,
+    feedback:      feedback ?? this.feedback,
+    aiAdvice:      aiAdvice ?? this.aiAdvice,
+    aiLanguage:    aiLanguage ?? this.aiLanguage,
+    aiSource:      aiSource ?? this.aiSource,
+    aiModel:       aiModel ?? this.aiModel,
+    aiCreatedAt:   aiCreatedAt ?? this.aiCreatedAt,
   );
 }
 

@@ -20,7 +20,7 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
-from src.phase1_cnn.data_pipeline import IMG_SIZE, CLASS_NAMES, AUTOTUNE
+from src.phase1_cnn.data_pipeline import IMG_SIZE, CLASS_NAMES, AUTOTUNE, build_augmentation
 from src.phase2_ocr.extractor import extract_fields_from_path
 from src.phase2_ocr.encoder import encode, METADATA_DIM
 from src.phase3_fusion.fusion_model import build_fusion_model, compile_fusion_model
@@ -64,9 +64,10 @@ def compute_or_load_metadata(df: pd.DataFrame) -> np.ndarray:
 
 def _load_image(path: str) -> tf.Tensor:
     raw   = tf.io.read_file(path)
-    image = tf.image.decode_jpeg(raw, channels=3)
+    image = tf.image.decode_image(raw, channels=3, expand_animations=False)
     image = tf.image.resize(image, IMG_SIZE)
-    return tf.cast(image, tf.float32)   # keep [0, 255]; EfficientNetB3 rescales internally
+    image = tf.cast(image, tf.float32)   # keep [0, 255]; EfficientNetB3 rescales internally
+    return image
 
 
 def build_fusion_dataset(
@@ -81,6 +82,10 @@ def build_fusion_dataset(
 
     img_ds   = tf.data.Dataset.from_tensor_slices(paths)
     img_ds   = img_ds.map(_load_image, num_parallel_calls=AUTOTUNE)
+
+    if augment:
+        aug    = build_augmentation()
+        img_ds = img_ds.map(lambda x: aug(x, training=True), num_parallel_calls=AUTOTUNE)
 
     meta_ds  = tf.data.Dataset.from_tensor_slices(metadata_vecs)
     label_ds = tf.data.Dataset.from_tensor_slices(labels)

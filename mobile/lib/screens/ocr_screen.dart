@@ -1,13 +1,12 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import '../constants/colors.dart';
+import '../design_system/design_system.dart';
 import '../models/scan_record.dart';
 import '../providers/app_provider.dart';
+import '../services/ocr_parser.dart';
 import '../services/ocr_service.dart';
-import '../widgets/ds.dart';
 
 class OcrScreen extends ConsumerStatefulWidget {
   const OcrScreen({super.key});
@@ -19,280 +18,273 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
   OcrFields? _fields;
   bool _isProcessing = false;
   String? _error;
+  String? _dateError;
+
+  final _varietyCtrl = TextEditingController();
+  final _batchCtrl   = TextEditingController();
+  final _dateCtrl    = TextEditingController();
+
+  @override
+  void dispose() {
+    _varietyCtrl.dispose();
+    _batchCtrl.dispose();
+    _dateCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _scan(ImageSource source) async {
     final picked = await ImagePicker().pickImage(source: source);
     if (picked == null) return;
-    setState(() { _isProcessing = true; _error = null; });
+    setState(() {
+      _isProcessing = true;
+      _error = null;
+    });
     try {
       final result = await OcrService.instance.extractFields(picked.path);
-      setState(() { _fields = result; _isProcessing = false; });
+      _varietyCtrl.text = result.cropVariety ?? '';
+      _batchCtrl.text   = result.batchNumber  ?? '';
+      _dateCtrl.text    = result.plantingDate  ?? '';
+      setState(() {
+        _fields = result;
+        _isProcessing = false;
+      });
     } catch (e) {
-      setState(() { _error = e.toString(); _isProcessing = false; });
+      setState(() {
+        _error = e.toString();
+        _isProcessing = false;
+      });
     }
   }
 
   void _attach() {
     if (_fields == null) return;
-    ref.read(pendingOcrProvider.notifier).state = _fields;
+    if (!isValidPlantingDate(_dateCtrl.text)) {
+      setState(() => _dateError = 'Enter a real date as YYYY-MM-DD, e.g. 2024-03-15');
+      return;
+    }
+    final corrected = OcrFields(
+      cropVariety: _varietyCtrl.text.trim().isEmpty ? null : _varietyCtrl.text.trim(),
+      batchNumber: _batchCtrl.text.trim().isEmpty ? null : _batchCtrl.text.trim(),
+      plantingDate: _dateCtrl.text.trim().isEmpty ? null : _dateCtrl.text.trim(),
+      rawText: _fields!.rawText,
+    );
+    ref.read(pendingOcrProvider.notifier).state = corrected;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text(
-          'Seed label attached — will be linked to your next leaf scan')),
+      const SnackBar(
+        content: Text('Seed metadata linked — will attach to your next leaf scan'),
+      ),
     );
     context.push('/camera');
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark   = ref.watch(isDarkModeProvider);
-    final pending  = ref.watch(pendingOcrProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pending = ref.watch(pendingOcrProvider);
     final hasFields = _fields != null;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.canvasDark : AppColors.canvas,
-      body: CustomScrollView(
-        slivers: [
-          // ── Glass app bar ────────────────────────────────────────────────
-          SliverAppBar(
-            pinned: true,
-            expandedHeight: 90,
-            backgroundColor:
-                (isDark ? AppColors.surfaceDark : AppColors.surface).withOpacity(0.88),
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: const FlexibleSpaceBar(
-                  title: Text('Seed Label Scanner',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-                  titlePadding: EdgeInsets.only(left: 16, bottom: 14),
-                ),
+      backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+      appBar: AppBar(
+        title: Row(
+          children: [
+            MaizeGuardLogo(size: 22, isDark: isDark),
+            const SizedBox(width: AppSpacing.sm),
+            const Text('Seed Bag Label OCR Scanner'),
+          ],
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 100),
+        children: [
+          // Active Linked Metadata Banner
+          if (pending != null) ...[
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.healthy.withValues(alpha: 0.12),
+                borderRadius: AppRadii.md,
+                border: Border.all(color: AppColors.healthy.withValues(alpha: 0.4)),
               ),
-            ),
-          ),
-
-          SliverPadding(
-            padding: AppSpacing.pagePad,
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                const SizedBox(height: 12),
-
-                // ── Pending label banner ─────────────────────────────────
-                if (pending != null)
-                  GlassCard(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    child: Row(children: [
-                      const DuotoneIcon(Icons.check_circle_rounded,
-                          primaryColor: AppColors.successFg,
-                          secondaryColor: Color(0xFF69F0AE)),
-                      const SizedBox(width: 10),
-                      const Expanded(child: Text('Label attached — ready to scan a leaf',
-                          style: TextStyle(fontSize: 13, color: AppColors.successFg,
-                              fontWeight: FontWeight.w600))),
-                      TextButton(
-                        onPressed: () => ref.read(pendingOcrProvider.notifier).state = null,
-                        child: const Text('Clear',
-                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      ),
-                    ]),
-                  ),
-
-                // ── Instruction card ─────────────────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(children: [
-                    const DuotoneIcon(Icons.info_rounded,
-                        primaryColor: AppColors.accent,
-                        secondaryColor: AppColors.accentFg),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Photograph the front of a seed bag label to extract crop variety, batch number, and planting date. The data will be linked to your next disease scan.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
-                      ),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 16),
-
-                // ── Camera / Gallery buttons ─────────────────────────────
-                Row(children: [
-                  Expanded(child: _ScanButton(
-                    icon: Icons.camera_alt_rounded,
-                    label: 'Camera',
-                    onTap: _isProcessing ? null : () => _scan(ImageSource.camera),
-                  )),
-                  const SizedBox(width: 12),
-                  Expanded(child: _ScanButton(
-                    icon: Icons.photo_library_rounded,
-                    label: 'Gallery',
-                    onTap: _isProcessing ? null : () => _scan(ImageSource.gallery),
-                  )),
-                ]),
-
-                // ── Processing ───────────────────────────────────────────
-                if (_isProcessing) ...[
-                  const SizedBox(height: 24),
-                  GlassCard(
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: AppColors.healthy, size: 22),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(width: 18, height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2)),
-                        SizedBox(width: 12),
-                        Text('Extracting text from label…',
-                            style: TextStyle(color: AppColors.textSecondary)),
+                        Text(
+                          'Seed Metadata Active',
+                          style: AppTypography.bodySmall.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.healthy,
+                          ),
+                        ),
+                        Text(
+                          'Linked: ${pending.cropVariety ?? "Unknown Variety"}',
+                          style: AppTypography.caption.copyWith(
+                            color: isDark ? AppColors.charcoal300 : AppColors.charcoal700,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ],
-
-                // ── Error ────────────────────────────────────────────────
-                if (_error != null) ...[
-                  const SizedBox(height: 16),
-                  GlassCard(
-                    child: Row(children: [
-                      const Icon(Icons.error_rounded, color: AppColors.dangerFg),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(_error!,
-                          style: const TextStyle(color: AppColors.dangerFg, fontSize: 12))),
-                    ]),
+                  TextButton(
+                    onPressed: () => ref.read(pendingOcrProvider.notifier).state = null,
+                    child: const Text('Clear', style: TextStyle(color: AppColors.danger)),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
 
-                // ── Extracted fields ─────────────────────────────────────
-                if (hasFields) ...[
-                  const SectionLabel('Extracted Fields'),
-                  GlassCard(
-                    padding: EdgeInsets.zero,
-                    child: Column(children: [
-                      _FieldRow(
-                        icon: Icons.grass_rounded,
-                        iconColor: AppColors.successFg,
-                        label: 'Crop variety',
-                        value: _fields!.cropVariety,
-                      ),
-                      const Divider(height: 1, indent: 56),
-                      _FieldRow(
-                        icon: Icons.qr_code_rounded,
-                        iconColor: AppColors.accent,
-                        label: 'Batch number',
-                        value: _fields!.batchNumber,
-                      ),
-                      const Divider(height: 1, indent: 56),
-                      _FieldRow(
-                        icon: Icons.calendar_today_rounded,
-                        iconColor: AppColors.attentionFg,
-                        label: 'Planting date',
-                        value: _fields!.plantingDate,
-                      ),
-                    ]),
+          // Guidance Card
+          AppCard(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.emeraldBase.withValues(alpha: 0.15),
+                    borderRadius: AppRadii.sm,
                   ),
-
-                  const SectionLabel('Raw OCR Text'),
-                  GlassCard(
-                    padding: const EdgeInsets.all(14),
-                    child: Text(
-                      _fields!.rawText.isEmpty ? '(no text detected)' : _fields!.rawText,
-                      style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          height: 1.5),
+                  child: const MaizeGuardLogo(size: 24, isDark: false),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    'Capture the printed label on your certified maize seed package to automatically read the crop variety, seed lot batch number, and planting date.',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: isDark ? AppColors.charcoal300 : AppColors.charcoal700,
+                      height: 1.5,
                     ),
                   ),
-
-                  if (_fields!.hasAnyField) ...[
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _attach,
-                        icon: const Icon(Icons.link_rounded),
-                        label: const Text('Attach to next scan'),
-                      ),
-                    ),
-                  ],
-                ],
-
-                // ── Empty state ──────────────────────────────────────────
-                if (!hasFields && !_isProcessing && _error == null) ...[
-                  const SizedBox(height: 40),
-                  EmptyState(
-                    icon: Icons.document_scanner_rounded,
-                    title: 'No label scanned yet',
-                    subtitle: 'Point your camera at a seed bag label\nto extract variety and batch info.',
-                  ),
-                ],
-              ]),
+                ),
+              ],
             ),
           ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Camera',
+                  icon: Icons.camera_alt_outlined,
+                  backgroundColor: AppColors.forestDark,
+                  onPressed: _isProcessing ? null : () => _scan(ImageSource.camera),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: AppButton(
+                  label: 'Gallery',
+                  icon: Icons.photo_library_outlined,
+                  variant: AppButtonVariant.secondary,
+                  onPressed: _isProcessing ? null : () => _scan(ImageSource.gallery),
+                ),
+              ),
+            ],
+          ),
+
+          if (_isProcessing) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Center(
+              child: Column(
+                children: [
+                  const CircularProgressIndicator(color: AppColors.emeraldBase),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text('Parsing label text with on-device ML Kit OCR…', style: AppTypography.bodySmall),
+                ],
+              ),
+            ),
+          ],
+
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.12),
+                borderRadius: AppRadii.md,
+                border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
+              ),
+              child: Text(_error!, style: const TextStyle(color: AppColors.danger)),
+            ),
+          ],
+
+          // Form to review & correct OCR extraction
+          if (hasFields) ...[
+            const SizedBox(height: AppSpacing.lg),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Extracted Agronomic Metadata', style: AppTypography.h3),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Review and adjust values below prior to linking to field scan:',
+                    style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  AppTextField(
+                    label: 'Crop Variety',
+                    hint: 'e.g. Oba Super 2, SAMMAZ 15',
+                    controller: _varietyCtrl,
+                    prefixIcon: Icons.grass_rounded,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  AppTextField(
+                    label: 'Lot / Batch Number',
+                    hint: 'e.g. BATCH-2024-NG04',
+                    controller: _batchCtrl,
+                    prefixIcon: Icons.qr_code_rounded,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  AppTextField(
+                    label: 'Planting Date',
+                    hint: 'YYYY-MM-DD',
+                    controller: _dateCtrl,
+                    prefixIcon: Icons.calendar_today_rounded,
+                    errorText: _dateError,
+                    onChanged: (_) {
+                      if (_dateError != null) setState(() => _dateError = null);
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  AppButton(
+                    label: 'Attach Seed Metadata to Next Scan',
+                    icon: Icons.link_rounded,
+                    backgroundColor: AppColors.emeraldBase,
+                    onPressed: _attach,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'RAW DETECTED TEXT STREAM',
+                    style: AppTypography.overline.copyWith(color: AppColors.charcoal500),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  SelectableText(
+                    _fields!.rawText.isEmpty ? '(No textual patterns recognized)' : _fields!.rawText,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
-}
-
-class _ScanButton extends StatelessWidget {
-  const _ScanButton({required this.icon, required this.label, this.onTap});
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: GlassCard(
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      child: Column(children: [
-        DuotoneIcon(icon,
-            primaryColor: AppColors.accent,
-            secondaryColor: AppColors.accentFg),
-        const SizedBox(height: 8),
-        Text(label,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-      ]),
-    ),
-  );
-}
-
-class _FieldRow extends StatelessWidget {
-  const _FieldRow({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    this.value,
-  });
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String? value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    child: Row(children: [
-      Container(
-        width: 34, height: 34,
-        decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, size: 16, color: iconColor),
-      ),
-      const SizedBox(width: 12),
-      Expanded(child: Text(label,
-          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-      Text(
-        value ?? '—',
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: value != null ? FontWeight.w600 : FontWeight.w400,
-          color: value != null ? AppColors.textPrimary : AppColors.textMuted,
-        ),
-      ),
-    ]),
-  );
 }

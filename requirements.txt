@@ -26,6 +26,11 @@ flask-socketio==5.3.6
 gevent==24.2.1
 gevent-websocket==0.10.1
 
+# Notebooks, tests and dataset download
+ipykernel==7.3.0
+pytest==9.1.1
+kaggle==2.2.4
+
 # Utilities
 tqdm==4.66.4
 pyyaml==6.0.1

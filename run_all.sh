@@ -54,7 +54,7 @@ echo "║   Full ML Pipeline Runner                                        ║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  Team     : Olapade (CNN/CV)  ·  Tijani (OCR)                  ║"
 echo "║             Oshodilawal (Edge / UI)                              ║"
-echo "║  Platform : React Native 0.73 (Android + iOS)  +  Python 3.12  ║"
+echo "║  Platform : Flutter 3.x (Android + iOS)  +  Python 3.11         ║"
 if [ "$FULL" = true ]; then
 echo "║  Mode     : FULL TRAINING  (20+30 / 50 epochs)                  ║"
 else
@@ -100,8 +100,8 @@ echo ""
 echo "── PHASE GATE CONDITIONS  (REQUIREMENTS.md §8) ──────────────────────────"
 echo "  1 → 2 : Validation accuracy ≥ 90% on held-out test set"
 echo "  2 → 3 : OCR extracts ≥ 80% variety fields on 10 seed label images"
-echo "  3 → 4 : Fusion model accuracy ≥ CNN-only baseline + 5%"
-echo "  4 → 5 : TFLite INT8 model exported; mobile app classifies in < 500 ms"
+echo "  3 → 4 : Fusion is experimental (ADR-002) — synthetic metadata, no gate"
+echo "  4 → 5 : FP16 + INT8 exported and measured into models/exports/metrics.json"
 echo "  5     : UAV demo produces disease heatmap from orthomosaic"
 
 echo ""
@@ -116,8 +116,8 @@ echo ""
 echo "  Training protocol:"
 echo "    Stage 1  Feature extraction  LR=1e-3  backbone frozen     epochs=$EPOCHS_P1_S1 (full=20)"
 echo "    Stage 2  Fine-tuning         LR=1e-5  layers 0-99 frozen  epochs=$EPOCHS_P1_S2 (full=30)"
-echo "    Optimizer : Adam  |  Loss: Categorical Crossentropy"
-echo "    Callbacks : EarlyStopping(patience=5) · ReduceLROnPlateau(patience=3)"
+echo "    Optimizer : AdamW  |  Loss: Sparse categorical crossentropy"
+echo "    Callbacks : EarlyStopping(patience=8) · ReduceLROnPlateau(patience=4)"
 echo "                ModelCheckpoint (best val_accuracy)"
 echo "    Class weights applied to address GLS imbalance (574 vs 1,306 images)"
 
@@ -143,56 +143,14 @@ if [ ! -d "$PLANTVILLAGE_DIR" ]; then
 fi
 
 echo ">>> Step 0: Building labels.csv + labels_with_metadata.csv ..."
-$VENV - << 'PYEOF'
-import os, csv, random
-from collections import Counter
-
-MAPPING = {
-    "Blight":         (0, "NCLB"),
-    "Common_Rust":    (1, "Rust"),
-    "Gray_Leaf_Spot": (2, "GLS"),
-    "Healthy":        (3, "Healthy"),
-}
-ROOT = "data/raw/plantvillage/data"
-rows = []
-for folder, (label, class_name) in MAPPING.items():
-    path = os.path.join(ROOT, folder)
-    for fname in sorted(os.listdir(path)):
-        if fname.lower().endswith((".jpg", ".jpeg", ".png")):
-            rows.append({"image_path": os.path.join(path, fname),
-                         "label": label, "class_name": class_name, "source": "plantvillage"})
-
-os.makedirs("data/annotations", exist_ok=True)
-with open("data/annotations/labels.csv", "w", newline="") as f:
-    w = csv.DictWriter(f, fieldnames=["image_path","label","class_name","source"])
-    w.writeheader(); w.writerows(rows)
-
-varieties = ["SAMMAZ 15","SAMMAZ 17","SAMMAZ 29","SAMMAZ 34","SAMMAZ 50",
-             "OBA SUPER 2","EVDT 99","POOL 16 DT","TZEE-W","ABA WHITE",
-             "ACROSS 97","SUWAN 1","EARLY THRIVING", None]
-batches   = ["BN-2024-042", "BN-2023-011", "LOT-2024-007", None]
-dates     = ["2024-03-15", "2023-11-01", "2024-05-20", None]
-rng = random.Random(0)
-with open("data/annotations/labels_with_metadata.csv", "w", newline="") as f:
-    fn = ["image_path","label","class_name","source","crop_variety","batch_number","planting_date"]
-    w = csv.DictWriter(f, fieldnames=fn)
-    w.writeheader()
-    for row in rows:
-        w.writerow({**row, "crop_variety": rng.choice(varieties),
-                    "batch_number": rng.choice(batches),
-                    "planting_date": rng.choice(dates)})
-
-counts = Counter(r["class_name"] for r in rows)
-total  = sum(counts.values())
-print(f"\n  labels.csv written: {total} images")
-print(f"  {'Class':<24} {'Count':>6}  {'Pct':>6}")
-print(f"  {'─'*40}")
-for cls in ["NCLB","Rust","GLS","Healthy"]:
-    n = counts.get(cls, 0)
-    print(f"  {cls:<24} {n:>6}  {n/total*100:>5.1f}%")
-print(f"  {'─'*40}")
-print(f"  {'TOTAL':<24} {total:>6}  100.0%")
-PYEOF
+# Built by a tested module (tests/test_build_labels.py), not an inline heredoc.
+# Images listed in data/annotations/exclusions.csv are dropped: two duplicate
+# pairs carried conflicting labels (T34).
+$VENV -m src.phase1_cnn.build_labels \
+  --root "$PLANTVILLAGE_DIR" \
+  --labels "$LABELS_CSV" \
+  --metadata "$META_CSV" \
+  --check-duplicates
 echo ""
 
 # ── Step 1: Phase 1 CNN training ───────────────────────────────────────────────
@@ -246,19 +204,19 @@ echo "════════════════════════�
 echo ""
 echo "  OCR pipeline (§6.2):"
 echo "    1. Grayscale conversion"
-echo "    2. Adaptive thresholding (Gaussian, block=11, C=2)"
+echo "    2. Adaptive thresholding (Gaussian, block=31, C=10)"
 echo "    3. Deskew via Hough line detection"
 echo "    4. Morphological denoising"
 echo "    5. Tesseract 5 LSTM — Page Segmentation Mode 6"
-echo "    6. Fuzzy field extraction (FuzzyWuzzy partial ratio, threshold=60)"
+echo "    6. Field extraction: per-word match, numbers exact, score ≥ 60 (FR-14)"
 echo ""
 echo "  Supported Nigerian varieties (FR-14, 13 varieties):"
 echo "    SAMMAZ 15/17/29/34/50 · OBA SUPER 2 · EVDT 99 · POOL 16 DT"
 echo "    TZEE-W · ABA WHITE · ACROSS 97 · SUWAN 1 · EARLY THRIVING"
 echo ""
-echo "  Metadata encoding: 24-d float32 vector"
+echo "  Metadata encoding: 17-d float32 vector"
 echo "    13-d one-hot (variety) + 1 (batch present) + 1 (batch year)"
-echo "    + 2 (planting month sin/cos) + 7 (padding)"
+echo "    + 2 (planting month sin/cos)"
 echo ""
 echo ">>> Step 3: Testing OCR pipeline ..."
 echo ""
@@ -303,12 +261,12 @@ echo ""
 # ── Step 4: Phase 3 Fusion ────────────────────────────────────────────────────
 echo "════════════════════════════════════════════════════════════════════════════"
 echo "  PHASE 3 — Multimodal Fusion Model  (REQUIREMENTS.md §6.3)"
-echo "  Gate: fusion accuracy ≥ CNN-only baseline + 5%"
+echo "  Status: experimental (ADR-002) — metadata is synthetic; report as ablation"
 echo "════════════════════════════════════════════════════════════════════════════"
 echo ""
 echo "  Fusion architecture (§6.3):"
 echo "    Image branch  : EfficientNetB3 (frozen) → Dense(256) → 256-d"
-echo "    OCR branch    : Input(24,) → Dense(32) → BatchNorm → 32-d"
+echo "    OCR branch    : Input(17,) → Dense(32) → BatchNorm → 32-d"
 echo "    Fusion head   : Concatenate(288-d) → Dense(128,relu) → Dropout(0.3)"
 echo "                    → Dense(4,softmax)"
 echo "    Optimizer     : Adam (LR=5e-4)  |  Epochs: $EPOCHS_P3 (full=50)"
@@ -322,7 +280,7 @@ $VENV -m src.phase3_fusion.train_fusion \
   --epochs $EPOCHS_P3
 echo ""
 echo "  Output: models/exports/fusion_model.keras"
-echo "  Phase 3→4 gate: fusion accuracy must exceed CNN-only + 5%"
+echo "  Fusion is experimental (ADR-002): compare with CNN-only via the ablation"
 echo ""
 
 # ── Step 5: Phase 4 TFLite ────────────────────────────────────────────────────
@@ -332,11 +290,11 @@ echo "  Gate: INT8 + FP16 models exported; mobile app loads and classifies < 500
 echo "════════════════════════════════════════════════════════════════════════════"
 echo ""
 echo "  Quantisation spec (§6.4):"
-echo "    INT8 (primary)  : ~13 MB · calibrated on 200 representative images"
-echo "    FP16 (fallback) : ~23 MB · for devices without INT8 GPU delegate"
+echo "    FP16 (primary, ADR-001) : ~23 MB · 91.1% test accuracy"
+echo "    INT8 (fallback)         : ~13 MB · 88.1% · calibrated on 200 images"
 echo "    INT8 output dequant: score = (raw_uint8 − zero_point) × scale"
 echo "                         scale=0.00390625  zero_point=0"
-echo "    NFR-22 APK bundle target: ≤ 15 MB  ✓"
+echo "    NFR-22 (≤ 15 MB) assumed INT8; ADR-001 ships FP16 — REQUIREMENTS needs updating"
 echo ""
 echo ">>> Step 5: Converting Keras → TFLite INT8 + FP16 ..."
 $VENV -m src.phase4_edge.convert_tflite \
@@ -371,20 +329,20 @@ echo ""
 mkdir -p data/uav
 
 echo ">>> Step 6a: Generating demo flight plan ..."
-$VENV -m deployment.uav.flight_planner \
+$VENV -m src.phase5_uav.flight_planner \
   --demo \
   --output data/uav/mission.waypoints
 echo ""
 
 echo ">>> Step 6b: Patch inference on synthetic orthomosaic ..."
-$VENV -m deployment.uav.patch_runner \
+$VENV -m src.phase5_uav.patch_runner \
   --demo \
   --model models/exports/efficientnetb3_maize_int8.tflite \
   --output data/uav/patch_predictions.csv
 echo ""
 
 echo ">>> Step 6c: Generating disease heatmap ..."
-$VENV -m deployment.uav.heatmap \
+$VENV -m src.phase5_uav.heatmap \
   --csv    data/uav/patch_predictions.csv \
   --output data/uav/disease_heatmap.html
 echo ""
@@ -410,13 +368,13 @@ echo "║    data/uav/disease_heatmap_summary.json                        ║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  Mobile app                                                      ║"
 echo "║    bash mobile/setup.sh                                          ║"
-echo "║    cd mobile && npm start          # Metro bundler (Tab 1)       ║"
-echo "║    cd mobile && npm run android    # Android device/emulator     ║"
-echo "║    cd mobile && npm run ios        # iOS Simulator (macOS only)  ║"
+echo "║    cd mobile && flutter pub get                                  ║"
+echo "║    cd mobile && flutter run                                      ║"
+echo "║    cd mobile && flutter build apk --release                      ║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  Live UAV (real drone — see REQUIREMENTS.md §6.5)               ║"
-echo "║    python -m deployment.uav.live_server                          ║"
-echo "║    python -m deployment.uav.drone_telemetry \\                    ║"
+echo "║    python -m src.phase5_uav.live_server                          ║"
+echo "║    python -m src.phase5_uav.drone_telemetry \\                    ║"
 echo "║        --connect udp:0.0.0.0:14550 \\                             ║"
 echo "║        --mission data/uav/mission.waypoints \\                    ║"
 echo "║        --server  http://localhost:5000                            ║"

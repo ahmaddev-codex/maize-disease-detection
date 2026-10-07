@@ -14,7 +14,7 @@
 └──────────────────────────────────────────────────────────────────────────┘
 
   ┌──────────────────────────────────────────────────────────────────────┐
-  │  LAYER 1 — PRESENTATION (React Native UI)                            │
+  │  LAYER 1 — PRESENTATION (Flutter UI)                            │
   │                                                                      │
   │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
   │   │  Home    │  │ Camera   │  │ Result   │  │   OCR    │           │
@@ -35,7 +35,7 @@
   │  └───────────────┘  └───────────────┘  └──────────────────────┘    │
   │  ┌───────────────┐  ┌───────────────┐  ┌──────────────────────┐    │
   │  │  aiAdvisor.ts │  │ locationSvc   │  │     database.ts      │    │
-  │  │  Gemini API   │  │ GPS Tagging   │  │  op-sqlite (DAO)     │    │
+  │  │  Groq API     │  │ GPS Tagging   │  │  sqflite (DAO)       │    │
   │  └───────────────┘  └───────────────┘  └──────────────────────┘    │
   └─────────────────────────┬────────────────────────────────────────────┘
                              │ reads/writes
@@ -44,7 +44,7 @@
   │                                                                      │
   │   ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐   │
   │   │  SQLite DB       │  │  AsyncStorage   │  │ Android Keychain │   │
-  │   │ scan_records tbl │  │ theme prefs     │  │ Gemini API key   │   │
+  │   │ scan_records tbl │  │ theme prefs     │  │ API keys (secure)│   │
   │   └─────────────────┘  └─────────────────┘  └──────────────────┘   │
   └─────────────────────────┬────────────────────────────────────────────┘
                              │ loads
@@ -63,7 +63,7 @@
 
    External Services (optional, online only):
    ┌─────────────────────────────────────────┐
-   │  Google Gemini 2.0 Flash API (HTTPS)    │
+   │  Groq API (HTTPS, optional)             │
    │  AI-powered agronomic advice            │
    └─────────────────────────────────────────┘
 ```
@@ -77,7 +77,7 @@
                          │                               │
    ┌──────────┐          │         MAIZEGUARD            │          ┌──────────────────┐
    │          │  Image   │                               │  Prompt  │                  │
-   │  FARMER  │─────────►│    AI-Powered Maize Disease   │─────────►│   Gemini 2.0     │
+   │  FARMER  │─────────►│    AI-Powered Maize Disease   │─────────►│   Groq API       │
    │          │◄─────────│    Detection System           │◄─────────│   Flash API      │
    │          │ Disease  │                               │  Advice  │                  │
    └──────────┘  Report  │                               │          └──────────────────┘
@@ -92,7 +92,7 @@
 **Explanation:**
 - The **Farmer** sends a leaf image to the system and receives a disease report (diagnosis + treatment advice)
 - The **PlantVillage Dataset** provides training images used offline during model training (not at runtime)
-- The **Gemini 2.0 Flash API** is an optional external service; the system works fully offline without it
+- The **Groq API** is an optional external service. Diagnosis, the built-in advice, history and the map work without it; generated advice and Nigerian-language speech do not.
 
 ---
 
@@ -159,7 +159,7 @@
 ┌──────────────────────────────────────────────────────────────────────┐
 │  8.0  RECOMMENDATION ENGINE                                          │
 │  ┌─────────────────────┐       ┌──────────────────────────────┐     │
-│  │  On-device rules    │  OR   │  Gemini 2.0 Flash API        │     │
+│  │  Built-in rules     │  OR   │  Groq API (key + network)    │     │
 │  │  (season / urgency  │       │  (POST with structured prompt │     │
 │  │   / fungicides)     │       │   → formatted advice text)   │     │
 │  └─────────────────────┘       └──────────────────────────────┘     │
@@ -176,8 +176,8 @@
 ## Diagram 4 — Entity Relationship Diagram (ERD)
 
 ```
- ┌─────────────────────────────────────────────────────────────────┐
- │                        SCAN_RECORD                              │
+ ┌────────────────────────────────────────────────────────────────┐
+ │                        SCAN_RECORD                             │
  ├──────────────────┬──────────────┬──────────────────────────────┤
  │  ATTRIBUTE       │  DATA TYPE   │  NOTES                       │
  ├──────────────────┼──────────────┼──────────────────────────────┤
@@ -187,7 +187,7 @@
  │     class_name   │ TEXT         │ e.g. "Northern Corn Leaf…"   │
  │     short_name   │ TEXT         │ NCLB / Rust / GLS / Healthy  │
  │     confidence   │ REAL         │ [0.0, 1.0]                   │
- │     all_scores   │ TEXT (JSON)  │ "[0.12, 0.75, 0.08, 0.05]"  │
+ │     all_scores   │ TEXT (JSON)  │ "[0.12, 0.75, 0.08, 0.05]"   │
  │     latency_ms   │ REAL         │ Inference time               │
  │     latitude     │ REAL (null)  │ GPS — nullable               │
  │     longitude    │ REAL (null)  │ GPS — nullable               │
@@ -197,18 +197,18 @@
  │     scanned_at   │ TEXT         │ ISO 8601 datetime (UTC)      │
  │     notes        │ TEXT (null)  │ User notes — nullable        │
  └──────────────────┴──────────────┴──────────────────────────────┘
-          │
-          │ class_id references
-          ▼
+                            │
+                            │ class_id references
+                            ▼
  ┌─────────────────────────────────────────────────────────────────┐
  │                       DISEASE_CLASS  (lookup, not stored in DB) │
- ├──────────────────┬──────────────┬──────────────────────────────┤
- │ PK  id           │ INTEGER      │ 0, 1, 2, 3                   │
- │     short_name   │ TEXT         │ NCLB / Rust / GLS / Healthy  │
- │     full_name    │ TEXT         │ Northern Corn Leaf Blight…   │
- │     severity     │ TEXT         │ high / medium / low / none   │
- │     color_hex    │ TEXT         │ #F85149 / #E3B341 / …        │
- └──────────────────┴──────────────┴──────────────────────────────┘
+ ├──────────────────┬──────────────┬───────────────────────────────┤
+ │ PK  id           │ INTEGER      │ 0, 1, 2, 3                    │
+ │     short_name   │ TEXT         │ NCLB / Rust / GLS / Healthy   │
+ │     full_name    │ TEXT         │ Northern Corn Leaf Blight…    │
+ │     severity     │ TEXT         │ high / medium / low / none    │
+ │     color_hex    │ TEXT         │ #F85149 / #E3B341 / …     │
+ └──────────────────┴──────────────┴───────────────────────────────┘
 
   Relationship:
   SCAN_RECORD ──── (class_id) ──── DISEASE_CLASS
@@ -233,29 +233,29 @@
 │            MAIZEGUARD — ITERATIVE PHASED DEVELOPMENT MODEL               │
 └──────────────────────────────────────────────────────────────────────────┘
 
- ┌──────────────┐
- │   PLANNING   │  ← Dataset acquisition, system design, team role assignment
- └──────┬───────┘
-        │
-        ▼
- ┌──────────────────────────────────────────────────────────────────────┐
- │  PHASE 1 — CNN CLASSIFIER                                            │
+                            ┌──────────────┐
+                            │   PLANNING   │  ← Dataset acquisition, system design, team role assignment
+                            └──────┬───────┘
+                                   │
+                                   ▼
+ ┌─────────────────────────────────────────────────────────────────────┐
+ │  PHASE 1 — CNN CLASSIFIER                                           │
  │  Build: data_pipeline.py → model.py → train.py → evaluate.py        │
- │  Output: EfficientNetB3 trained model (.keras)                       │
- │  ────────────────────────────────────────────────────────────────    │
+ │  Output: EfficientNetB3 trained model (.keras)                      │
+ │  ────────────────────────────────────────────────────────────────   │
  │  GATE: Validation accuracy ≥ 90%  ✔ / ✘ → iterate (more epochs)     │
- └──────┬───────────────────────────────────────────────────────────────┘
-        │ PASS
-        ▼
- ┌──────────────────────────────────────────────────────────────────────┐
- │  PHASE 2 — OCR SUBSYSTEM                                             │
+ └─────────────────────────────────┬───────────────────────────────────┘
+                                   │ PASS
+                                   ▼
+ ┌─────────────────────────────────────────────────────────────────────┐
+ │  PHASE 2 — OCR SUBSYSTEM                                            │
  │  Build: preprocessor.py → extractor.py → encoder.py                 │
- │  Output: 24-d feature vector from seed label photos                  │
- │  ────────────────────────────────────────────────────────────────    │
+ │  Output: 17-d feature vector from seed label photos                 │
+ │  ────────────────────────────────────────────────────────────────   │
  │  GATE: ≥ 80% variety extraction accuracy on 10 test labels  ✔ / ✘   │
- └──────┬───────────────────────────────────────────────────────────────┘
-        │ PASS
-        ▼
+ └─────────────────────────────────┬───────────────────────────────────┘
+                                   │ PASS
+                                   ▼
  ┌──────────────────────────────────────────────────────────────────────┐
  │  PHASE 3 — MULTIMODAL FUSION                                         │
  │  Build: fusion_model.py → train_fusion.py                            │
@@ -287,10 +287,10 @@
         │
         ▼
  ┌──────────────────────────────────────────────────────────────────────┐
- │  MOBILE APP — React Native (Android-first)                           │
+ │  MOBILE APP — Flutter (Android-first)                           │
  │  ┌─────────────────┐ ┌──────────────────┐ ┌─────────────────────┐  │
  │  │ Sprint A — Core │ │ Sprint B — UI    │ │ Sprint C — AI/Map   │  │
- │  │ Camera + TFLite │ │ Dashboard +      │ │ Gemini advisor +    │  │
+ │  │ Camera + TFLite │ │ Dashboard +      │ │ Groq advisor +    │  │
  │  │ SQLite + OCR    │ │ History + Export │ │ Map + Settings      │  │
  │  └─────────────────┘ └──────────────────┘ └─────────────────────┘  │
  └──────────────────────────────────────────────────────────────────────┘
@@ -503,7 +503,7 @@
                                     ▼
                        ┌─────────────────────────────┐
                        │  INSERT scan_records        │
-                       │  (SQLite via op-sqlite)     │
+                       │  (SQLite via sqflite)     │
                        └──────────────┬──────────────┘
                                       │ scanId
                                       ▼
@@ -515,12 +515,12 @@
                                       │ User taps "Get AI Advice"
                                       ▼
                        ┌─────────────────────────────┐
-                       │  Gemini API key set?         │
+                       │  Groq API key set?         │
                        └───────┬─────────────┬────────┘
                                │ YES          │ NO
                                ▼             ▼
                     ┌──────────────┐  ┌──────────────────────┐
-                    │ POST Gemini  │  │ On-device engine:    │
+                    │ POST Groq  │  │ On-device engine:    │
                     │ 2.0 Flash    │  │ season + urgency +   │
                     │ API (HTTPS)  │  │ fungicide rules      │
                     └──────┬───────┘  └──────────┬───────────┘
@@ -539,7 +539,7 @@
 
 ```
         IMAGE INPUT                         OCR INPUT
-   [1 × 300 × 300 × 3]                      [24-d vector]
+   [1 × 300 × 300 × 3]                      [17-d vector]
           │                                       │
           ▼                                       ▼
   ┌───────────────────┐                  ┌──────────────────┐

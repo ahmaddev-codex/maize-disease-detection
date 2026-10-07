@@ -1,0 +1,15 @@
+{
+  "_source": "Groq published model list (https://console.groq.com/docs/models), transcribed 2026-09-23 — not a live capture of /openai/v1/models",
+  "_note": "Update by recording a real GET https://api.groq.com/openai/v1/models response when a key is available.",
+  "object": "list",
+  "data": [
+    { "id": "openai/gpt-oss-120b", "object": "model", "owned_by": "OpenAI" },
+    { "id": "openai/gpt-oss-20b", "object": "model", "owned_by": "OpenAI" },
+    { "id": "llama-3.3-70b-versatile", "object": "model", "owned_by": "Meta" },
+    { "id": "llama-3.1-8b-instant", "object": "model", "owned_by": "Meta" },
+    { "id": "meta-llama/llama-4-scout-17b-16e-instruct", "object": "model", "owned_by": "Meta" },
+    { "id": "meta-llama/llama-4-maverick-17b-128e-instruct", "object": "model", "owned_by": "Meta" },
+    { "id": "gemma2-9b-it", "object": "model", "owned_by": "Google" },
+    { "id": "qwen/qwen3-32b", "object": "model", "owned_by": "Alibaba Cloud" }
+  ]
+}

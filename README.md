@@ -2,7 +2,7 @@
 
 A multimodal AI system for detecting maize crop diseases, targeting Nigerian smallholder farmers. Combines an EfficientNetB3 CNN classifier with on-device OCR for seed label metadata, GPS-tagged history, AI agronomic advice, and a UAV live disease heatmap dashboard.
 
-**Mobile:** Flutter 3.x (Android + iOS) · **ML:** Python 3.12 + TensorFlow 2.16  
+**Mobile:** Flutter 3.x (Android + iOS) · **ML:** Python 3.11 + TensorFlow 2.16  
 **Team:** Tijani · Oshodilawal · Olapade
 
 ---
@@ -19,7 +19,7 @@ A multimodal AI system for detecting maize crop diseases, targeting Nigerian sma
   - [B. Mobile App — iOS](#b-mobile-app--ios)
   - [C. UAV Dashboard — Demo (no drone)](#c-uav-dashboard--demo-no-drone)
   - [D. UAV Dashboard — Live Drone](#d-uav-dashboard--live-drone)
-  - [E. ML Training Pipeline](#e-ml-training-pipeline)
+  - [E. ML Training Pipeline](#e-ml-training-pipeline)t
 - [Mobile App Reference](#mobile-app-reference)
 - [UAV Reference](#uav-reference)
 - [Roadmap](#roadmap)
@@ -35,7 +35,7 @@ Maize (*Zea mays*) is a staple crop across sub-Saharan Africa. Disease outbreaks
 
 - **Instant leaf disease classification** — EfficientNetB3 TFLite, fully offline, < 500 ms on mid-range Android
 - **Seed label OCR** — reads crop variety, batch number, and planting date from seed bags via ML Kit
-- **AI agronomic advice** — on-device rule engine + optional Gemini 2.0 Flash or local Ollama backend
+- **AI agronomic advice** — built-in rules on the device, plus an optional Groq advisory when a key and a connection are present; the result always says which one answered
 - **GPS-tagged scan history** — filterable, with per-scan notes and an OpenStreetMap farm map
 - **Dashboard analytics** — farm health score, 7-day trend, disease breakdown charts
 - **UAV live heatmap** — Flask + Socket.IO dashboard with real-time Leaflet.js disease map
@@ -47,21 +47,21 @@ Maize (*Zea mays*) is a staple crop across sub-Saharan Africa. Disease outbreaks
 ### System Layers
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  PRESENTATION — Flutter (Android + iOS)                   │
-│  Home · Camera · Result · OCR · Dashboard                 │
-│  History · Map · Settings · AI Advice (bottom sheet)      │
-├──────────────────────────────────────────────────────────┤
-│  BUSINESS LOGIC — Dart Services                           │
-│  ClassifierService · OcrService · RecommendationEngine    │
-│  AiAdvisor · LocationService · DatabaseService            │
-├──────────────────────────────────────────────────────────┤
-│  DATA — Local Persistence                                 │
+┌──────────────────────────────────────────────────────────────┐
+│  PRESENTATION — Flutter (Android + iOS)                      │
+│  Home · Camera · Result · OCR · Dashboard                    │
+│  History · Map · Settings · AI Advice (bottom sheet)         │
+├──────────────────────────────────────────────────────────────┤
+│  BUSINESS LOGIC — Dart Services                              │
+│  ClassifierService · OcrService · RecommendationEngine       │
+│  AiAdvisor · LocationService · DatabaseService               │
+├──────────────────────────────────────────────────────────────┤
+│  DATA — Local Persistence                                    │
 │  sqflite (scan history) · FlutterSecureStorage · SharedPrefs │
-├──────────────────────────────────────────────────────────┤
-│  ML CORE — Bundled TFLite Models                          │
-│  EfficientNetB3 INT8 (~13 MB) · FP16 fallback (~23 MB)   │
-└──────────────────────────────────────────────────────────┘
+├──────────────────────────────────────────────────────────────┤
+│  ML CORE — Bundled TFLite Models                             │
+│  EfficientNetB3 INT8 (~13 MB) · FP16 fallback (~23 MB)       │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### ML Pipeline
@@ -83,7 +83,7 @@ Leaf Image (300×300 RGB)        Seed Label Photo
          │                              │
          │                              ▼
          │                      Metadata Encoder
-         │                      24-d float32 vector
+         │                      17-d float32 vector
          │                              │
          └──────────────┬───────────────┘
                         │ Concatenate (288-d)
@@ -123,13 +123,14 @@ maize-disease-detection/
 │   ├── lib/
 │   │   ├── main.dart
 │   │   ├── app.dart               ← GoRouter + shell nav
-│   │   ├── screens/               ← 8 screens (home, camera, result, ocr…)
+│   │   ├── screens/               ← 9 screens (splash, home, camera, result, ocr…)
 │   │   ├── services/              ← TFLite · OCR · SQLite · AI advisor
 │   │   ├── providers/             ← Riverpod state
-│   │   ├── models/                ← ScanRecord · ClassificationResult
-│   │   ├── constants/             ← Colors · diseases · varieties
+│   │   ├── models/                ← ScanRecord · ClassificationResult · FarmStats
+│   │   ├── constants/             ← Colors · diseases · varieties · thresholds
 │   │   ├── config/                ← AppEnv (.env.json reader)
-│   │   └── widgets/               ← GlassCard · DuotoneIcon · AiAdviceSheet
+│   │   ├── l10n/                  ← Offline advice · voice scripts
+│   │   └── design_system/         ← Tokens · theme · AppCard · ConfidenceMeter · AudioAdvisoryBar
 │   ├── assets/models/             ← TFLite model files (.tflite)
 │   ├── android/                   ← Android native project
 │   ├── ios/                       ← iOS Xcode project
@@ -138,28 +139,35 @@ maize-disease-detection/
 │   ├── .env.json.example          ← Template
 │   └── setup.sh                   ← One-shot setup (copies models, pod install)
 │
-├── src/                           ← Python ML training pipeline
+├── src/                           ← Python ML pipeline
+│   ├── common/                    ← Class names · post-processing · variety list (single sources)
 │   ├── phase1_cnn/                ← EfficientNetB3 training & evaluation
-│   ├── phase2_ocr/                ← Tesseract OCR extractor & encoder
-│   ├── phase3_fusion/             ← Multimodal fusion model
-│   └── phase4_edge/               ← TFLite conversion (INT8 + FP16 export)
-│
-├── deployment/
-│   └── uav/
+│   ├── phase2_ocr/                ← Tesseract OCR extractor, encoder, synthetic tags & evaluation
+│   ├── phase3_fusion/             ← Multimodal fusion model & ablation
+│   ├── phase4_edge/               ← TFLite conversion (INT8 + FP16) & evaluation
+│   └── phase5_uav/                ← UAV pipeline (canonical, ADR-004)
 │       ├── flight_planner.py      ← Grid mission → QGC .waypoints file
 │       ├── patch_runner.py        ← Orthomosaic tiling + TFLite inference
 │       ├── heatmap.py             ← Folium HTML + matplotlib PNG heatmaps
 │       ├── drone_telemetry.py     ← Live MAVLink drone connection + mission upload
 │       └── live_server.py         ← Flask + Socket.IO real-time map dashboard
 │
+├── deployment/uav/                ← Deprecated shims re-exporting src.phase5_uav (to be removed)
+│
 ├── data/
 │   ├── raw/plantvillage/          ← PlantVillage dataset images
 │   ├── raw/seed_labels/           ← Seed label images for OCR testing
-│   └── annotations/               ← labels.csv · labels_with_metadata.csv
+│   ├── synthetic/seed_tags/       ← Generated seed tags for OCR evaluation
+│   └── annotations/               ← labels.csv · labels_with_metadata.csv · exclusions.csv
 │
 ├── models/
-│   └── exports/                   ← Trained .keras + .tflite files
+│   └── exports/                   ← .tflite files + metrics.json (every reported number)
 │
+├── decisions/                     ← Architecture decision records (ADR-001 … ADR-006)
+├── notebooks/                     ← One notebook per phase
+├── research-papers/               ← Abstract, chapters 1–5, references
+├── scripts/                       ← check_claims.sh · sync_varieties.py
+├── tests/                         ← pytest suite
 ├── logs/                          ← TensorBoard training logs
 ├── setup_env.sh                   ← Python venv setup
 ├── run_all.sh                     ← Full pipeline runner (Phases 1–5)
@@ -180,7 +188,7 @@ maize-disease-detection/
 | CocoaPods | latest | `sudo gem install cocoapods` |
 | JDK | 17+ | Android builds |
 | Android SDK | API 21+ | Android Studio or CLI |
-| Python | 3.12 | TF 2.16 does not support 3.13+ |
+| Python | 3.11 | The version the pipeline is developed and tested on; TF 2.16 does not support 3.13+ |
 | Tesseract | 5+ | `brew install tesseract` / `apt install tesseract-ocr` |
 | Kaggle CLI | configured | `~/.kaggle/kaggle.json` for dataset download |
 
@@ -199,9 +207,12 @@ bash mobile/setup.sh --android
 ```bash
 cp mobile/.env.json.example mobile/.env.json
 # Edit .env.json:
-# GEMINI_API_KEY  → production Gemini key (release builds only)
-# OLLAMA_HOST     → Ollama server URL (debug builds, default: http://localhost:11434)
-# OLLAMA_MODEL    → model name (debug builds, default: llama3.1:8b)
+# GROQ_API_KEY     → optional, for generated agronomic advice (development builds)
+# YARNGPT_API_KEY  → optional, for Yoruba/Igbo/Hausa speech
+#
+# Release builds ship with no keys: the farmer enters their own in Settings,
+# where they are stored in the platform keystore (ADR-003). A key removed
+# there stays removed.
 ```
 
 **3. Run:**
@@ -292,13 +303,13 @@ pip install flask flask-socketio
 **3. Generate a demo flight plan:**
 
 ```bash
-python -m deployment.uav.flight_planner --demo --output data/uav/mission.waypoints
+python -m src.phase5_uav.flight_planner --demo --output data/uav/mission.waypoints
 ```
 
 **4. Run patch inference on a synthetic orthomosaic:**
 
 ```bash
-python -m deployment.uav.patch_runner \
+python -m src.phase5_uav.patch_runner \
   --demo \
   --model  models/exports/efficientnetb3_maize_int8.tflite \
   --output data/uav/patch_predictions.csv
@@ -307,7 +318,7 @@ python -m deployment.uav.patch_runner \
 **5. Generate the heatmap:**
 
 ```bash
-python -m deployment.uav.heatmap \
+python -m src.phase5_uav.heatmap \
   --csv    data/uav/patch_predictions.csv \
   --output data/uav/disease_heatmap.html
 ```
@@ -317,7 +328,7 @@ Open `data/uav/disease_heatmap.html` in a browser — it shows a Folium interact
 **6. (Optional) Start the live web dashboard:**
 
 ```bash
-python -m deployment.uav.live_server
+python -m src.phase5_uav.live_server
 # → Open http://localhost:5000
 ```
 
@@ -331,14 +342,14 @@ Connects to a real MAVLink drone (Pixhawk / ArduCopter / PX4), uploads the surve
 
 ```bash
 source .venv/bin/activate
-python -m deployment.uav.live_server
+python -m src.phase5_uav.live_server
 # → Open http://localhost:5000
 ```
 
 **Terminal 2 — Generate the mission file:**
 
 ```bash
-python -m deployment.uav.flight_planner \
+python -m src.phase5_uav.flight_planner \
   --farm-geojson data/uav/farm_boundary.geojson \
   --altitude 30 \
   --output   data/uav/mission.waypoints
@@ -348,32 +359,38 @@ python -m deployment.uav.flight_planner \
 
 ```bash
 # USB / SiK radio (serial)
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect /dev/ttyUSB0:57600 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000
 
 # UDP — MAVProxy, SITL, or WiFi bridge
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect udp:0.0.0.0:14550 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000
 
 # TCP — companion computer or direct WiFi
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect tcp:192.168.1.1:5760 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000
 
 # Arm and enter AUTO mode automatically after mission upload
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect udp:0.0.0.0:14550 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000 \
   --auto-arm
 ```
 
-As the drone flies each waypoint, `drone_telemetry.py` runs TFLite inference on the captured patch and POSTs the result to the live server — appearing instantly as a coloured disease marker on the map.
+As the drone reaches each waypoint (`MISSION_ITEM_REACHED`), `drone_telemetry.py` classifies the newest capture that it has not already processed and POSTs the result to the live server, where it appears as a coloured marker on the map.
+
+**What this assumes, and what it does not show**
+
+- **You supply the captures.** `drone_telemetry.py` does not command the camera or download photos. It watches `--image-dir` for image files, which something else must put there — MAVLink FTP, a companion computer writing frames from an RTSP stream, or a card reader on the ground. Each waypoint consumes at most one new file; if the camera has not written one yet, that waypoint is skipped with a message rather than re-posting the previous photo.
+- **A file is only used once**, and only if it is newer than the last one used, so a slow camera cannot make one photo appear at several waypoints.
+- **The classifier is a leaf model, not an aerial one.** It was trained and measured on close-up leaf photographs (PlantVillage), and has never been evaluated on imagery taken from a drone at altitude. Treat UAV output as an exploratory heatmap for deciding where to walk and scout, not as a diagnosis of those plants. The measured leaf-photo numbers are in `models/exports/metrics.json`; there is no aerial equivalent yet.
 
 **Test without real hardware using ArduCopter SITL:**
 
@@ -385,7 +402,7 @@ sim_vehicle.py -v ArduCopter --console --map
 mavproxy.py --master tcp:127.0.0.1:5760 --out udp:127.0.0.1:14550
 
 # Terminal C — connect drone_telemetry as normal
-python -m deployment.uav.drone_telemetry \
+python -m src.phase5_uav.drone_telemetry \
   --connect udp:0.0.0.0:14550 \
   --mission data/uav/mission.waypoints \
   --server  http://localhost:5000
@@ -468,7 +485,7 @@ python -m src.phase1_cnn.evaluate \
   --csv   data/annotations/labels.csv
 
 # Phase 2 — OCR a seed label
-python src/phase2_ocr/extractor.py --image data/raw/seed_labels/sample_label.jpg
+python -m src.phase2_ocr.extractor --image data/raw/seed_labels/sample_label.jpg
 
 # Phase 3 — train fusion model
 python -m src.phase3_fusion.train_fusion \
@@ -497,12 +514,12 @@ All inference runs on-device — no internet required for core features.
 | **Home** | App launch | Scan hero card, farm stats, recent scans, seed label shortcut |
 | **Camera** | Centre scan button | Live camera with framing guide and brightness feedback |
 | **Result** | After scan | Disease class, confidence bars, symptoms, treatments, prevention |
-| **AI Advice** | "Get AI Advice" on Result | Bottom sheet — on-device rule engine + Gemini / Ollama advice |
+| **AI Advice** | Advice card on Result | Built-in agronomic rules, or a Groq advisory when a key and a connection are present — the card names which |
 | **OCR** | "Scan Seed Label" on Home | Extracts crop variety, batch number, planting date from seed bag |
 | **Map** | Map icon on Home app bar | OpenStreetMap with GPS-tagged disease pins |
 | **Dashboard** | Stats tab | Farm health score, 7-day bar chart, disease breakdown |
 | **History** | History tab | All scans with filter chips, long-press to add notes or delete |
-| **Settings** | Settings tab | Dark/light theme, Gemini API key, Ollama config, clear data |
+| **Settings** | Settings tab | Theme, Groq and YarnGPT keys, language, experimental crop-to-box toggle, purge local data |
 
 ### Key Flutter Packages
 
@@ -518,7 +535,7 @@ All inference runs on-device — no internet required for core features.
 | Navigation | `go_router` |
 | Charts | `fl_chart` |
 | Secure storage | `flutter_secure_storage` |
-| AI networking | `http` (Gemini API / Ollama) |
+| AI networking | `http` (Groq chat completions, YarnGPT speech) |
 | Fonts | `google_fonts` (DM Sans) |
 
 ### Useful Flutter Commands (run from `mobile/`)
@@ -581,8 +598,8 @@ All inference runs on-device — no internet required for core features.
 | Member | Role |
 |---|---|
 | Olapade | CNN model training and evaluation (Phase 1 & 3) |
-| Tijani | OCR pipeline and metadata extraction (Phase 2) |
-| Oshodilawal | Flutter mobile app, UAV pipeline, edge deployment |
+| Tijani | OCR pipeline and metadata extraction, Flutter mobile app, UAV pipeline (Phase 2) |
+| Oshodilawal | Edge deployment |
 
 ---
 

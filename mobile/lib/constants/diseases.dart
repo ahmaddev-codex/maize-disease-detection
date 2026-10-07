@@ -1,3 +1,40 @@
+// Nigerian maize varieties (FR-14) live in one generated file, so the Dart
+// and Python lists cannot drift apart: see varieties.dart and
+// data/reference/maize_varieties.csv (ADR-006).
+export 'varieties.dart';
+
+/// Class id of the Healthy class.
+const int kHealthyClassId = 3;
+
+/// Where the actives table below comes from, and whether anyone qualified has
+/// checked it. The app must not imply a sign-off it does not have (T25, Q5).
+class ActivesReview {
+  const ActivesReview({
+    required this.status,
+    required this.updated,
+    required this.sources,
+    this.reviewer,
+  });
+
+  /// 'pending-agronomist-review' until a named agronomist signs it off.
+  final String status;
+  final String updated; // ISO date
+  final List<String> sources;
+  final String? reviewer;
+
+  bool get isSignedOff => status == 'reviewed' && reviewer != null;
+}
+
+const ActivesReview kActivesReview = ActivesReview(
+  status: 'pending-agronomist-review',
+  updated: '2026-09-23',
+  sources: [
+    'CIMMYT, Maize Doctor: Northern corn leaf blight, common rust, gray leaf spot',
+    'IITA maize disease management guidance for West Africa',
+    'FAO/NAFDAC principle: dose and pre-harvest interval come from the product label',
+  ],
+);
+
 class DiseaseInfo {
   final int classId;
   final String name;
@@ -7,6 +44,11 @@ class DiseaseInfo {
   final List<String> treatments;
   final List<String> prevention;
 
+  /// Chemical groups and active ingredients that control this disease. Named as
+  /// actives, not brands: brands differ by market, and two widely sold products
+  /// (metalaxyl "Ridomil Gold", copper "Funguran") do not control these fungi.
+  final List<String> actives;
+
   const DiseaseInfo({
     required this.classId,
     required this.name,
@@ -15,6 +57,7 @@ class DiseaseInfo {
     required this.symptoms,
     required this.treatments,
     required this.prevention,
+    this.actives = const [],
   });
 }
 
@@ -36,6 +79,11 @@ const List<DiseaseInfo> kDiseases = [
       'Remove and destroy severely blighted leaves',
       'Ensure adequate plant spacing for air circulation',
       'Avoid overhead irrigation',
+    ],
+    actives: [
+      'mancozeb (protectant, contact)',
+      'azoxystrobin (strobilurin)',
+      'propiconazole (triazole)',
     ],
     prevention: [
       'Plant resistant varieties (SAMMAZ 15, SAMMAZ 17)',
@@ -62,6 +110,10 @@ const List<DiseaseInfo> kDiseases = [
       'Begin treatment at first pustule appearance',
       'Repeat application after 14 days if infection persists',
     ],
+    actives: [
+      'propiconazole or tebuconazole (triazole)',
+      'azoxystrobin (strobilurin)',
+    ],
     prevention: [
       'Plant early to avoid peak spore periods',
       'Use rust-resistant varieties where available',
@@ -86,6 +138,10 @@ const List<DiseaseInfo> kDiseases = [
       'Tank-mix with triazole for broad-spectrum control',
       'Apply at first sign of lesions on lower leaves',
       'Ensure thorough leaf coverage during application',
+    ],
+    actives: [
+      'azoxystrobin or pyraclostrobin (strobilurin)',
+      'propiconazole (triazole), often tank-mixed with a strobilurin',
     ],
     prevention: [
       'Increase plant spacing to improve air circulation',
@@ -113,10 +169,3 @@ const List<DiseaseInfo> kDiseases = [
 
 DiseaseInfo diseaseForClass(int classId) =>
     kDiseases.firstWhere((d) => d.classId == classId, orElse: () => kDiseases[3]);
-
-// Nigerian maize varieties (FR-14)
-const List<String> kNigerianVarieties = [
-  'SAMMAZ 15', 'SAMMAZ 17', 'SAMMAZ 29', 'SAMMAZ 34', 'SAMMAZ 50',
-  'OBA SUPER 2', 'EVDT 99', 'POOL 16 DT', 'TZEE-W', 'ABA WHITE',
-  'ACROSS 97', 'SUWAN 1', 'EARLY THRIVING',
-];

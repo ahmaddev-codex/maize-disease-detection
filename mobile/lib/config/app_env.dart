@@ -1,31 +1,32 @@
-import 'package:flutter/foundation.dart';
-
 /// Compile-time environment configuration.
 ///
 /// Values are injected via:
 ///   flutter run  --dart-define-from-file=.env.json
 ///   flutter build ... --dart-define-from-file=.env.json
-///
-/// Copy .env.json.example → .env.json and fill in your values.
 abstract final class AppEnv {
-  // ── Ollama (development) ────────────────────────────────────────────────
-  static const ollamaHost = String.fromEnvironment(
-    'OLLAMA_HOST',
-    defaultValue: 'http://localhost:11434',
+  // ── Groq (Sole Online AI Assistant Provider) ────────────────────────────
+  // Flagship 120B parameter model on Groq: top-tier agronomic reasoning.
+  static const defaultGroqModel = 'openai/gpt-oss-120b';
+
+  static const groqApiKey = String.fromEnvironment('GROQ_API_KEY');
+  static const groqModel = String.fromEnvironment(
+    'GROQ_MODEL',
+    defaultValue: defaultGroqModel,
   );
 
-  static const ollamaModel = String.fromEnvironment(
-    'OLLAMA_MODEL',
-    defaultValue: 'llama3.1:8b',
-  );
+  /// Models the advisor may try, in order. Every id here must appear in Groq's
+  /// served model list — `test/fixtures/groq_models.json` holds a recorded copy
+  /// and the test fails when an id drifts out of it (T26).
+  static const groqFallbackModels = <String>[
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'llama-3.3-70b-versatile',
+  ];
 
-  // ── Gemini (production) ─────────────────────────────────────────────────
-  // Optional: supply at build time for CI / staging.
-  // End-users enter their key in Settings → it is stored in FlutterSecureStorage.
-  static const geminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
+  /// [groqModel] first, then the fallbacks, without repeats.
+  static List<String> get groqModels =>
+      <String>{groqModel, ...groqFallbackModels}.toList();
 
-  // ── Backend selector ────────────────────────────────────────────────────
-  // debug build  →  Ollama (local, no key required)
-  // release build →  Gemini (API key from env or user settings)
-  static bool get useOllama => kDebugMode;
+  // ── YarnGPT (Nigerian-language TTS: Hausa, Yoruba, Igbo, Pidgin) ────────
+  static const yarnGptApiKey = String.fromEnvironment('YARNGPT_API_KEY');
 }

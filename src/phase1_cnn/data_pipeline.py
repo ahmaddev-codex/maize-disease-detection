@@ -12,8 +12,10 @@ from sklearn.model_selection import train_test_split
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-CLASS_NAMES = ["NCLB", "Rust", "GLS", "Healthy"]
-NUM_CLASSES = len(CLASS_NAMES)   # MSV excluded — not in PlantVillage; add field photos later
+# Folder names, plot labels and metric keys use the short form; the display
+# names live beside them in src/common/labels.py (ADR-006).
+from src.common.labels import SHORT_NAMES as CLASS_NAMES  # noqa: E402
+from src.common.labels import NUM_CLASSES  # noqa: E402,F401  # MSV excluded — not in PlantVillage
 IMG_SIZE    = (300, 300)   # EfficientNetB3 native resolution
 BATCH_SIZE  = 32
 AUTOTUNE    = tf.data.AUTOTUNE

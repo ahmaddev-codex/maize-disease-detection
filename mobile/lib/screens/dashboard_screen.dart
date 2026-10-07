@@ -1,12 +1,12 @@
-import 'dart:ui';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import '../constants/colors.dart';
+import '../design_system/design_system.dart';
+import '../constants/diseases.dart';
+import '../models/farm_stats.dart';
 import '../providers/app_provider.dart';
-import '../services/database_service.dart';
-import '../widgets/ds.dart';
+import '../providers/service_providers.dart';
+import '../utils/time_format.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -15,7 +15,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  Map<String, int> _classCounts = {};
+  FarmStats _stats = const FarmStats(days: 30, countsByClass: {});
   Map<String, int> _dailyCounts = {};
   bool _loading = true;
 
@@ -27,265 +27,377 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
-    final results = await Future.wait([
-      DatabaseService.instance.getClassCounts(days: 30),
-      DatabaseService.instance.getDailyScans(days: 7),
-    ]);
+    final db = ref.read(databaseServiceProvider);
+    final stats = await db.farmStats(days: 30);
+    final daily = await db.getDailyScans(days: 7);
     if (mounted) {
       setState(() {
-        _classCounts = results[0] as Map<String, int>;
-        _dailyCounts = results[1] as Map<String, int>;
+        _stats = stats;
+        _dailyCounts = daily;
         _loading = false;
       });
     }
   }
 
-  int get _total   => _classCounts.values.fold(0, (a, b) => a + b);
-  int get _healthy => _classCounts['Healthy'] ?? 0;
-  double get _healthScore => _total == 0 ? 100 : _healthy / _total * 100;
-
   @override
   Widget build(BuildContext context) {
-    final isDark     = ref.watch(isDarkModeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final trendAsync = ref.watch(healthTrendProvider);
-    final labels     = _dayLabels();
+    final labels = _dayLabels();
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.canvasDark : AppColors.canvas,
-      body: CustomScrollView(
-        slivers: [
-          // ── Glass app bar ────────────────────────────────────────────────
-          SliverAppBar(
-            pinned: true,
-            expandedHeight: 90,
-            backgroundColor:
-                (isDark ? AppColors.surfaceDark : AppColors.surface).withOpacity(0.88),
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                tooltip: 'Refresh',
-                onPressed: _load,
-              ),
-            ],
-            flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: const FlexibleSpaceBar(
-                  title: Text('Farm Analytics',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-                  titlePadding: EdgeInsets.only(left: 16, bottom: 14),
-                ),
-              ),
-            ),
+      backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+      appBar: AppBar(
+        title: Row(
+          children: [
+            MaizeGuardLogo(size: 22, isDark: isDark),
+            const SizedBox(width: AppSpacing.sm),
+            const Text('Epidemiological Analytics'),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh Metrics',
+            onPressed: _load,
           ),
-
-          if (_loading)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else
-            SliverPadding(
-              padding: AppSpacing.pagePad,
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  const SizedBox(height: 12),
-
-                  // ── Health score + trend row ─────────────────────────
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.emeraldBase))
+          : RefreshIndicator(
+              onRefresh: _load,
+              color: AppColors.emeraldBase,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 100),
+                children: [
+                  // Row: Farm Health Index + 7-Day Trend
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(flex: 3, child: _HealthScoreCard(score: _healthScore, total: _total)),
-                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 3,
+                        child: _HealthScoreCard(rate: _stats.healthRate, total: _stats.total),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         flex: 2,
                         child: trendAsync.when(
                           data: (delta) => _TrendCard(delta: delta),
-                          loading: () => const GlassCard(child: Center(child: CircularProgressIndicator())),
-                          error: (_, __) => const GlassCard(child: Icon(Icons.error_rounded)),
+                          loading: () => const AppCard(
+                            child: SizedBox(
+                              height: 120,
+                              child: Center(
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                          ),
+                          error: (_, __) => const AppCard(
+                            child: SizedBox(
+                              height: 120,
+                              child: Center(
+                                child: Icon(Icons.error_outline_rounded, color: AppColors.danger),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
 
-                  // ── Quick stats row ──────────────────────────────────
-                  Row(children: [
-                    Expanded(child: StatChip(
-                      value: '$_total',
-                      label: 'Scans (30d)',
-                      icon: Icons.qr_code_scanner_rounded,
-                      color: AppColors.accent,
-                    )),
-                    const SizedBox(width: 10),
-                    Expanded(child: StatChip(
-                      value: '${_total - _healthy}',
-                      label: 'Diseased',
-                      icon: Icons.warning_rounded,
-                      color: AppColors.dangerFg,
-                    )),
-                  ]),
+                  const SizedBox(height: AppSpacing.md),
 
-                  // ── Disease breakdown ────────────────────────────────
-                  const SectionLabel('Disease Breakdown (30 days)'),
-                  GlassCard(
-                    child: Column(
-                      children: [
-                        ('NCLB', 0), ('Rust', 1), ('GLS', 2), ('Healthy', 3),
-                      ].map(((String, int) e) {
-                        final count = _classCounts[e.$1] ?? 0;
-                        final pct   = _total > 0 ? count / _total : 0.0;
-                        final color = AppColors.forClass(e.$2);
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                  // Quick Metrics Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppCard(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(children: [
-                                DiseaseDot(color),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(e.$1,
-                                    style: const TextStyle(fontSize: 13,
-                                        fontWeight: FontWeight.w500))),
-                                Text('$count',
-                                    style: TextStyle(fontSize: 13,
-                                        color: color, fontWeight: FontWeight.w700)),
-                                const SizedBox(width: 4),
-                                SizedBox(width: 36, child: Text(
-                                  '(${(pct * 100).toStringAsFixed(0)}%)',
-                                  style: const TextStyle(
-                                      fontSize: 11, color: AppColors.textSecondary),
-                                )),
-                              ]),
-                              const SizedBox(height: 6),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: LinearProgressIndicator(
-                                  value: pct,
-                                  minHeight: 8,
-                                  backgroundColor: color.withOpacity(0.10),
-                                  valueColor: AlwaysStoppedAnimation(color),
-                                ),
+                              Text(
+                                '${_stats.total}',
+                                style: AppTypography.h2.copyWith(color: AppColors.emeraldBase),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Scans (Last 30 Days)',
+                                style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
                               ),
                             ],
                           ),
-                        );
-                      }).toList(),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: AppCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_stats.diseased}',
+                                style: AppTypography.h2.copyWith(color: AppColors.rust),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Pathologies Detected',
+                                style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // Disease Prevalence Breakdown
+                  AppCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'PATHOLOGY INCIDENCE BREAKDOWN (30 DAYS)',
+                          style: AppTypography.overline.copyWith(
+                            color: AppColors.charcoal500,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        ...[
+                          ('Northern Leaf Blight (NCLB)', 0, AppColors.nclb),
+                          ('Common Rust', 1, AppColors.rust),
+                          ('Gray Leaf Spot (GLS)', 2, AppColors.gls),
+                          ('Healthy Foliage', kHealthyClassId, AppColors.healthy),
+                        ].map((item) {
+                          final count = _stats.countFor(item.$2);
+                          final pct = _stats.shareOf(item.$2);
+                          final color = item.$3;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      item.$1,
+                                      style: AppTypography.bodySmall.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? AppColors.charcoal200 : AppColors.charcoal800,
+                                      ),
+                                    ),
+                                    Text(
+                                      '$count (${(pct * 100).toStringAsFixed(0)}%)',
+                                      style: AppTypography.caption.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: color,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                ClipRRect(
+                                  borderRadius: AppRadii.full,
+                                  child: LinearProgressIndicator(
+                                    value: pct,
+                                    minHeight: 6,
+                                    backgroundColor: color.withValues(alpha: 0.12),
+                                    valueColor: AlwaysStoppedAnimation(color),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
                     ),
                   ),
 
-                  // ── 7-day bar chart ──────────────────────────────────
-                  const SectionLabel('Scan Activity (7 days)'),
-                  GlassCard(
-                    padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
-                    child: SizedBox(
-                      height: 150,
-                      child: BarChart(BarChartData(
-                        barGroups: labels.asMap().entries.map((e) =>
-                          BarChartGroupData(
-                            x: e.key,
-                            barRods: [BarChartRodData(
-                              toY: (_dailyCounts[e.value] ?? 0).toDouble(),
-                              gradient: const LinearGradient(
-                                colors: [AppColors.accent, AppColors.accentFg],
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
-                              ),
-                              width: 18,
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                            )],
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // 7-Day Field Activity Histogram
+                  AppCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '7-DAY FIELD SCANNING VELOCITY',
+                          style: AppTypography.overline.copyWith(
+                            color: AppColors.charcoal500,
+                            letterSpacing: 1.1,
                           ),
-                        ).toList(),
-                        titlesData: FlTitlesData(
-                          bottomTitles: AxisTitles(sideTitles: SideTitles(
-                            showTitles: true,
-                            getTitlesWidget: (v, _) => Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                labels[v.toInt()].substring(5), // MM-DD
-                                style: const TextStyle(
-                                    fontSize: 9, color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        SizedBox(
+                          height: 160,
+                          child: BarChart(
+                            BarChartData(
+                              barGroups: labels.asMap().entries.map((e) {
+                                return BarChartGroupData(
+                                  x: e.key,
+                                  barRods: [
+                                    BarChartRodData(
+                                      toY: (_dailyCounts[e.value] ?? 0).toDouble(),
+                                      color: AppColors.forestDark,
+                                      width: 18,
+                                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                              titlesData: FlTitlesData(
+                                bottomTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    getTitlesWidget: (v, _) {
+                                      final idx = v.toInt();
+                                      if (idx < 0 || idx >= labels.length) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      return Padding(
+                                        padding: const EdgeInsets.only(top: 6),
+                                        child: Text(
+                                          labels[idx].substring(5), // MM-DD
+                                          style: AppTypography.caption.copyWith(
+                                            fontSize: 10,
+                                            color: AppColors.charcoal500,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                leftTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    reservedSize: 24,
+                                    getTitlesWidget: (v, _) => Text(
+                                      '${v.toInt()}',
+                                      style: AppTypography.caption.copyWith(
+                                        fontSize: 10,
+                                        color: AppColors.charcoal500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                               ),
+                              gridData: FlGridData(
+                                drawVerticalLine: false,
+                                getDrawingHorizontalLine: (_) => FlLine(
+                                  color: isDark ? Colors.white10 : AppColors.charcoal200,
+                                  strokeWidth: 1,
+                                ),
+                              ),
+                              borderData: FlBorderData(show: false),
                             ),
-                          )),
-                          leftTitles: AxisTitles(sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 24,
-                            getTitlesWidget: (v, _) => Text('${v.toInt()}',
-                                style: const TextStyle(
-                                    fontSize: 9, color: AppColors.textSecondary)),
-                          )),
-                          topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          ),
                         ),
-                        gridData: FlGridData(
-                          drawVerticalLine: false,
-                          getDrawingHorizontalLine: (_) =>
-                              const FlLine(color: AppColors.border, strokeWidth: 0.5),
-                        ),
-                        borderData: FlBorderData(show: false),
-                      )),
+                      ],
                     ),
                   ),
-                ]),
+                  const SizedBox(height: AppSpacing.lg),
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        MaizeGuardWordmark(
+                          height: 20,
+                          isDark: isDark,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Regional Epidemiological Surveillance Engine',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.charcoal400,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+                ],
               ),
             ),
-        ],
-      ),
     );
   }
 
+  // Local days, matching how getDailyScans buckets scans (T16/T17).
   List<String> _dayLabels() {
     final today = DateTime.now();
-    return List.generate(7, (i) {
-      final d = today.subtract(Duration(days: 6 - i));
-      return DateFormat('yyyy-MM-dd').format(d);
-    });
+    return List.generate(7, (i) => localDayKey(today.subtract(Duration(days: 6 - i))));
   }
 }
 
-// ── Farm health score arc card ─────────────────────────────────────────────────
 class _HealthScoreCard extends StatelessWidget {
-  const _HealthScoreCard({required this.score, required this.total});
-  final double score;
+  /// Null when nothing has been scanned yet — showing 100% would be a lie.
+  final double? rate;
   final int total;
+  const _HealthScoreCard({required this.rate, required this.total});
 
   @override
   Widget build(BuildContext context) {
-    final color = score >= 70
-        ? AppColors.successFg
-        : score >= 40 ? AppColors.attentionFg : AppColors.dangerFg;
+    if (rate == null) {
+      return AppCard(
+        child: SizedBox(
+          height: 120,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.grass_outlined, size: 28, color: AppColors.charcoal400),
+              const SizedBox(height: AppSpacing.xs),
+              Text('No scans yet', style: AppTypography.h3.copyWith(fontSize: 13)),
+              Text(
+                'Scan a leaf to see farm health',
+                textAlign: TextAlign.center,
+                style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
-    return GlassCard(
+    final score = rate! * 100;
+    final color = score >= 70
+        ? AppColors.healthy
+        : (score >= 40 ? AppColors.warning : AppColors.danger);
+
+    return AppCard(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 80, height: 80,
-            child: Stack(alignment: Alignment.center, children: [
-              CircularProgressIndicator(
-                value: score / 100,
-                strokeWidth: 8,
-                backgroundColor: color.withOpacity(0.12),
-                valueColor: AlwaysStoppedAnimation(color),
-                strokeCap: StrokeCap.round,
-              ),
-              Text('${score.toStringAsFixed(0)}',
-                  style: TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.w800, color: color)),
-            ]),
+            width: 74,
+            height: 74,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: score / 100,
+                  strokeWidth: 7,
+                  backgroundColor: color.withValues(alpha: 0.12),
+                  valueColor: AlwaysStoppedAnimation(color),
+                  strokeCap: StrokeCap.round,
+                ),
+                Text(
+                  score.toStringAsFixed(0),
+                  style: AppTypography.h2.copyWith(color: color),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-          const Text('Farm Health',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          const SizedBox(height: 2),
-          Text('$total scans',
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.sm),
+          Text('Crop Health Index', style: AppTypography.h3.copyWith(fontSize: 13)),
           Text(
-            score >= 70 ? 'Looking good' :
-            score >= 40 ? 'Moderate risk' : 'Take action',
-            style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
+            score >= 70 ? 'Crop Vigorous' : (score >= 40 ? 'Moderate Pathogen Load' : 'High Infestation'),
+            style: AppTypography.caption.copyWith(fontWeight: FontWeight.w600, color: color),
           ),
         ],
       ),
@@ -293,50 +405,38 @@ class _HealthScoreCard extends StatelessWidget {
   }
 }
 
-// ── Trend card ────────────────────────────────────────────────────────────────
 class _TrendCard extends StatelessWidget {
-  const _TrendCard({required this.delta});
   final double delta;
+  const _TrendCard({required this.delta});
 
   @override
   Widget build(BuildContext context) {
-    final isImproving  = delta > 0.08;
-    final isWorsening  = delta < -0.08;
-    final color = isImproving ? AppColors.successFg
-        : isWorsening ? AppColors.dangerFg
-        : AppColors.attentionFg;
-    final icon  = isImproving ? Icons.trending_up_rounded
-        : isWorsening ? Icons.trending_down_rounded
-        : Icons.trending_flat_rounded;
-    final label = isImproving ? 'Improving'
-        : isWorsening ? 'Worsening'
-        : 'Stable';
-    final sub   = isImproving ? 'vs last week'
-        : isWorsening ? 'vs last week'
-        : 'No change';
+    final isImproving = delta > 0.05;
+    final isWorsening = delta < -0.05;
+    final color = isImproving
+        ? AppColors.healthy
+        : (isWorsening ? AppColors.danger : AppColors.charcoal500);
+    final icon = isImproving
+        ? Icons.trending_up_rounded
+        : (isWorsening ? Icons.trending_down_rounded : Icons.trending_flat_rounded);
+    final label = isImproving ? 'Improving' : (isWorsening ? 'Deteriorating' : 'Stable');
 
-    return GlassCard(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              shape: BoxShape.circle,
+    return AppCard(
+      child: SizedBox(
+        height: 120,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 36),
+            const SizedBox(height: AppSpacing.xs),
+            Text(label, style: AppTypography.h3.copyWith(fontSize: 14, color: color)),
+            const SizedBox(height: 2),
+            Text(
+              'vs Previous Week',
+              style: AppTypography.caption.copyWith(color: AppColors.charcoal500),
             ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 10),
-          Text(label,
-              style: TextStyle(
-                fontWeight: FontWeight.w800, fontSize: 14, color: color)),
-          const SizedBox(height: 2),
-          Text('Trend · $sub',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 10, color: AppColors.textSecondary)),
-        ],
+          ],
+        ),
       ),
     );
   }

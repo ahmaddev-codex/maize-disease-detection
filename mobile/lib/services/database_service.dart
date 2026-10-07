@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import '../models/farm_stats.dart';
 import '../models/scan_record.dart';
+import '../utils/time_format.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
@@ -8,11 +11,15 @@ class DatabaseService {
 
   Database? _db;
 
-  Future<void> init() async {
-    final dbPath = await getDatabasesPath();
+  /// Lets tests run against an in-memory database.
+  @visibleForTesting
+  factory DatabaseService.forTesting() => DatabaseService._();
+
+  Future<void> init({String? path}) async {
+    final dbPath = path ?? join(await getDatabasesPath(), 'maizeguard.db');
     _db = await openDatabase(
-      join(dbPath, 'maizeguard.db'),
-      version: 1,
+      dbPath,
+      version: 3,
       onCreate: (db, _) async {
         await db.execute('''
           CREATE TABLE scan_records (
@@ -30,13 +37,43 @@ class DatabaseService {
             batch_number  TEXT,
             planting_date TEXT,
             scanned_at    TEXT NOT NULL,
-            notes         TEXT
+            notes         TEXT,
+            feedback      INTEGER,
+            ai_advice     TEXT,
+            ai_language   TEXT,
+            ai_source     TEXT,
+            ai_model      TEXT,
+            ai_created_at TEXT
           )
         ''');
         await db.execute('CREATE INDEX idx_scanned_at ON scan_records(scanned_at DESC)');
         await db.execute('CREATE INDEX idx_class_id ON scan_records(class_id)');
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        // Additive only: existing scans keep every value they had.
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE scan_records ADD COLUMN feedback INTEGER');
+        }
+        if (oldVersion < 3) {
+          for (final column in const [
+            'ai_advice TEXT',
+            'ai_language TEXT',
+            'ai_source TEXT',
+            'ai_model TEXT',
+            'ai_created_at TEXT',
+          ]) {
+            await db.execute('ALTER TABLE scan_records ADD COLUMN $column');
+          }
+        }
+      },
     );
+  }
+
+  /// Closes the database so each test starts from a clean in-memory instance.
+  @visibleForTesting
+  Future<void> close() async {
+    await _db?.close();
+    _db = null;
   }
 
   Database get _database {
@@ -61,11 +98,22 @@ class DatabaseService {
     return rows.map(ScanRecord.fromMap).toList();
   }
 
+  Future<ScanRecord?> getScanById(int id) async {
+    final rows = await _database.query(
+      'scan_records',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return ScanRecord.fromMap(rows.first);
+  }
+
   Future<List<ScanRecord>> getScansInRange(DateTime from, DateTime to) async {
     final rows = await _database.query(
       'scan_records',
       where: 'scanned_at >= ? AND scanned_at <= ?',
-      whereArgs: [from.toIso8601String(), to.toIso8601String()],
+      whereArgs: [from.toUtc().toIso8601String(), to.toUtc().toIso8601String()],
       orderBy: 'scanned_at DESC',
     );
     return rows.map(ScanRecord.fromMap).toList();
@@ -73,6 +121,16 @@ class DatabaseService {
 
   Future<void> deleteScan(int id) async {
     await _database.delete('scan_records', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Attached after the scan is saved, so a slow fix never blocks the result (T18).
+  Future<void> updateLocation(int id, double latitude, double longitude) async {
+    await _database.update(
+      'scan_records',
+      {'latitude': latitude, 'longitude': longitude},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> updateNotes(int id, String notes) async {
@@ -84,38 +142,84 @@ class DatabaseService {
     );
   }
 
-  Future<Map<String, int>> getClassCounts({int days = 30}) async {
-    final since = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+  // feedback: 1 = correct, 0 = incorrect, -1 = unsure
+  Future<void> updateFeedback(int id, int feedback) async {
+    await _database.update(
+      'scan_records',
+      {'feedback': feedback},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Stores the advice shown for a scan, with where it came from, so
+  /// reopening the scan costs neither a request nor a fresh speech file (T24).
+  Future<void> saveAdvice(
+    int id, {
+    required String advice,
+    required String language,
+    required String source,
+    String? model,
+    DateTime? createdAt,
+  }) async {
+    await _database.update(
+      'scan_records',
+      {
+        'ai_advice': advice,
+        'ai_language': language,
+        'ai_source': source,
+        'ai_model': model,
+        'ai_created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Scan counts per class over the last [days]. Grouped by class_id: grouping
+  /// by class_name made the dashboard read 0 for every disease (T16).
+  Future<FarmStats> farmStats({int days = 30}) async {
+    final since = DateTime.now().toUtc().subtract(Duration(days: days)).toIso8601String();
     final rows = await _database.rawQuery('''
-      SELECT class_name, COUNT(*) as cnt
+      SELECT class_id, COUNT(*) as cnt
       FROM scan_records
       WHERE scanned_at >= ?
-      GROUP BY class_name
+      GROUP BY class_id
     ''', [since]);
-    return {for (final r in rows) r['class_name'] as String: r['cnt'] as int};
+    return FarmStats(
+      days: days,
+      countsByClass: {for (final r in rows) r['class_id'] as int: r['cnt'] as int},
+    );
   }
 
   Future<void> clearAll() async {
     await _database.delete('scan_records');
   }
 
-  // Returns scan count per day for the last [days] days (for the bar chart)
+  // Scan count per *local* day for the last [days] days (for the bar chart).
+  // Timestamps are stored in UTC, so a 00:30 scan in Lagos belongs to that day
+  // locally, not the day before (T16/T17).
   Future<Map<String, int>> getDailyScans({int days = 7}) async {
-    final since = DateTime.now().subtract(Duration(days: days)).toIso8601String();
-    final rows = await _database.rawQuery('''
-      SELECT substr(scanned_at, 1, 10) as day, COUNT(*) as cnt
-      FROM scan_records
-      WHERE scanned_at >= ?
-      GROUP BY day
-      ORDER BY day ASC
-    ''', [since]);
-    return {for (final r in rows) r['day'] as String: r['cnt'] as int};
+    final since = DateTime.now().toUtc().subtract(Duration(days: days)).toIso8601String();
+    final rows = await _database.query(
+      'scan_records',
+      columns: ['scanned_at'],
+      where: 'scanned_at >= ?',
+      whereArgs: [since],
+    );
+
+    final counts = <String, int>{};
+    for (final row in rows) {
+      final key = localDayKey(DateTime.parse(row['scanned_at'] as String));
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
   }
 
   // Returns health rate change: positive = improving, negative = worsening.
   // Compares healthy% in last 7 days vs 7–14 days ago.
   Future<double> getHealthTrend() async {
-    final now   = DateTime.now();
+    final now   = DateTime.now().toUtc();
     final week1 = now.subtract(const Duration(days: 7)).toIso8601String();
     final week2 = now.subtract(const Duration(days: 14)).toIso8601String();
 

@@ -1,0 +1,407 @@
+{
+  "models": {
+    "efficientnetb3_maize_int8.tflite": {
+      "path": "models/exports/efficientnetb3_maize_int8.tflite",
+      "sha256": "31b5a71b83f0ee17ce4e495dd74b13aadfed61542e80812ac9ee7e98be43c090",
+      "input": {
+        "dtype": "uint8",
+        "quantization": [
+          1.0,
+          0
+        ]
+      },
+      "output": {
+        "dtype": "uint8",
+        "quantization": [
+          0.00390625,
+          0
+        ]
+      },
+      "python": {
+        "n": 628,
+        "accuracy": 0.8774,
+        "per_class": {
+          "NCLB": {
+            "precision": 0.8125,
+            "recall": 0.7558,
+            "f1": 0.7831,
+            "support": 172
+          },
+          "Rust": {
+            "precision": 0.9353,
+            "recall": 0.9592,
+            "f1": 0.9471,
+            "support": 196
+          },
+          "GLS": {
+            "precision": 0.6593,
+            "recall": 0.6977,
+            "f1": 0.678,
+            "support": 86
+          },
+          "Healthy": {
+            "precision": 0.983,
+            "recall": 0.9943,
+            "f1": 0.9886,
+            "support": 174
+          }
+        },
+        "confusion_matrix": [
+          [
+            130,
+            10,
+            30,
+            2
+          ],
+          [
+            6,
+            188,
+            1,
+            1
+          ],
+          [
+            24,
+            2,
+            60,
+            0
+          ],
+          [
+            0,
+            1,
+            0,
+            173
+          ]
+        ],
+        "csv": "data/annotations/labels.csv",
+        "split": "test",
+        "git_sha": "4b366974901b3cec1d1a3cc868df9db8cc86fe25",
+        "git_dirty": true,
+        "evaluated_at": "2026-09-23T20:31:46+00:00"
+      },
+      "app": {
+        "n": 628,
+        "accuracy": 0.8774,
+        "per_class": {
+          "NCLB": {
+            "precision": 0.8125,
+            "recall": 0.7558,
+            "f1": 0.7831,
+            "support": 172
+          },
+          "Rust": {
+            "precision": 0.9353,
+            "recall": 0.9592,
+            "f1": 0.9471,
+            "support": 196
+          },
+          "GLS": {
+            "precision": 0.6593,
+            "recall": 0.6977,
+            "f1": 0.678,
+            "support": 86
+          },
+          "Healthy": {
+            "precision": 0.983,
+            "recall": 0.9943,
+            "f1": 0.9886,
+            "support": 174
+          }
+        },
+        "confusion_matrix": [
+          [
+            130,
+            10,
+            30,
+            2
+          ],
+          [
+            6,
+            188,
+            1,
+            1
+          ],
+          [
+            24,
+            2,
+            60,
+            0
+          ],
+          [
+            0,
+            1,
+            0,
+            173
+          ]
+        ],
+        "csv": "data/annotations/labels.csv",
+        "split": "test",
+        "git_sha": "4b366974901b3cec1d1a3cc868df9db8cc86fe25",
+        "git_dirty": true,
+        "evaluated_at": "2026-09-23T20:33:06+00:00"
+      },
+      "export": {
+        "path": "models/exports/efficientnetb3_maize_int8.tflite",
+        "sha256": "31b5a71b83f0ee17ce4e495dd74b13aadfed61542e80812ac9ee7e98be43c090",
+        "precision": "int8",
+        "source_keras": {
+          "path": "models/checkpoints/phase1_stage2_best.keras",
+          "sha256": "e6cc64dc5d7d96c0ed90b89a9588849f0e2629b7a6a76dcd3b953b98ae3e2a35"
+        },
+        "exported_at": "2026-09-23T20:25:45+00:00",
+        "calibration": {
+          "csv": "data/annotations/labels.csv",
+          "split": "train",
+          "images": 200
+        }
+      }
+    },
+    "efficientnetb3_maize_fp16.tflite": {
+      "path": "models/exports/efficientnetb3_maize_fp16.tflite",
+      "sha256": "54081d8bc48206305a1121d62c4ce45727adb91bcef65c67fd538b59c0e9320d",
+      "input": {
+        "dtype": "float32",
+        "quantization": [
+          0.0,
+          0
+        ]
+      },
+      "output": {
+        "dtype": "float32",
+        "quantization": [
+          0.0,
+          0
+        ]
+      },
+      "python": {
+        "n": 628,
+        "accuracy": 0.9315,
+        "per_class": {
+          "NCLB": {
+            "precision": 0.8674,
+            "recall": 0.9128,
+            "f1": 0.8895,
+            "support": 172
+          },
+          "Rust": {
+            "precision": 0.9843,
+            "recall": 0.9592,
+            "f1": 0.9716,
+            "support": 196
+          },
+          "GLS": {
+            "precision": 0.8049,
+            "recall": 0.7674,
+            "f1": 0.7857,
+            "support": 86
+          },
+          "Healthy": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 174
+          }
+        },
+        "confusion_matrix": [
+          [
+            157,
+            0,
+            15,
+            0
+          ],
+          [
+            7,
+            188,
+            1,
+            0
+          ],
+          [
+            17,
+            3,
+            66,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            174
+          ]
+        ],
+        "csv": "data/annotations/labels.csv",
+        "split": "test",
+        "git_sha": "c26075de18f7c2a699bcf234a08429365186a37b",
+        "git_dirty": true,
+        "evaluated_at": "2026-09-23T20:17:57+00:00"
+      },
+      "app": {
+        "n": 628,
+        "accuracy": 0.9315,
+        "per_class": {
+          "NCLB": {
+            "precision": 0.8674,
+            "recall": 0.9128,
+            "f1": 0.8895,
+            "support": 172
+          },
+          "Rust": {
+            "precision": 0.9843,
+            "recall": 0.9592,
+            "f1": 0.9716,
+            "support": 196
+          },
+          "GLS": {
+            "precision": 0.8049,
+            "recall": 0.7674,
+            "f1": 0.7857,
+            "support": 86
+          },
+          "Healthy": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 174
+          }
+        },
+        "confusion_matrix": [
+          [
+            157,
+            0,
+            15,
+            0
+          ],
+          [
+            7,
+            188,
+            1,
+            0
+          ],
+          [
+            17,
+            3,
+            66,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            174
+          ]
+        ],
+        "csv": "data/annotations/labels.csv",
+        "split": "test",
+        "git_sha": "c26075de18f7c2a699bcf234a08429365186a37b",
+        "git_dirty": true,
+        "evaluated_at": "2026-09-23T20:18:27+00:00"
+      },
+      "export": {
+        "path": "models/exports/efficientnetb3_maize_fp16.tflite",
+        "sha256": "54081d8bc48206305a1121d62c4ce45727adb91bcef65c67fd538b59c0e9320d",
+        "precision": "fp16",
+        "source_keras": {
+          "path": "models/checkpoints/phase1_stage2_best.keras",
+          "sha256": "e6cc64dc5d7d96c0ed90b89a9588849f0e2629b7a6a76dcd3b953b98ae3e2a35"
+        },
+        "exported_at": "2026-09-23T20:19:49+00:00"
+      }
+    }
+  },
+  "dataset": {
+    "csv": "data/annotations/labels.csv",
+    "split_sizes": {
+      "train": 2930,
+      "val": 628,
+      "test": 628
+    },
+    "duplicates": {
+      "duplicate_files": 0,
+      "duplicate_groups": 0,
+      "conflicting_label_groups": 0,
+      "groups_spanning_train_and_test": 0,
+      "conflicting_groups": []
+    }
+  },
+  "fusion_ablation": {
+    "arms": {
+      "cnn_only": {
+        "accuracy": 0.9363057613372803,
+        "loss": 0.16400127112865448,
+        "n": 628
+      },
+      "fusion": {
+        "accuracy": 0.9378980994224548,
+        "loss": 0.16379472613334656,
+        "n": 628
+      },
+      "fusion_shuffled": {
+        "accuracy": 0.9363057613372803,
+        "loss": 0.16903084516525269,
+        "n": 628
+      }
+    },
+    "metadata_is_synthetic": true,
+    "seed": 0,
+    "verdict": {
+      "fusion_minus_cnn_only": 0.0016,
+      "fusion_minus_shuffled": 0.0016,
+      "noise_band": 0.01,
+      "fusion_beats_cnn_only": false,
+      "fusion_beats_shuffled": false,
+      "summary": "All three arms are within noise (fusion vs CNN +0.002, vs shuffled +0.002, band 0.010)."
+    },
+    "config": {
+      "csv": "data/annotations/labels_with_metadata.csv",
+      "rows_used": 4186,
+      "split_sizes": {
+        "train": 2930,
+        "val": 628,
+        "test": 628
+      },
+      "epochs": 3,
+      "batch_size": 32,
+      "learning_rate": 0.0005,
+      "cnn_weights": "models/checkpoints/phase1_stage2_best.keras",
+      "cnn_frozen": true
+    },
+    "recorded_at": "2026-09-25T20:39:59+00:00"
+  },
+  "ocr": {
+    "synthetic": {
+      "n": 200,
+      "set": "data/synthetic/seed_tags",
+      "seed": 42,
+      "per_field": {
+        "crop_variety": {
+          "accuracy": 0.995,
+          "correct": 199,
+          "missing": 1,
+          "wrong": 0
+        },
+        "batch_number": {
+          "accuracy": 1.0,
+          "correct": 200,
+          "missing": 0,
+          "wrong": 0
+        },
+        "planting_date": {
+          "accuracy": 1.0,
+          "correct": 200,
+          "missing": 0,
+          "wrong": 0
+        }
+      },
+      "failures": [
+        {
+          "image": "images/tag_0167.jpg",
+          "field": "crop_variety",
+          "expected": "TZEE-W",
+          "got": null
+        }
+      ],
+      "source": "synthetic",
+      "engine": "tesseract (python pipeline)",
+      "caveat": "Rendered tags, not photographs of real seed bags; bounds the parser rather than field performance. The app uses ML Kit, not Tesseract.",
+      "evaluated_at": "2026-09-25T21:07:17+00:00"
+    }
+  }
+}
