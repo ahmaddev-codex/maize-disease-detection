@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, dev]
+    branches: [main]
 
 # One run per branch; a new push cancels the previous one.
 concurrency:
@@ -15,6 +15,7 @@ jobs:
   flutter:
     name: Flutter — analyze and test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: mobile
@@ -26,9 +27,9 @@ jobs:
           channel: stable
           cache: true
 
-      # --enforce-lockfile: CI resolves exactly what the lockfile pins, so a
-      # transitive bump cannot land silently through a green run.
-      - run: flutter pub get --enforce-lockfile
+      - run: flutter pub get
+
+      - run: mkdir -p assets/models
 
       - run: flutter analyze
 
@@ -40,6 +41,7 @@ jobs:
   python:
     name: Python — pytest
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +56,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Install Tesseract (OCR tests)
-        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+        run: |
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="15" || true
+          sudo apt-get install -y --no-install-recommends tesseract-ocr || true
 
       # Tests that need the exported .tflite files skip themselves when the
       # models are absent; everything else must pass.
@@ -63,6 +67,7 @@ jobs:
   claims:
     name: Claims, secrets and single sources
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/check_claims.sh

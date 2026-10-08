@@ -54,26 +54,31 @@ def main():
     )
 
     # 3. Train Phase 1 CNN with improved transfer learning
-    print("\n[3/5] Training EfficientNetB3 (Stage 1 Head + Stage 2 Fine-Tuning)...")
+    backbone = os.environ.get("MAIZE_BACKBONE", "efficientnetb3")
+    print(f"\n[3/5] Training {backbone} (Stage 1 Head + Stage 2 Deep Fine-Tuning)...")
     run(
         f"{sys.executable} -m src.phase1_cnn.train "
+        f"--backbone {backbone} "
         f"--csv data/annotations/labels.csv "
         f"--batch-size 32 "
         f"--stage1-epochs 20 "
-        f"--stage2-epochs 35 "
+        f"--stage2-epochs 45 "
         f"--stage1-lr 1e-3 "
-        f"--stage2-lr 3e-5 "
-        f"--fine-tune-at 50 "
+        f"--stage2-lr 2.5e-5 "
+        f"--fine-tune-at 20 "
         f"--label-smoothing 0.05 "
-        f"--patience 12"
+        f"--mix both "
+        f"--mix-prob 0.25 "
+        f"--patience 15"
     )
 
-    # 4. Evaluate Keras model on held-out test split
-    print("\n[4/5] Evaluating Keras model on held-out test split...")
+    # 4. Evaluate Keras model on held-out test split (with TTA)
+    print("\n[4/5] Evaluating Keras model on held-out test split with TTA...")
     run(
         f"{sys.executable} -m src.phase1_cnn.evaluate "
         f"--model models/exports/efficientnetb3_maize.keras "
-        f"--csv data/annotations/labels.csv"
+        f"--csv data/annotations/labels.csv "
+        f"--tta"
     )
 
     # 5. Convert to TFLite (FP16 + INT8) and evaluate both
@@ -89,7 +94,8 @@ def main():
         f"{sys.executable} -m src.phase4_edge.evaluate_tflite "
         f"--model models/exports/efficientnetb3_maize_fp16.tflite "
         f"--model models/exports/efficientnetb3_maize_int8.tflite "
-        f"--csv data/annotations/labels.csv"
+        f"--csv data/annotations/labels.csv "
+        f"--tta"
     )
 
     print("\n" + "=" * 70)

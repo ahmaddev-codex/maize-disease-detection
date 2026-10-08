@@ -185,7 +185,7 @@ A mobile application running a quantised EfficientNetB3 model fully on-device (n
 
 | ID | Requirement | Target |
 |---|---|---|
-| NFR-22 | Bundled TFLite model size | ≤ 15 MB for INT8 (measured 13.5 MB ✓). The app loads FP16 (23.3 MB) first for accuracy (ADR-001), so the bundled models total 36.8 MB and this requirement needs restating |
+| NFR-22 | Bundled TFLite model size | ≤ 15 MB for INT8 (measured 13.5 MB ✓). The app loads FP16 (23.4 MB) first for accuracy (ADR-001), so the bundled models total 36.9 MB and this requirement needs restating |
 | NFR-23 | Total APK size | ≤ 80 MB. **Not met:** the release APK measures 148.4 MB (T58) |
 
 ---

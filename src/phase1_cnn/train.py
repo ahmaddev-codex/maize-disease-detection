@@ -80,7 +80,7 @@ def train(args):
         )
 
     # Build model
-    model = build_model()
+    model = build_model(backbone=args.backbone)
     model = compile_model(
         model,
         learning_rate=args.stage1_lr,
@@ -110,7 +110,7 @@ def train(args):
     tmp_weights = os.path.join(CHECKPOINT_DIR, "tmp_stage1.weights.h5")
     model.save_weights(tmp_weights)
 
-    model2 = build_model()
+    model2 = build_model(backbone=args.backbone)
     model2 = unfreeze_for_finetuning(
         model2,
         fine_tune_at=args.fine_tune_at,
@@ -130,6 +130,15 @@ def train(args):
     )
     model = model2
 
+    # Reload best checkpoint from Stage 2 if available
+    best_checkpoint = os.path.join(CHECKPOINT_DIR, "phase1_stage2_best.keras")
+    if os.path.exists(best_checkpoint):
+        try:
+            print(f"\nReloading best checkpoint from {best_checkpoint}...")
+            model = tf.keras.models.load_model(best_checkpoint)
+        except Exception as e:
+            print(f"Note: Could not reload {best_checkpoint} directly ({e}), keeping in-memory weights.")
+
     # Remove temp weights file
     if os.path.exists(tmp_weights):
         os.remove(tmp_weights)
@@ -147,6 +156,8 @@ def train(args):
 
 def parse_args():
     p = argparse.ArgumentParser(description="Train Phase 1 CNN classifier")
+    p.add_argument("--backbone",        choices=["efficientnetb3", "efficientnetv2_s", "efficientnetv2_m"],
+                   default="efficientnetb3", help="CNN backbone architecture")
     p.add_argument("--csv",             default="data/annotations/labels.csv")
     p.add_argument("--data-dir",        default=None,
                    help="Use directory-based loading instead of CSV")

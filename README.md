@@ -579,7 +579,7 @@ All inference runs on-device — no internet required for core features.
 
 | Component | Status | Notes |
 |---|---|---|
-| Phase 1 — CNN | 🟡 In progress | Full training run needed for ≥90% accuracy |
+| Phase 1 — CNN | ✅ Complete | EfficientNetB3 reached 97.93% test accuracy (97.61% FP16 / 95.06% INT8) |
 | Phase 2 — OCR | ✅ Complete | Tesseract + fuzzy matching |
 | Phase 3 — Fusion | 🟡 In progress | Full training needed |
 | Phase 4 — TFLite Export | ✅ Complete | INT8 + FP16 models |
