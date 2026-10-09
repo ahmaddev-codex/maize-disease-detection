@@ -8,8 +8,6 @@ abstract class AppTypography {
   static const String fontFamily = 'DM Sans';
 
   /// Uses the DM Sans files bundled in google_fonts/ and never downloads a font.
-  /// Without this the app threw an unhandled exception per weight whenever
-  /// fonts.gstatic.com was unreachable (T57).
   static void configureBundledFonts() {
     GoogleFonts.config.allowRuntimeFetching = false;
     LicenseRegistry.addLicense(() async* {
@@ -27,45 +25,47 @@ abstract class AppTypography {
 
     return GoogleFonts.dmSansTextTheme().copyWith(
       displayLarge: GoogleFonts.dmSans(
-        fontSize: 36,
-        fontWeight: FontWeight.w800,
+        fontSize: 38,
+        fontWeight: FontWeight.w900,
         color: primary,
-        letterSpacing: -1.0,
+        letterSpacing: -1.2,
       ),
       displayMedium: GoogleFonts.dmSans(
-        fontSize: 28,
-        fontWeight: FontWeight.w700,
+        fontSize: 30,
+        fontWeight: FontWeight.w800,
         color: primary,
-        letterSpacing: -0.5,
+        letterSpacing: -0.8,
       ),
       displaySmall: GoogleFonts.dmSans(
         fontSize: 24,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
         color: primary,
+        letterSpacing: -0.5,
       ),
       headlineLarge: GoogleFonts.dmSans(
         fontSize: 22,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
         color: primary,
+        letterSpacing: -0.4,
       ),
       headlineMedium: GoogleFonts.dmSans(
         fontSize: 19,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: primary,
       ),
       headlineSmall: GoogleFonts.dmSans(
         fontSize: 17,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: primary,
       ),
       titleLarge: GoogleFonts.dmSans(
         fontSize: 16,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: primary,
       ),
       titleMedium: GoogleFonts.dmSans(
         fontSize: 14,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: primary,
       ),
       titleSmall: GoogleFonts.dmSans(
@@ -75,7 +75,7 @@ abstract class AppTypography {
       ),
       bodyLarge: GoogleFonts.dmSans(
         fontSize: 15,
-        fontWeight: FontWeight.w400,
+        fontWeight: FontWeight.w500,
         color: primary,
         height: 1.5,
       ),
@@ -93,19 +93,19 @@ abstract class AppTypography {
       ),
       labelLarge: GoogleFonts.dmSans(
         fontSize: 14,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: primary,
       ),
       labelMedium: GoogleFonts.dmSans(
         fontSize: 12,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         color: secondary,
       ),
       labelSmall: GoogleFonts.dmSans(
         fontSize: 11,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: secondary,
-        letterSpacing: 0.5,
+        letterSpacing: 0.6,
       ),
     );
   }
@@ -125,26 +125,38 @@ abstract class AppTypography {
   }
 
   // ── Static TextStyles for Direct UI Access ────────────────────────────────
-  static TextStyle get h1 => GoogleFonts.dmSans(
-        fontSize: 28,
+  static TextStyle get displayLarge => GoogleFonts.dmSans(
+        fontSize: 38,
+        fontWeight: FontWeight.w900,
+        letterSpacing: -1.2,
+      );
+
+  static TextStyle get displayMedium => GoogleFonts.dmSans(
+        fontSize: 30,
         fontWeight: FontWeight.w800,
-        letterSpacing: -0.5,
+        letterSpacing: -0.8,
+      );
+
+  static TextStyle get h1 => GoogleFonts.dmSans(
+        fontSize: 32,
+        fontWeight: FontWeight.w900,
+        letterSpacing: -0.8,
       );
 
   static TextStyle get h2 => GoogleFonts.dmSans(
-        fontSize: 20,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.3,
+        fontSize: 22,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.4,
       );
 
   static TextStyle get h3 => GoogleFonts.dmSans(
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: FontWeight.w700,
       );
 
   static TextStyle get bodyLarge => GoogleFonts.dmSans(
         fontSize: 15,
-        fontWeight: FontWeight.w400,
+        fontWeight: FontWeight.w500,
         height: 1.5,
       );
 
@@ -167,7 +179,7 @@ abstract class AppTypography {
 
   static TextStyle get overline => GoogleFonts.dmSans(
         fontSize: 10,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.2,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.3,
       );
 }

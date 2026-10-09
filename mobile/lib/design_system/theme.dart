@@ -22,17 +22,17 @@ abstract class AppTheme {
       ),
       textTheme: AppTypography.textTheme(isDark: false),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.surface,
+        backgroundColor: AppColors.canvas,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
-        scrolledUnderElevation: 0.5,
+        scrolledUnderElevation: 0,
         centerTitle: false,
       ),
       cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: AppRadii.lgBR,
+          borderRadius: AppRadii.card,
           side: const BorderSide(color: AppColors.border, width: 1.0),
         ),
       ),
@@ -60,17 +60,17 @@ abstract class AppTheme {
       ),
       textTheme: AppTypography.textTheme(isDark: true),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: AppColors.canvasDark,
         foregroundColor: AppColors.textPrimaryDark,
         elevation: 0,
-        scrolledUnderElevation: 0.5,
+        scrolledUnderElevation: 0,
         centerTitle: false,
       ),
       cardTheme: CardThemeData(
         color: AppColors.surfaceDark,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: AppRadii.lgBR,
+          borderRadius: AppRadii.card,
           side: const BorderSide(color: AppColors.borderDark, width: 1.0),
         ),
       ),
