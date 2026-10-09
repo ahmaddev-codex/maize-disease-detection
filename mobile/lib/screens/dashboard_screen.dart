@@ -370,36 +370,42 @@ class _HealthScoreCard extends StatelessWidget {
         : (score >= 40 ? AppColors.warning : AppColors.danger);
 
     return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 74,
-            height: 74,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: score / 100,
-                  strokeWidth: 7,
-                  backgroundColor: color.withValues(alpha: 0.12),
-                  valueColor: AlwaysStoppedAnimation(color),
-                  strokeCap: StrokeCap.round,
-                ),
-                Text(
-                  score.toStringAsFixed(0),
-                  style: AppTypography.h2.copyWith(color: color),
-                ),
-              ],
+      child: SizedBox(
+        height: 120,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 68,
+              height: 68,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(
+                    child: CircularProgressIndicator(
+                      value: score / 100,
+                      strokeWidth: 4,
+                      backgroundColor: color.withValues(alpha: 0.12),
+                      valueColor: AlwaysStoppedAnimation(color),
+                      strokeCap: StrokeCap.round,
+                    ),
+                  ),
+                  Text(
+                    score.toStringAsFixed(0),
+                    style: AppTypography.h2.copyWith(color: color),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text('Crop Health Index', style: AppTypography.h3.copyWith(fontSize: 13)),
-          Text(
-            score >= 70 ? 'Crop Vigorous' : (score >= 40 ? 'Moderate Pathogen Load' : 'High Infestation'),
-            style: AppTypography.caption.copyWith(fontWeight: FontWeight.w600, color: color),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.xs),
+            Text('Crop Health Index', style: AppTypography.h3.copyWith(fontSize: 13)),
+            Text(
+              score >= 70 ? 'Crop Vigorous' : (score >= 40 ? 'Moderate Pathogen Load' : 'High Infestation'),
+              style: AppTypography.caption.copyWith(fontWeight: FontWeight.w600, color: color),
+            ),
+          ],
+        ),
       ),
     );
   }
