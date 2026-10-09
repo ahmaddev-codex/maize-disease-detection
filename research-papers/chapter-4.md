@@ -27,16 +27,16 @@ The shipped models are exported from the resulting checkpoint (`models/checkpoin
 
 | Model | Test accuracy | NCLB F1 | Rust F1 | GLS F1 | Healthy F1 |
 |---|---|---|---|---|---|
-| FP16 TFLite | **97.61%** | 0.965 | 0.985 | 0.931 | 1.000 |
-| INT8 TFLite | 95.06% | 0.917 | 0.985 | 0.847 | 0.997 |
+| FP16 TFLite | **97.61%** | 0.960 | 0.987 | 0.936 | 1.000 |
+| INT8 TFLite | 96.82% | 0.948 | 0.987 | 0.901 | 1.000 |
 
-Both accuracy targets are met comfortably by both the FP16 export (97.61%) and the INT8 export (95.06%). The per-class F1 target (≥0.88) is met across all classes for FP16 (Healthy 1.000, Rust 0.985, NCLB 0.965, GLS 0.931). Under INT8, GLS reaches 0.847 F1 (up substantially from earlier baselines) and NCLB reaches 0.917. GLS remains the most challenging class due to visual similarity to early-stage NCLB lesions (Ramcharan et al., 2017) and smaller class support in the training set.
+Both accuracy targets are met comfortably by both the FP16 export (97.61%) and the INT8 export (96.82%). The per-class F1 target (≥0.88) is met across all classes for both FP16 (Healthy 1.000, Rust 0.987, NCLB 0.960, GLS 0.936) and INT8 (Healthy 1.000, Rust 0.987, NCLB 0.948, GLS 0.901). GLS remains the most challenging class due to visual similarity to early-stage NCLB lesions (Ramcharan et al., 2017) and smaller class support in the training set.
 
 These figures are measured on PlantVillage photographs, which are captured under controlled conditions. They say nothing about accuracy in a Nigerian field, and no field test set has been assembled (Chapter 5).
 
 ### 4.2.3 Class Imbalance Handling
 
-The GLS class (573 training images against 1,306 for Rust, after the duplicate exclusions described below) required explicit imbalance handling. Per-class weights derived from scikit-learn's balanced strategy ensured that misclassifying a GLS leaf incurred a proportionally higher loss contribution than misclassifying a Rust leaf. Post-training confusion matrix analysis confirmed that GLS recall improved compared to an unweighted baseline, with GLS reaching 0.931 F1 under FP16 and 0.847 under INT8.
+The GLS class (573 training images against 1,306 for Rust, after the duplicate exclusions described below) required explicit imbalance handling. Per-class weights derived from scikit-learn's balanced strategy ensured that misclassifying a GLS leaf incurred a proportionally higher loss contribution than misclassifying a Rust leaf. Post-training confusion matrix analysis confirmed that GLS recall improved compared to an unweighted baseline, with GLS reaching 0.936 F1 under FP16 and 0.901 under INT8.
 
 **Duplicate exclusions.** Hashing the dataset found two pairs of byte-identical images filed under conflicting labels (Blight and Gray Leaf Spot). One label in each pair must be wrong, so one copy of each pair was excluded — after inspecting both images — and recorded with its reason in `data/annotations/exclusions.csv`. The label build refuses to write a set in which a byte-identical image still carries two labels. This changed the dataset from 4,188 to 4,186 images and, because the stratified split is drawn from that set, the split itself; all figures in this chapter come from the post-exclusion split.
 
@@ -94,14 +94,14 @@ The expectation from the literature is that INT8 is faster than FP16 on ARM thro
 
 ### 4.4.3 Accuracy Degradation from Quantisation
 
-Post-training INT8 quantisation uses a 200-image calibration set drawn from the **training split only**. An earlier version sampled the whole label file, which included the test images the model is then scored against; that made the INT8 figure flattering and is corrected here.
+Post-training INT8 quantisation uses a 300-image calibration set drawn from the **training split only**. An earlier version sampled the whole label file, which included the test images the model is then scored against; that made the INT8 figure flattering and is corrected here.
 
 | Model | Test accuracy | Size |
 |-------|---------------|------|
 | FP16 TFLite | 97.61% | 23.4 MB |
-| INT8 TFLite | 95.06% | 13.5 MB |
+| INT8 TFLite | 96.82% | 13.5 MB |
 
-The cost of INT8 post-training quantisation with 300 calibration images is 2.55 accuracy points (97.61% → 95.06%), with INT8 compressing the model from 23.4 MB to 13.5 MB while maintaining an F1 of 0.847 on GLS, 0.917 on NCLB, 0.985 on Rust, and 0.997 on Healthy. Because FP16 achieves 97.61% accuracy, the application loads FP16 first and falls back to INT8 when memory constraints require it (ADR-001).
+The cost of INT8 post-training quantisation with 300 calibration images is 0.79 accuracy points (97.61% → 96.82%), with INT8 compressing the model from 23.4 MB to 13.5 MB while maintaining an F1 of 0.901 on GLS, 0.948 on NCLB, 0.987 on Rust, and 1.000 on Healthy. Because FP16 achieves 97.61% accuracy, the application loads FP16 first and falls back to INT8 when memory constraints require it (ADR-001).
 
 ## 4.5 Application Functional Evaluation
 
@@ -333,11 +333,11 @@ MaizeGuard implements a dual-mode theme based on GitHub Primer colour tokens. Th
 
 Studies reporting the highest accuracy figures evaluate systems on different crops under controlled conditions, and none incorporates seed label metadata or offline operation. Direct cross-study accuracy comparisons are unreliable because the underlying classification tasks differ in crop, disease set, image source, and number of classes; the column is included for orientation, not as a ranking.
 
-MaizeGuard reaches 97.61% on the PlantVillage maize test split — the same dataset used in prior maize-specific studies — and delivers a four-language advisory system with Nigerian-language speech that the compared systems do not. Two qualifications belong with that claim. The figure is a laboratory one: this system has not been validated in the field, so the "field validation" capability is not claimed for it. And the accuracy is the FP16 export's; the INT8 model scores 95.06%.
+MaizeGuard reaches 97.61% on the PlantVillage maize test split — the same dataset used in prior maize-specific studies — and delivers a four-language advisory system with Nigerian-language speech that the compared systems do not. Two qualifications belong with that claim. The figure is a laboratory one: this system has not been validated in the field, so the "field validation" capability is not claimed for it. And the accuracy is the FP16 export's; the INT8 model scores 96.82%.
 
 ## 4.8 Summary of Results
 
-The EfficientNetB3 CNN reaches 97.61% on the held-out PlantVillage test split (628 images) in its FP16 export, with two-stage transfer learning and class-weighted training. INT8 quantisation takes the model from 23.4 MB to 13.5 MB at an accuracy of 95.06%, which is why the application loads FP16 first and treats INT8 as a lightweight fallback. Per-class F1 under FP16 is 1.000 for Healthy, 0.985 for Rust, 0.965 for NCLB and 0.931 for GLS; every figure here is produced by `src/phase4_edge/evaluate_tflite.py` and recorded with the model hashes in `models/exports/metrics.json`. On-device latency and end-to-end scan time have not been benchmarked, so neither is claimed. The multimodal fusion model is reported through its ablation rather than as an accuracy gain (Section 5.1.2). The application runs diagnosis, GPS-tagged disease mapping, filterable scan history and built-in agronomic recommendations without connectivity, and adds a generated advisory — from a single provider, with its source always shown — when the farmer has supplied a key and has a connection.
+The EfficientNetB3 CNN reaches 97.61% on the held-out PlantVillage test split (628 images) in its FP16 export, with two-stage transfer learning and class-weighted training. INT8 quantisation takes the model from 23.4 MB to 13.5 MB at an accuracy of 96.82%, which is why the application loads FP16 first and treats INT8 as a lightweight fallback. Per-class F1 under FP16 is 1.000 for Healthy, 0.987 for Rust, 0.960 for NCLB and 0.936 for GLS; every figure here is produced by `src/phase4_edge/evaluate_tflite.py` and recorded with the model hashes in `models/exports/metrics.json`. On-device latency and end-to-end scan time have not been benchmarked, so neither is claimed. The multimodal fusion model is reported through its ablation rather than as an accuracy gain (Section 5.1.2). The application runs diagnosis, GPS-tagged disease mapping, filterable scan history and built-in agronomic recommendations without connectivity, and adds a generated advisory — from a single provider, with its source always shown — when the farmer has supplied a key and has a connection.
 
 Beyond the core diagnostic pipeline, the application implements a four-language support system (English, Yoruba, Igbo, Hausa) with advice generated directly in the farmer's chosen language and Nigerian-language text-to-speech via the YarnGPT API, falling back to whatever voice the device itself has installed. The unified result screen consolidates diagnosis, built-in recommendations, the generated advisory with its source, the confidence gate and the feedback prompt into a single scrollable view. The confidence gate triggers below 0.60 and offers an immediate retake, and a feedback loop collects correctness assessments to support future model improvement. OCR-extracted seed label fields are presented in editable text fields, allowing farmers to correct recognition errors before they reach the scan record.
 
@@ -348,7 +348,7 @@ Every numeric or capability claim in the abstract and in this chapter is listed 
 | Claim | Value | Artefact | How to reproduce |
 |---|---|---|---|
 | FP16 test accuracy | 97.61% | `models/exports/metrics.json` → `models["efficientnetb3_maize_fp16.tflite"]["python"]` | `python -m src.phase4_edge.evaluate_tflite --model models/exports/efficientnetb3_maize_fp16.tflite --mode python app` |
-| INT8 test accuracy | 95.06% | same file, INT8 entry | as above with the INT8 model |
+| INT8 test accuracy | 96.82% | same file, INT8 entry | as above with the INT8 model |
 | Per-class F1 (both models) | see 4.2.2 | `per_class` in each entry | as above |
 | Test split size | 628 images | `dataset.split_sizes` in `metrics.json` | `split_dataframe(load_labels_csv(...))` |
 | Dataset size after exclusions | 4,186 images | `data/annotations/labels.csv`, `exclusions.csv` | `python -m src.phase1_cnn.build_labels --check-duplicates` |
@@ -356,7 +356,7 @@ Every numeric or capability claim in the abstract and in this chapter is listed 
 | FP16 / INT8 file sizes | 23.4 MB / 13.5 MB | the files in `models/exports/` | `ls -l models/exports/*.tflite` |
 | Source checkpoint size | 140.4 MB | `models/checkpoints/phase1_stage2_best.keras` | `ls -l` |
 | Export provenance (tflite ↔ keras sha256) | recorded | `export.source_keras` in `metrics.json` | `python -m src.phase4_edge.convert_tflite --model models/checkpoints/phase1_stage2_best.keras` |
-| INT8 calibration set | 200 images, training split only | `export.calibration` in `metrics.json` | as above |
+| INT8 calibration set | 300 images, training split only | `export.calibration` in `metrics.json` | as above |
 | Release APK size | 148.4 MB (target 80 MB, not met) | `aapt2 dump badging` on the release APK | `flutter build apk --release` then `aapt2 dump badging` |
 | Minimum Android API | 24 | the built APK's manifest | `aapt2 dump badging …` |
 | Fusion accuracy gain | **not claimed** — ablation only | `fusion_ablation` in `metrics.json` | `python -m src.phase3_fusion.ablation --epochs 3` |
