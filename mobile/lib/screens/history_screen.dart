@@ -283,32 +283,10 @@ class _ScanCard extends ConsumerWidget {
   }
 
   Future<void> _editNotes(BuildContext context, WidgetRef ref) async {
-    final ctrl = TextEditingController(text: scan.notes ?? '');
     final saved = await showDialog<String>(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Field Observations & Notes'),
-        content: TextField(
-          controller: ctrl,
-          maxLines: 4,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Record field observations, chemical dosage, or weather…',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(dialogCtx, ctrl.text),
-            child: const Text('Save Notes'),
-          ),
-        ],
-      ),
+      builder: (dialogCtx) => _EditNotesDialog(initialNotes: scan.notes ?? ''),
     );
-    ctrl.dispose();
     if (saved == null || scan.id == null) return;
     await DatabaseService.instance.updateNotes(scan.id!, saved);
     await ref.read(scanListProvider.notifier).load();
@@ -337,3 +315,53 @@ class _ScanCard extends ConsumerWidget {
     }
   }
 }
+
+class _EditNotesDialog extends StatefulWidget {
+  final String initialNotes;
+  const _EditNotesDialog({required this.initialNotes});
+
+  @override
+  State<_EditNotesDialog> createState() => _EditNotesDialogState();
+}
+
+class _EditNotesDialogState extends State<_EditNotesDialog> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialNotes);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Field Observations & Notes'),
+      content: TextField(
+        controller: _ctrl,
+        maxLines: 4,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: 'Record field observations, chemical dosage, or weather…',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _ctrl.text),
+          child: const Text('Save Notes'),
+        ),
+      ],
+    );
+  }
+}
+
