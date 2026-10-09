@@ -6,11 +6,13 @@ class OcrService {
   static final OcrService instance = OcrService._();
   OcrService._();
 
-  final _recognizer = TextRecognizer(script: TextRecognitionScript.latin);
+  TextRecognizer? _recognizer;
+  TextRecognizer get _activeRecognizer =>
+      _recognizer ??= TextRecognizer(script: TextRecognitionScript.latin);
 
   Future<OcrFields> extractFields(String imagePath) async {
     final inputImage = InputImage.fromFilePath(imagePath);
-    final recognized = await _recognizer.processImage(inputImage);
+    final recognized = await _activeRecognizer.processImage(inputImage);
     final rawText = recognized.text;
 
     return OcrFields(
@@ -22,6 +24,7 @@ class OcrService {
   }
 
   Future<void> dispose() async {
-    await _recognizer.close();
+    await _recognizer?.close();
+    _recognizer = null;
   }
 }
